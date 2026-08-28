@@ -1,344 +1,517 @@
-# ArduPilot Gazebo Plugin
+# ArduPilot Gazebo: hướng dẫn SITL và C++ sensor subscriber trên macOS
 
-[![ubuntu-build](https://github.com/ArduPilot/ardupilot_gazebo/actions/workflows/ubuntu-build.yml/badge.svg)](https://github.com/ArduPilot/ardupilot_gazebo/actions/workflows/ubuntu-build.yml)
-[![ccplint](https://github.com/ArduPilot/ardupilot_gazebo/actions/workflows/ccplint.yml/badge.svg)](https://github.com/ArduPilot/ardupilot_gazebo/actions/workflows/ccplint.yml)
-[![cppcheck](https://github.com/ArduPilot/ardupilot_gazebo/actions/workflows/ccpcheck.yml/badge.svg)](https://github.com/ArduPilot/ardupilot_gazebo/actions/workflows/ccpcheck.yml)
+Repository này chứa ArduPilot Gazebo Plugin cùng hướng dẫn thực hành bằng tiếng
+Việt. Nội dung trình bày toàn bộ luồng từ build ArduCopter SITL, kết nối với
+Gazebo Harmonic, kiểm tra sensor topic, đến viết một C++ subscriber có callback
+và processing thread.
 
-This is the official ArduPilot plugin for [Gazebo](https://gazebosim.org/home).
-It replaces the previous
-[`ardupilot_gazebo`](https://github.com/khancyr/ardupilot_gazebo)
-plugin and provides support for the recent releases of the Gazebo simulator:
-[Gazebo Garden](https://gazebosim.org/docs/garden/install), [Gazebo Harmonic (LTS)](https://gazebosim.org/docs/harmonic/install), [Gazebo Ionic](https://gazebosim.org/docs/ionic/install) and [Gazebo Jetty (LTS)](https://gazebosim.org/docs/jetty/install).
+Mục tiêu cuối cùng là hiểu và chạy được pipeline:
 
-It also adds the following features:
+```text
+ArduPilot SITL ──motor commands──> ArduPilotPlugin ──> Gazebo physics
+       ^                                                   │
+       └──────────────── state / IMU ──────────────────────┘
 
-- More flexible data exchange between SITL and Gazebo using JSON.
-- Additional sensors supported.
-- True simulation lockstepping. It is now possible to use GDB to stop
-  the Gazebo time for debugging.
-- Improved 3D rendering using the `ogre2` rendering engine.
-
-The project comprises a Gazebo plugin to connect to ArduPilot SITL
-(Software In The Loop) and some example models and worlds.
-
-## Prerequisites
-
-Gazebo Garden or Harmonic is supported on Ubuntu 22.04 (Jammy).
-Harmonic is recommended.
-If you are running Ubuntu as a virtual machine you will need at least
-Ubuntu 20.04 in order to have the OpenGL support required for the
-`ogre2` render engine. Gazebo and ArduPilot SITL will also run on macOS
-(Big Sur, Monterey and Venturua; Intel and M1 devices).
-
-Follow the instructions for a binary install of
-[Gazebo Garden](https://gazebosim.org/docs/garden/install) or [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install) or [Gazebo Ionic](https://gazebosim.org/docs/ionic/install)
-and verify that Gazebo is running correctly.
-
-Set up an [ArduPilot development environment](https://ardupilot.org/dev/index.html).
-In the following it is assumed that you are able to run ArduPilot SITL using
-the [MAVProxy GCS](https://ardupilot.org/mavproxy/index.html).
-
-## Installation
-
-Install additional dependencies:
-
-### Ubuntu
-
-#### Garden (apt)
-
-Manual - Gazebo Garden Dependencies:
-
-```bash
-sudo apt update
-sudo apt install libgz-sim7-dev rapidjson-dev
-sudo apt install libopencv-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-gl
+Gazebo sensor ──> Gazebo Transport ──> C++ callback
+                                             │
+                                             v
+                                      thread-safe queue
+                                             │
+                                             v
+                                      processing thread
+                                             │
+                                             v
+                                       AI / CV / SLAM
 ```
 
-#### Harmonic (apt)
+> [!NOTE]
+> Các lệnh và đường dẫn trong tài liệu giả định ArduPilot nằm tại
+> `~/Projects/ardupilot`, còn `ardupilot_gazebo` nằm tại
+> `~/Projects/ardupilot_gazebo`.
 
-Manual - Gazebo Harmonic Dependencies:
+## 1. Các thành phần trong hệ thống
 
-```bash
-sudo apt update
-sudo apt install libgz-sim8-dev rapidjson-dev
-sudo apt install libopencv-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-gl
-```
+- **ArduPilot SITL** là flight controller được compile để chạy trực tiếp trên
+  CPU của máy Mac thay vì trên Pixhawk.
+- **Gazebo server** chạy physics, world và sensor simulation.
+- **Gazebo GUI** render môi trường 3D và cho phép tương tác với mô phỏng.
+- **ArduPilotPlugin** là bridge: nhận motor output từ ArduPilot và gửi
+  state/sensor từ Gazebo về ArduPilot.
+- **Gazebo Transport** publish dữ liệu sensor qua topic để chương trình khác có
+  thể subscribe.
 
-#### Rosdep
+Gazebo server và GUI là hai process riêng, giao tiếp với nhau qua Gazebo
+Transport.
 
-Use rosdep with
-[osrf's rosdep rules](https://github.com/osrf/osrf-rosdep?tab=readme-ov-file#1-use-rosdep-to-resolve-gazebo-libraries)
-to manage all dependencies. This is driven off of the environment variable `GZ_VERSION`.
+## 2. Build ArduPilot SITL
 
-```bash
-export GZ_VERSION=harmonic # or garden or ionic
-sudo bash -c 'wget https://raw.githubusercontent.com/osrf/osrf-rosdep/master/gz/00-gazebo.list -O /etc/ros/rosdep/sources.list.d/00-gazebo.list'
-rosdep update
-rosdep resolve gz-harmonic # or gz-garden or gz-ionic
-# Navigate to your ROS workspace before the next command.
-rosdep install --from-paths src --ignore-src -y
-```
-
-### macOS
+Cài Command Line Tools và các dependency cần thiết:
 
 ```bash
+xcode-select --install
 brew update
-brew install rapidjson
-brew install opencv gstreamer
+brew install cmake gz-harmonic rapidjson opencv gstreamer
 ```
 
-Ensure the `GZ_VERSION` environment variable is set to either
-`garden` or `harmonic` or `ionic`.
-
-Clone the repo and build:
+Clone ArduPilot cùng các submodule:
 
 ```bash
-git clone https://github.com/ArduPilot/ardupilot_gazebo
-cd ardupilot_gazebo
-mkdir build && cd build
+git clone --recurse-submodules \
+    https://github.com/ArduPilot/ardupilot.git \
+    ~/Projects/ardupilot
+```
+
+Nếu đã có ArduPilot tại `~/Projects/ardupilot`, bỏ qua bước clone. Sau đó build
+SITL từ thư mục gốc của repo:
+
+```bash
+cd ~/Projects/ardupilot
+./waf configure --board sitl
+./waf copter
+```
+
+Executable được tạo tại:
+
+```text
+build/sitl/bin/arducopter
+```
+
+## 3. Kiểm tra SITL độc lập
+
+Chạy ArduCopter bằng physics model có sẵn trong SITL, chưa dùng Gazebo:
+
+```bash
+cd ~/Projects/ardupilot
+./Tools/autotest/sim_vehicle.py -v ArduCopter -f quad
+```
+
+Trong MAVProxy, thử một chu trình bay đơn giản:
+
+```text
+mode guided
+arm throttle
+takeoff 5
+land
+```
+
+Bước này giúp tách lỗi. Nếu SITL độc lập hoạt động nhưng mô phỏng Gazebo không
+hoạt động, cần tập trung kiểm tra plugin, cấu hình hoặc kết nối giữa hai hệ
+thống thay vì flight controller.
+
+## 4. Cài và kiểm tra Gazebo Harmonic
+
+Cài Gazebo trên macOS bằng Homebrew:
+
+```bash
+brew install gz-harmonic
+```
+
+Chạy server:
+
+```bash
+gz sim -v4 shapes.sdf -s
+```
+
+Mở terminal khác và chạy GUI:
+
+```bash
+gz sim -v4 -g
+```
+
+Nếu GUI hiển thị các vật thể mẫu như cube, sphere và cylinder thì Gazebo
+server, GUI và Transport đang hoạt động.
+
+## 5. Build plugin `ardupilot_gazebo`
+
+Clone repository này vào thư mục được dùng xuyên suốt tutorial:
+
+```bash
+git clone \
+    https://github.com/thanhlamauto/ardu_plugin_gazebo.git \
+    ~/Projects/ardupilot_gazebo
+```
+
+Build plugin:
+
+```bash
+cd ~/Projects/ardupilot_gazebo
+mkdir -p build
+cd build
 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
-make -j4
+cmake --build . -j4
 ```
 
-## Configure
+Trên macOS, kết quả build gồm `libArduPilotPlugin.dylib`. Plugin thực hiện hai
+chiều giao tiếp:
 
-Set the Gazebo environment variables in your `.bashrc` or `.zshrc` or in 
-the terminal used to run Gazebo.
+```text
+ArduPilot ──motor output──> plugin ──> Gazebo
+ArduPilot <──state/sensor── plugin <── Gazebo
+```
 
-#### Terminal
+## 6. Chạy Iris trong Gazebo và nối với ArduPilot
 
-Assuming that you have cloned the repository to `$HOME/ardupilot_gazebo`:
+Mỗi terminal trong phần này phải dùng cùng một `GZ_PARTITION`. Biến này tách
+network Transport của mô phỏng hiện tại khỏi các Gazebo process khác.
+
+Thiết lập environment:
 
 ```bash
-export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/ardupilot_gazebo/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
-export GZ_SIM_RESOURCE_PATH=$HOME/ardupilot_gazebo/models:$HOME/ardupilot_gazebo/worlds:$GZ_SIM_RESOURCE_PATH
+export GZ_PARTITION=ardupilot_test
+export GZ_SIM_SYSTEM_PLUGIN_PATH="$HOME/Projects/ardupilot_gazebo/build"
+export GZ_SIM_RESOURCE_PATH="$HOME/Projects/ardupilot_gazebo/models:$HOME/Projects/ardupilot_gazebo/worlds"
 ```
 
-#### .bashrc or .zshrc
-
-Assuming that you have cloned the repository to `$HOME/ardupilot_gazebo`:
+### Terminal 1: Gazebo server
 
 ```bash
-echo 'export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/ardupilot_gazebo/build:${GZ_SIM_SYSTEM_PLUGIN_PATH}' >> ~/.bashrc
-echo 'export GZ_SIM_RESOURCE_PATH=$HOME/ardupilot_gazebo/models:$HOME/ardupilot_gazebo/worlds:${GZ_SIM_RESOURCE_PATH}' >> ~/.bashrc
+export GZ_PARTITION=ardupilot_test
+export GZ_SIM_SYSTEM_PLUGIN_PATH="$HOME/Projects/ardupilot_gazebo/build"
+export GZ_SIM_RESOURCE_PATH="$HOME/Projects/ardupilot_gazebo/models:$HOME/Projects/ardupilot_gazebo/worlds"
+
+gz sim -v4 -r \
+    "$HOME/Projects/ardupilot_gazebo/worlds/iris_runway.sdf" \
+    -s
 ```
 
-Reload your terminal with `source ~/.bashrc` (or `source ~/.zshrc` on macOS).
-
-## Usage
-
-### 1. Iris quad-copter
-
-#### Run Gazebo
+### Terminal 2: Gazebo GUI
 
 ```bash
-gz sim -v4 -r iris_runway.sdf
+export GZ_PARTITION=ardupilot_test
+gz sim -v4 -g
 ```
 
-The `-v4` parameter is not mandatory, it shows additional information and is
-useful for troubleshooting.
-
-#### Run ArduPilot SITL
-
-To run an ArduPilot simulation with Gazebo, the frame should have `gazebo-`
-in it and have `JSON` as model. Other commandline parameters are the same
-as usual on SITL.
+### Terminal 3: ArduPilot SITL
 
 ```bash
-sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console
+cd ~/Projects/ardupilot
+
+./Tools/autotest/sim_vehicle.py \
+    -v ArduCopter \
+    -f JSON \
+    --add-param-file="$HOME/Projects/ardupilot_gazebo/config/gazebo-iris-gimbal.parm"
 ```
 
-#### Arm and takeoff
+Chỉ thêm `-w` khi cần xóa và nạp lại toàn bộ parameter. Không cần dùng tùy chọn
+này trong mỗi lần chạy.
+
+Trong MAVProxy:
+
+```text
+mode guided
+arm throttle
+takeoff 5
+land
+```
+
+Khi Iris cất cánh trong GUI, closed loop sau đã hoạt động:
+
+```text
+ArduPilot ──> motor commands ──> Gazebo physics
+ArduPilot <── IMU and state <──── Gazebo sensors
+```
+
+## 7. Tìm và kiểm tra sensor topic
+
+Nhớ dùng cùng partition với Gazebo server:
 
 ```bash
-STABILIZE> mode guided
-GUIDED> arm throttle
-GUIDED> takeoff 5
+export GZ_PARTITION=ardupilot_test
+gz topic -l
 ```
 
-### 2. Zephyr delta wing  
-
-The Zephyr delta wing is positioned on the runway for vertical take-off. 
-
-#### Run Gazebo
+Lọc các topic thường dùng:
 
 ```bash
-gz sim -v4 -r zephyr_runway.sdf
+gz topic -l | grep -Ei 'camera|image|imu|lidar|scan|point'
 ```
 
-#### Run ArduPilot SITL
+Tên topic phụ thuộc vào world và model. Với world Iris trong ví dụ, IMU topic
+có thể là:
+
+```text
+/world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
+```
+
+Kiểm tra kiểu message:
 
 ```bash
-sim_vehicle.py -v ArduPlane -f gazebo-zephyr --model JSON --map --console
+gz topic -i -t \
+    /world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
 ```
 
-#### Arm, takeoff and circle
+Kết quả mong đợi có kiểu:
+
+```text
+gz.msgs.IMU
+```
+
+Echo dữ liệu thực tế:
 
 ```bash
-MANUAL> mode fbwa
-FBWA> arm throttle
-FBWA> rc 3 1800
-FBWA> mode circle
+gz topic -e -t \
+    /world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
 ```
 
-#### Increase the simulation speed
+Nếu không thấy dữ liệu, kiểm tra theo thứ tự:
 
-The `zephyr_runway.sdf` world has a `<physics>` element configured to run
-faster than real time: 
+1. Gazebo server còn chạy và simulation không bị pause.
+2. Terminal hiện tại dùng đúng `GZ_PARTITION`.
+3. Topic được copy chính xác từ kết quả `gz topic -l`.
+4. Sensor tương ứng có trong model đang chạy.
 
-```xml
-<physics name="1ms" type="ignore">
-  <max_step_size>0.001</max_step_size>
-  <real_time_factor>-1.0</real_time_factor>
-</physics>
+## 8. Hiểu subscriber và callback
+
+Cốt lõi của subscriber chỉ gồm một node và lời gọi `Subscribe`:
+
+```cpp
+gz::transport::Node node;
+node.Subscribe(topic, imu_callback);
 ```
 
-To see the effect of the speed-up set the param `SIM_SPEEDUP` to a value
-greater than one:
+Callback nhận message:
+
+```cpp
+void imu_callback(const gz::msgs::IMU &msg)
+{
+    const auto &accel = msg.linear_acceleration();
+    const auto &gyro = msg.angular_velocity();
+    // Xử lý dữ liệu ở đây.
+}
+```
+
+Chương trình không tự gọi `imu_callback`. Khi topic có message mới, Gazebo
+Transport gọi hàm đã đăng ký. Một hàm trở thành callback vì nó được đưa cho
+framework để framework quyết định thời điểm gọi; callback không phải một loại
+hàm đặc biệt trong C++.
+
+Callback có thể log, lưu hoặc chuyển tiếp dữ liệu. Tuy nhiên, callback nên làm
+ít việc và return nhanh. Chạy neural network hoặc thuật toán nặng trực tiếp
+trong callback có thể tạo latency, làm đầy queue nội bộ hoặc khiến frame bị
+drop.
+
+## 9. Subscriber với thread-safe queue
+
+Pattern producer-consumer tách việc nhận message khỏi xử lý nặng:
+
+```text
+Gazebo Transport thread             Processing thread
+          │                                 │
+          │ callback                        │
+          v                                 │
+     copy message                           │
+          │                                 │
+          v                                 │
+  bounded shared queue ───────────────────> pop
+                                            │
+                                            v
+                                      xử lý dữ liệu
+```
+
+Tạo một thư mục thử nghiệm bên ngoài source tree để không đưa build artifact
+vào repo:
 
 ```bash
-MANUAL> param set SIM_SPEEDUP 10
+mkdir -p /tmp/gz_imu_subscriber
+cd /tmp/gz_imu_subscriber
 ```
 
-### 3. Streaming camera video
+Tạo `main.cpp` với nội dung:
 
-Images from camera sensors may be streamed with GStreamer using
-the `GstCameraPlugin` sensor plugin. The example gimbal models include the
-plugin element:
+```cpp
+#include <gz/msgs/imu.pb.h>
+#include <gz/transport/Node.hh>
 
-```xml
-<plugin name="GstCameraPlugin"
-    filename="GstCameraPlugin">
-  <udp_host>127.0.0.1</udp_host>
-  <udp_port>5600</udp_port>
-  <use_basic_pipeline>true</use_basic_pipeline>
-  <use_cuda>false</use_cuda>
-</plugin>
+#include <atomic>
+#include <condition_variable>
+#include <cstddef>
+#include <deque>
+#include <iostream>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <utility>
+
+namespace {
+
+constexpr std::size_t MAX_QUEUE_SIZE = 10;
+
+std::atomic<bool> running{true};
+std::condition_variable queue_cv;
+std::deque<gz::msgs::IMU> imu_queue;
+std::mutex queue_mutex;
+
+void imu_callback(const gz::msgs::IMU &msg)
+{
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex);
+
+        // Giới hạn queue để latency và memory không tăng vô hạn nếu consumer
+        // xử lý chậm hơn tốc độ publish của sensor.
+        if (imu_queue.size() >= MAX_QUEUE_SIZE) {
+            imu_queue.pop_front();
+        }
+        imu_queue.push_back(msg);
+    }
+    queue_cv.notify_one();
+}
+
+void process_imu()
+{
+    while (true) {
+        gz::msgs::IMU msg;
+
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex);
+            queue_cv.wait(lock, [] {
+                return !running.load() || !imu_queue.empty();
+            });
+
+            if (!running.load() && imu_queue.empty()) {
+                return;
+            }
+
+            msg = std::move(imu_queue.front());
+            imu_queue.pop_front();
+        }
+
+        const auto &accel = msg.linear_acceleration();
+        const auto &gyro = msg.angular_velocity();
+
+        std::cout << "accel [m/s^2]: "
+                  << accel.x() << ", "
+                  << accel.y() << ", "
+                  << accel.z() << " | gyro [rad/s]: "
+                  << gyro.x() << ", "
+                  << gyro.y() << ", "
+                  << gyro.z() << '\n';
+
+        // Đặt AI, CV hoặc SLAM processing tại đây.
+    }
+}
+
+}  // namespace
+
+int main(int argc, char **argv)
+{
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <imu-topic>\n";
+        return 1;
+    }
+
+    const std::string topic = argv[1];
+    gz::transport::Node node;
+
+    if (!node.Subscribe(topic, imu_callback)) {
+        std::cerr << "Failed to subscribe to " << topic << '\n';
+        return 1;
+    }
+
+    std::thread worker(process_imu);
+
+    std::cout << "Subscribed to " << topic << '\n'
+              << "Press Enter to stop.\n";
+    std::cin.get();
+
+    running.store(false);
+    queue_cv.notify_all();
+    worker.join();
+    return 0;
+}
 ```
 
-The `<image_topic>` and `<enable_topic>` parameters are deduced from the
-topic name for the camera sensor, but may be overriden if required.
+Tạo `CMakeLists.txt`:
 
-The `gimbal.sdf` world includes a 3 degrees of freedom gimbal with a
-zoomable camera. To start streaming:
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(gz_imu_subscriber LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Gazebo Harmonic sử dụng gz-transport13 và gz-msgs10.
+find_package(gz-transport13 REQUIRED)
+find_package(gz-msgs10 REQUIRED)
+
+add_executable(gz_imu_subscriber main.cpp)
+target_link_libraries(
+    gz_imu_subscriber
+    PRIVATE
+        gz-transport13::core
+        gz-msgs10::core
+)
+```
+
+Build:
 
 ```bash
-gz topic -t /world/gimbal/model/mount/model/gimbal/link/pitch_link/sensor/camera/image/enable_streaming -m gz.msgs.Boolean -p "data: 1"
+cmake -S . -B build
+cmake --build build -j4
 ```
 
-Display the streamed video:
+Chạy subscriber trong terminal có cùng partition:
 
 ```bash
-gst-launch-1.0 -v udpsrc port=5600 caps='application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264' ! rtph264depay ! avdec_h264 ! videoconvert ! autovideosink sync=false
+export GZ_PARTITION=ardupilot_test
+
+./build/gz_imu_subscriber \
+    /world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
 ```
 
-View the streamed camera frames in [QGC](http://qgroundcontrol.com/):
+Thay topic trong ví dụ bằng topic lấy từ `gz topic -l` nếu model của bạn dùng
+tên khác.
 
-`Open QGC > Application Settings > Video Settings > Select UDP h.264 Video Stream & use port 5600`
+### Vì sao queue cần giới hạn?
 
-![qgc_video_settings](https://github.com/user-attachments/assets/61fa4c2a-37e2-47cf-abcf-9f110d9c2015)
+Ví dụ camera publish 30 Hz, tức có frame mới khoảng mỗi 33 ms. Nếu processing
+mất 200 ms mỗi frame, producer tạo dữ liệu nhanh hơn consumer. Queue không giới
+hạn sẽ liên tục tăng, gây tăng memory và latency. Với dữ liệu real-time, thường
+hợp lý hơn khi bỏ frame cũ và ưu tiên dữ liệu mới.
 
+Chính sách drop tùy ứng dụng:
 
-### 4. Using 3d Gimbal
+- Queue FIFO nhỏ phù hợp khi vẫn cần xử lý một vài sample liên tiếp.
+- Chỉ giữ sample mới nhất phù hợp với hiển thị hoặc điều khiển real-time.
+- Không drop phù hợp khi mọi sample đều quan trọng, nhưng consumer phải đủ nhanh
+  hoặc cần backpressure/persistence phù hợp.
 
-The Iris model is equipped with a 3d gimbal and camera that can be controlled directly in MAVProxy using the RC overrides.
+## 10. Thread giao tiếp với nhau như thế nào?
 
-#### Run Gazebo
+Các thread trong cùng một process dùng chung address space, nên có thể giao
+tiếp qua shared memory. Trong ví dụ trên, `imu_queue` là shared memory được cả
+callback thread và processing thread truy cập.
 
-```bash
-gz sim -v4 -r iris_runway.sdf
-```
+Các primitive có vai trò khác nhau:
 
-#### Run ArduPilot SITL with a specified parameter file
+- `std::mutex` đảm bảo chỉ một thread thay đổi queue tại một thời điểm, tránh
+  race condition.
+- `std::condition_variable` cho processing thread ngủ khi queue rỗng và được
+  đánh thức khi callback push message mới, thay vì polling liên tục.
+- `std::atomic<bool>` cho phép các thread đọc/ghi cờ dừng an toàn.
+- `std::thread::join()` chỉ chờ một thread kết thúc. Nó không phải cơ chế truyền
+  dữ liệu giữa các thread.
 
-```bash
-cd ardupilot
+Mutex là cần thiết vì một thao tác tưởng như đơn giản có thể gồm nhiều bước đọc,
+sửa và ghi. Nếu hai thread xen kẽ các bước này mà không đồng bộ, kết quả phụ
+thuộc timing và tạo ra race condition.
 
-sim_vehicle.py -D -v ArduCopter -f JSON --add-param-file=$HOME/ardupilot_gazebo/config/gazebo-iris-gimbal.parm --console --map
-```
+## 11. Tổng kết
 
-Control action for gimbal over RC channel:
+Sau tutorial này, pipeline hoàn chỉnh là:
 
-| Action | Channel | RC Low | RC High |
-| ------------- | ------------- | ------------- | ------------- |
-| Roll | RC6 | Roll Left | Roll Right |
-| Pitch | RC7 | Pitch Down | Pitch Up |
-| Yaw | RC8 | Yaw Left | Yaw Right |
+1. ArduPilot SITL chạy flight-controller firmware trên macOS.
+2. ArduPilotPlugin nối motor command và simulated state giữa SITL với Gazebo.
+3. Gazebo mô phỏng physics và publish dữ liệu sensor qua Transport topic.
+4. C++ subscriber đăng ký callback với topic.
+5. Transport thread gọi callback khi message đến.
+6. Callback copy message vào bounded thread-safe queue rồi return nhanh.
+7. Processing thread lấy message để chạy AI, OpenCV, SLAM hoặc logic riêng.
 
-Example usage:
+Điểm cốt lõi: queue vẫn là shared memory. `mutex`, `condition_variable` và
+`atomic` giúp các thread dùng vùng nhớ chung một cách an toàn và hiệu quả.
 
-`rc 6 1100` - Gimbal rolls left
+## Nguồn dự án và giấy phép
 
-`rc 7 1900` - Gimbal pitch upwards
-
-`rc 8 1500` - Gimbal yaw neutral
-
-## Models
-
-In addition to the Iris and Zephyr models included here, a selection
-of models configured use the ArduPilot Gazebo plugin is available in
-[ArduPilot/SITL_Models](https://github.com/ArduPilot/SITL_Models). 
-Click on the images to see further details.
-
-<table>
-<tr>
-<td title="Alti Transition">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/AltiTransition.md">
-<img src="https://user-images.githubusercontent.com/24916364/150612555-958a64d4-c434-4f90-94bd-678e6b6011ec.png" width="100%" style="display: block;">
-</a>
-</td>
-<td title="SkyCat TVBS">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/SkyCatTVBS.md">
-<img src="https://user-images.githubusercontent.com/24916364/145025150-4e7e48e1-3e83-4c83-be7b-b944db1d9152.png" width="100%" style="display: block;">
-</a>
-</td>
-<td title="Skywalker X8">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/SkywalkerX8.md">
-<img src="https://user-images.githubusercontent.com/24916364/142733947-1a39e963-0aea-4b1b-a57b-85455b2278fe.png" width="100%" style="display: block;">
-</a>
-</td>
-</tr>
-<tr>
-<td title="Quadruped">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/Quadruped.md">
-<img src="https://user-images.githubusercontent.com/24916364/144449710-5bab34b4-dabf-410f-b276-d290ddbb54b2.gif" width="100%" style="display: block;">
-</a>
-</td>
-<td title="WildThumper">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/WildThumper.md">
-<img src="https://user-images.githubusercontent.com/24916364/144286154-231ac9b3-e54b-489f-b35e-bc2adb4b1aa0.png" width="100%" style="display: block;">
-</a>
-</td>
-<td title="Rover Playpen">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/RoverPlayPen.md">
-<img src="https://user-images.githubusercontent.com/24916364/144513412-1b0661f1-fdf8-4aed-a745-e8bb73ffca91.jpg" width="100%" style="display: block;">
-</a>
-</td>
-</tr>
-
-</td>
-</tr>
-<tr>
-<td title="Swan-K1">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/Swan-K1.md">
-<img src="https://user-images.githubusercontent.com/24916364/210408630-01e5f56d-57ba-430e-b04d-62cb8d232527.png" width="100%" style="display: block;">
-</a>
-</td>
-<td title="Sawppy Rover">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/Sawppy.md">
-<img src="https://user-images.githubusercontent.com/24916364/210653579-e635ffc2-2962-4221-83a8-9622915a4121.png" width="100%" style="display: block;">
-</a>
-</td>
-<td title="Hexapod Copter">
-<a href="https://github.com/ArduPilot/SITL_Models/blob/master/Gazebo/docs/HexapodCopter.md">
-<img src="https://user-images.githubusercontent.com/24916364/225340320-9aa31fe2-4602-4036-ba6b-491f72097c01.jpg" width="100%" style="display: block;">
-</a>
-</td>
-</tr>
-
-</table>
-
-## Troubleshooting
-
-For issues concerning installing and running Gazebo on your platform please
-consult the Gazebo documentation for [troubleshooting frequent issues](https://gazebosim.org/docs/harmonic/troubleshooting#ubuntu).
+Repository này dựa trên
+[ArduPilot Gazebo Plugin](https://github.com/ArduPilot/ardupilot_gazebo). Xem
+[`LICENSE.md`](LICENSE.md) để biết thông tin giấy phép.
