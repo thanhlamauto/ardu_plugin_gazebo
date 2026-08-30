@@ -46,7 +46,7 @@
 }
 
 \title{Luồng gói tin trong hệ ArduPilot--Gazebo--ROS~2--RViz}
-\author{Nguyễn Thành Lâm}
+\author{Nguyễn Thanh Lâm}
 \date{30 tháng 8 năm 2026}
 
 \begin{document}
@@ -58,16 +58,16 @@ Báo cáo giải thích ở mức hệ thống cách dữ liệu cảm biến m�
 
 \section{Câu hỏi cần trả lời}
 
-Khi một camera hoặc LiDAR được đặt trên UAV trong Gazebo, RViz không thể đọc trực tiếp dữ liệu nội bộ của Gazebo. Hai hệ thống sử dụng hai họ message và hai cơ chế truyền khác nhau. Vì vậy cần một lớp trung gian để trả lời ba câu hỏi:
+Hệ thống được khảo sát bắt đầu từ lệnh điều khiển của người dùng và kết thúc tại dữ liệu cảm biến hiển thị trong RViz. MAVProxy gửi lệnh GUIDED cho ArduPilot; ArduPilot điều khiển Gazebo qua plugin; Gazebo mô phỏng chuyển động và tạo phép đo; ROS~2 chuyển các phép đo đó đến RViz. Mỗi đoạn dùng một loại message và cơ chế truyền khác nhau. Báo cáo cần trả lời bốn câu hỏi:
 
 \begin{enumerate}
-  \item Gazebo biểu diễn và truyền phép đo bằng chuẩn nào?
-  \item Dữ liệu được chuyển thành message ROS~2 như thế nào?
-  \item RViz nhận gì và dựa vào đâu để hiển thị đúng vị trí?
-  \item Lệnh GUIDED tác động lên Gazebo và làm dữ liệu sensor thay đổi qua những kết nối nào?
+  \item Lệnh MAVProxy được mã hóa thành gói MAVLink nào và ArduPilot xử lý ra sao?
+  \item ArduPilot và ArduPilotPlugin trao đổi PWM, IMU và trạng thái mô phỏng bằng định dạng nào?
+  \item Plugin tác động lên Gazebo physics và nhận dữ liệu sensor qua ECS hoặc Gazebo Transport như thế nào?
+  \item Dữ liệu Gazebo được chuyển thành message ROS~2 và đi đến Gazebo GUI hoặc RViz ra sao?
 \end{enumerate}
 
-Phương pháp kiểm chứng là chạy đồng thời Gazebo, ArduPilot SITL, bridge ROS~2 và RViz; sau đó điều khiển UAV ở chế độ GUIDED. Khi UAV thay đổi vị trí, ảnh camera, ảnh độ sâu và đám mây điểm trong RViz cũng thay đổi. Quan sát đồng thời này chứng minh toàn bộ chuỗi đang hoạt động trong thời gian thực, không chỉ dừng ở việc nạp mô hình.
+Phương pháp kiểm chứng là chạy đồng thời MAVProxy, ArduPilot SITL, ArduPilotPlugin, Gazebo, bridge ROS~2 và RViz; sau đó gửi lệnh GUIDED, arm, takeoff và setpoint vận tốc. Việc UAV di chuyển trong Gazebo đồng thời làm ảnh camera, ảnh độ sâu và đám mây điểm trong RViz thay đổi, qua đó xác nhận toàn bộ chuỗi điều khiển và quan sát đang hoạt động trong thời gian thực.
 
 \section{Bức tranh tổng thể}
 
