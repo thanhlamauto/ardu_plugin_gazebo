@@ -5,6 +5,12 @@ Việt. Nội dung trình bày toàn bộ luồng từ build ArduCopter SITL, k�
 Gazebo Harmonic, kiểm tra sensor topic, đến viết một C++ subscriber có callback
 và processing thread.
 
+Runbook chạy, capture UDP và map dữ liệu về source code nằm tại
+[`docs/closed_loop_runtime_walkthrough_vi.md`](docs/closed_loop_runtime_walkthrough_vi.md).
+
+- [Video Gazebo + RViz khi điều khiển UAV ở GUIDED mode](https://drive.google.com/file/d/1D1ceJg4oJFvSS2aUksKp6LQNnHCnOOei/view?usp=sharing)
+- [Báo cáo luồng packet Gazebo--ROS 2--RViz](output/pdf/gazebo_ros2_rviz_dataflow_report_vi.pdf)
+
 Mục tiêu cuối cùng là hiểu và chạy được pipeline:
 
 ```text
@@ -509,6 +515,19 @@ Sau tutorial này, pipeline hoàn chỉnh là:
 
 Điểm cốt lõi: queue vẫn là shared memory. `mutex`, `condition_variable` và
 `atomic` giúp các thread dùng vùng nhớ chung một cách an toàn và hiệu quả.
+
+## 12. Chạy sensor suite và RViz
+
+World `iris_sensor_arena.sdf` gắn đồng thời camera RGB, depth camera, LiDAR 3D,
+IMU, từ kế, khí áp và NavSat lên UAV. Hướng dẫn đầy đủ theo từng terminal nằm
+trong [runbook closed-loop](docs/closed_loop_runtime_walkthrough_vi.md#10-chạy-sensor-suite-và-rviz).
+
+Sau khi Gazebo và ArduPilot SITL đã chạy, mở bridge và RViz bằng một lệnh:
+
+```bash
+cd ~/Projects/ardupilot_gazebo
+./scripts/run_sensor_rviz.sh
+```
 
 ## Nguồn dự án và giấy phép
 

@@ -101,5 +101,17 @@ fabric.properties
 
 cmake-build-debug
 
+# Local simulation and report artifacts
+.DS_Store
+eeprom.bin
+logs/
+tmp/
+terrain/
+scripts/__pycache__/
+output/video/
+output/pdf/*.log
+reports/evidence/
+/-
+
 # Catkin custom files
 CATKIN_IGNORE

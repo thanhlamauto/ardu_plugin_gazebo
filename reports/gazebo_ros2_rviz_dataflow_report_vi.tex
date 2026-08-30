@@ -1,0 +1,385 @@
+\documentclass[a4paper]{article}
+
+\usepackage[left=25mm,right=25mm,top=20mm,bottom=20mm]{geometry}
+\usepackage{fontspec}
+\setmainfont[
+  BoldFont=lmroman10-bold.otf,
+  ItalicFont=lmroman10-italic.otf,
+  BoldItalicFont=lmroman10-bolditalic.otf
+]{lmroman10-regular.otf}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{listings}
+
+\renewcommand{\abstractname}{Tóm tắt}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\refname}{Tài liệu tham khảo}
+
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{2em}
+\setlist{itemsep=3pt,topsep=5pt,leftmargin=1.8em}
+\captionsetup{font=small,labelfont=bf}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  frame=single,
+  framesep=5pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  aboveskip=7pt,
+  belowskip=7pt,
+  showstringspaces=false
+}
+
+\title{Luồng gói tin trong hệ ArduPilot--Gazebo--ROS~2--RViz}
+\author{Nguyễn Thành Lâm}
+\date{30 tháng 8 năm 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Báo cáo giải thích ở mức hệ thống cách dữ liệu cảm biến mô phỏng đi từ Gazebo đến RViz, đồng thời chỉ ra vòng điều khiển hai chiều giữa ArduPilot SITL và Gazebo. Trọng tâm là hình dạng gói tin, chuẩn mã hóa và phép biến đổi tại mỗi đầu nhận. Gazebo dùng Protocol Buffers trên Gazebo Transport; bridge chuyển đổi message có kiểu; ROS~2 dùng CDR và DDS; RViz là subscriber cuối. Trong vòng điều khiển, SITL gửi lệnh servo nhị phân sang plugin và nhận trạng thái mô phỏng ở dạng JSON. Các ví dụ raw được lấy từ lần chạy thực nghiệm, không phải dữ liệu minh họa tự tạo.
+\end{abstract}
+
+\section{Câu hỏi cần trả lời}
+
+Khi một camera hoặc LiDAR được đặt trên UAV trong Gazebo, RViz không thể đọc trực tiếp dữ liệu nội bộ của Gazebo. Hai hệ thống sử dụng hai họ message và hai cơ chế truyền khác nhau. Vì vậy cần một lớp trung gian để trả lời ba câu hỏi:
+
+\begin{enumerate}
+  \item Gazebo biểu diễn và truyền phép đo bằng chuẩn nào?
+  \item Dữ liệu được chuyển thành message ROS~2 như thế nào?
+  \item RViz nhận gì và dựa vào đâu để hiển thị đúng vị trí?
+  \item Lệnh GUIDED tác động lên Gazebo và làm dữ liệu sensor thay đổi qua những kết nối nào?
+\end{enumerate}
+
+Phương pháp kiểm chứng là chạy đồng thời Gazebo, ArduPilot SITL, bridge ROS~2 và RViz; sau đó điều khiển UAV ở chế độ GUIDED. Khi UAV thay đổi vị trí, ảnh camera, ảnh độ sâu và đám mây điểm trong RViz cũng thay đổi. Quan sát đồng thời này chứng minh toàn bộ chuỗi đang hoạt động trong thời gian thực, không chỉ dừng ở việc nạp mô hình.
+
+\section{Bức tranh tổng thể}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=11mm,
+  box/.style={draw,rectangle,align=center,text width=72mm,minimum height=10mm,inner sep=3pt,font=\small},
+  outbox/.style={draw,rectangle,align=center,text width=49mm,minimum height=10mm,inner sep=3pt,font=\small},
+  arrow/.style={-{Latex[length=2mm]},thick},
+  biarrow/.style={{Latex[length=2mm]}-{Latex[length=2mm]},thick},
+  label/.style={font=\scriptsize,fill=white,inner sep=1.2pt,align=center},
+  vlabel/.style={font=\scriptsize,fill=white,inner sep=1.2pt,align=left,text width=42mm}
+]
+\node[box] (mav) {MAVProxy\\giao diện điều khiển};
+\node[box,below=of mav] (ap) {ArduPilot SITL\\estimator + controller};
+\node[box,below=of ap] (plugin) {ArduPilotPlugin\\adapter giữa flight controller và simulator};
+\node[box,below=of plugin] (gz) {Gazebo\\physics + sensors};
+
+\draw[biarrow] (mav) -- node[vlabel,right]{MAVLink/TCP: lệnh $\downarrow$; telemetry/ACK $\uparrow$} (ap);
+\draw[biarrow] (ap) -- node[vlabel,right]{UDP local: PWM binary $\downarrow$; JSON state $\uparrow$} (plugin);
+\draw[biarrow] (plugin) -- node[vlabel,right]{ECS + GZ Transport: joint cmd $\downarrow$; pose/IMU $\uparrow$} (gz);
+
+\node[outbox,below=11mm of gz,xshift=-30mm] (gui) {Gazebo GUI\\native visualizer};
+\node[outbox,below=11mm of gz,xshift=30mm] (bridge) {ros\_gz\_bridge\\Protobuf $\rightarrow$ ROS message};
+\node[outbox,below=of bridge] (ros) {ROS~2\\CDR + DDS/RTPS};
+\node[outbox,below=of ros] (rviz) {RViz\\sensor visualizer};
+
+\draw[arrow] (gz) -- node[label,left,pos=0.58]{render native} (gui);
+\draw[arrow] (gz) -- node[label,right,pos=0.58]{sensor Protobuf} (bridge);
+\draw[arrow] (bridge) -- node[label,right]{ROS message} (ros);
+\draw[arrow] (ros) -- node[label,right]{DDS sample} (rviz);
+\end{tikzpicture}
+\caption{Kiến trúc hoàn chỉnh từ lệnh điều khiển đến trực quan hóa sensor.}
+\label{fig:pipeline}
+\end{figure}
+
+Hình~\ref{fig:pipeline} ghép bốn kết nối thành một hệ thống thống nhất. Lệnh điều khiển không đi thẳng tới RViz. Nó làm thay đổi đầu ra motor, lực tác dụng và trạng thái vật lý của UAV; trạng thái mới làm các sensor trong Gazebo tạo phép đo mới. Dữ liệu đó mới được đưa tới Gazebo GUI hoặc qua ROS~2 để RViz hiển thị.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{7mm}>{\RaggedRight\arraybackslash}p{43mm}>{\RaggedRight\arraybackslash}X@{}}
+\toprule
+ & Kết nối & Dữ liệu trao đổi \\
+\midrule
+A & MAVProxy $\leftrightarrow$ ArduPilot & MAVLink mang mode, arm, takeoff, setpoint GUIDED theo chiều lệnh; ACK và telemetry đi theo chiều ngược lại. \\
+B & ArduPilot $\leftrightarrow$ ArduPilotPlugin & SITL gửi UDP binary chứa PWM; plugin trả UDP JSON chứa IMU, pose, quaternion và velocity. \\
+C & ArduPilotPlugin $\leftrightarrow$ Gazebo & Plugin ghi motor/joint command vào ECS; Gazebo physics trả pose và velocity qua ECS, còn IMU và sensor callback đi qua Gazebo Transport. \\
+D & Gazebo $\rightarrow$ visualizer & Gazebo GUI đọc dữ liệu native. Nhánh RViz đi qua Protobuf/Gazebo Transport, bridge, message ROS~2 và CDR/DDS. \\
+\bottomrule
+\end{tabularx}
+\caption{Vai trò của bốn kết nối trong toàn hệ thống.}
+\label{tab:overall-links}
+\end{table}
+
+Có thể hình dung mỗi phép đo đi qua hai ``ngôn ngữ''. Ở nửa đầu, Gazebo dùng message của Gazebo. Ở nửa sau, ROS~2 dùng các message chuẩn như \texttt{Image}, \texttt{Imu}, \texttt{LaserScan} và \texttt{PointCloud2}. Bridge đóng vai trò phiên dịch giữa hai ngôn ngữ này.
+
+Cần tách hai đường truyền thường bị nhầm với nhau. Đường \emph{điều khiển} tạo vòng kín ArduPilot--Gazebo và có dữ liệu ứng dụng theo cả hai chiều. Đường \emph{quan sát} đưa sensor từ Gazebo tới RViz; dữ liệu sensor đi một chiều, còn chiều ngược chỉ gồm discovery, subscription và acknowledgement của middleware khi QoS yêu cầu.
+
+\section{Các protocol và cơ chế chính}
+
+\subsection{Protocol Buffers ở phía Gazebo}
+
+Protocol Buffers, thường gọi là Protobuf, là chuẩn tuần tự hóa dữ liệu có cấu trúc. Mỗi loại message có một schema mô tả tên trường, kiểu dữ liệu và số định danh của trường. Khi truyền đi, tên trường không được lặp lại dưới dạng văn bản; chúng được thay bằng các tag số và giá trị nhị phân. Vì vậy payload nhỏ hơn JSON và máy tính có thể giải mã nhanh hơn.
+
+Ví dụ, một message IMU chứa các nhóm thông tin như dấu thời gian, hệ tọa độ, quaternion định hướng, vận tốc góc và gia tốc tuyến tính. Camera chứa kích thước ảnh, định dạng pixel và mảng byte. LiDAR chứa góc quét, khoảng đo hoặc một mảng điểm 3D.
+
+\subsection{Gazebo Transport}
+
+Gazebo Transport là lớp publish--subscribe của Gazebo. Sensor publish message lên một topic; thành phần quan tâm subscribe topic đó. Lớp này dùng ZeroMQ và kết nối TCP để vận chuyển dữ liệu chính. UDP multicast chủ yếu hỗ trợ discovery, tức giúp các tiến trình tìm thấy publisher, subscriber và topic của nhau.
+
+Điểm quan trọng là Protobuf trả lời câu hỏi ``các trường được mã hóa thế nào'', còn Gazebo Transport trả lời ``message được tìm thấy và vận chuyển thế nào''. Hai khái niệm này bổ sung cho nhau nhưng không phải một.
+
+\subsection{Bridge Gazebo--ROS~2}
+
+Bridge không chuyển nguyên xi một chuỗi byte từ đầu này sang đầu kia. Nó giải mã message Gazebo, tạo một message ROS~2 mới rồi ánh xạ các trường tương ứng. Chẳng hạn, áp suất của Gazebo được đưa vào trường áp suất của ROS~2; quaternion, gia tốc và vận tốc góc được đưa vào các trường tương ứng của message IMU.
+
+Một số metadata có thể không được giữ lại nếu phía ROS~2 không có trường tương ứng. Ngược lại, bridge có thể điền giá trị mặc định cho trường ROS~2 mà message Gazebo không cung cấp. Vì vậy đây là chuyển đổi ngữ nghĩa có kiểu, không chỉ là đổi header mạng.
+
+\subsection{DDS và CDR ở phía ROS~2}
+
+Sau bridge, dữ liệu trở thành message ROS~2. Middleware ROS~2 sử dụng DDS để discovery, quản lý publisher--subscriber và phân phối dữ liệu. CDR là định dạng nhị phân dùng để tuần tự hóa các trường của message ROS~2 trước khi truyền.
+
+DDS còn cung cấp Quality of Service (QoS), ví dụ lựa chọn ưu tiên độ tin cậy hay độ trễ thấp. Với sensor tốc độ cao, cấu hình thường chấp nhận bỏ một số frame cũ để luôn hiển thị dữ liệu mới nhất. Publisher và subscriber phải có QoS tương thích thì dữ liệu mới đi qua.
+
+\subsection{RViz}
+
+RViz là subscriber ROS~2. Nó không hiểu Protobuf của Gazebo và không kết nối trực tiếp với sensor plugin. RViz nhận các message ROS~2 đã được middleware giải mã, sau đó chọn cách hiển thị theo loại message:
+
+\begin{itemize}
+  \item \texttt{Image}: dựng ảnh RGB hoặc ảnh độ sâu;
+  \item \texttt{LaserScan}: dựng lát cắt LiDAR 2D;
+  \item \texttt{PointCloud2}: dựng đám mây điểm 3D;
+  \item \texttt{Imu} và các số đo khác: hiển thị hướng, vector hoặc giá trị số.
+\end{itemize}
+
+Để đặt dữ liệu đúng vị trí trong không gian 3D, RViz còn cần \texttt{frame\_id} và cây biến đổi tọa độ TF. Topic có dữ liệu nhưng thiếu TF phù hợp vẫn có thể khiến RViz không hiển thị gì.
+
+\section{Bốn kết nối với dữ liệu thật}
+
+Mỗi hình dưới đây chỉ dùng ba loại khối: dữ liệu trước xử lý, hàm xử lý và dữ liệu sau xử lý. Các giá trị packet lấy từ capture/rosbag của lần chạy thực nghiệm; riêng MAVLink được tái tạo bằng đúng encoder pymavlink mà MAVProxy trên máy đang sử dụng.
+
+\subsection{A. Kết nối MAVProxy và ArduPilot bằng MAVLink}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm,
+  data/.style={draw,rectangle,align=center,text width=25mm,minimum height=17mm,inner sep=2pt,font=\scriptsize},
+  proc/.style={draw,very thick,rectangle,align=center,text width=35mm,minimum height=17mm,inner sep=2pt,font=\scriptsize},
+  packet/.style={draw,rectangle,align=center,text width=46mm,minimum height=17mm,inner sep=2pt,font=\scriptsize},
+  state/.style={draw,rectangle,align=center,text width=31mm,minimum height=17mm,inner sep=2pt,font=\scriptsize},
+  arrow/.style={-{Latex[length=1.8mm]},thick}
+]
+\node[data] (a1) {\texttt{mode guided}};
+\node[proc,right=of a1] (a2) {\texttt{cmd\_mode()}\\\texttt{set\_mode\_apm()}};
+\node[packet,right=of a2] (a3) {MAVLink v2 \texttt{COMMAND\_LONG}\\44 byte; command=176\\param1=1, param2=4};
+\node[state,right=of a3] (a4) {\texttt{handle\_command\_}\\\texttt{do\_set\_mode()}\\mode=GUIDED};
+
+\node[data,below=of a1] (b1) {\texttt{arm throttle}};
+\node[proc,right=of b1] (b2) {\texttt{cmd\_arm()}\\\texttt{command\_long\_send()}};
+\node[packet,right=of b2] (b3) {MAVLink v2 \texttt{COMMAND\_LONG}\\44 byte; command=400\\param1=1};
+\node[state,right=of b3] (b4) {\texttt{handle\_command\_}\\\texttt{component\_arm\_}\\\texttt{disarm()} $\rightarrow$ armed};
+
+\node[data,below=of b1] (c1) {\texttt{takeoff 4}};
+\node[proc,right=of c1] (c2) {\texttt{cmd\_takeoff()}\\\texttt{command\_long\_send()}};
+\node[packet,right=of c2] (c3) {MAVLink v2 \texttt{COMMAND\_LONG}\\44 byte; command=22\\param7=4.0 m};
+\node[state,right=of c3] (c4) {\texttt{handle\_MAV\_CMD\_}\\\texttt{NAV\_TAKEOFF()}\\target altitude=4 m};
+
+\node[data,below=of c1] (d1) {\texttt{velocity 1 0 0}};
+\node[proc,right=of d1] (d2) {\texttt{cmd\_velocity()}\\\texttt{set\_position\_target\_}\\\texttt{local\_ned\_send()}};
+\node[packet,right=of d2] (d3) {MAVLink v2 \texttt{SET\_POSITION\_TARGET\_LOCAL\_NED}\\65 byte; frame=8; mask=4039\\vx=1, vy=0, vz=0};
+\node[state,right=of d3] (d4) {\texttt{handle\_message\_}\\\texttt{set\_position\_target\_}\\\texttt{local\_ned()}\\GUIDED velocity target};
+
+\foreach \x/\y in {a1/a2,a2/a3,a3/a4,b1/b2,b2/b3,b3/b4,c1/c2,c2/c3,c3/c4,d1/d2,d2/d3,d3/d4}{\draw[arrow] (\x) -- (\y);}
+\node[above=2mm of a1,font=\scriptsize\bfseries] {Lệnh người dùng};
+\node[above=2mm of a2,font=\scriptsize\bfseries] {MAVProxy + encoder};
+\node[above=2mm of a3,font=\scriptsize\bfseries] {Packet phát trên TCP};
+\node[above=2mm of a4,font=\scriptsize\bfseries] {ArduPilot sau decode};
+\end{tikzpicture}
+\caption{Bốn lệnh MAVProxy và packet MAVLink thật được tạo ra.}
+\label{fig:mavproxy-packets}
+\end{figure}
+
+\begin{lstlisting}
+velocity 1 0 0 -> MAVLink v2 raw, seq=0:
+fd 35 00 00 00 ff 00 54 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 80 3f 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 c7 0f 01
+00 08 64 4f
+\end{lstlisting}
+
+Byte đầu \texttt{fd} là MAVLink~2; \texttt{35} là payload 53 byte; message id \texttt{54 00 00}=84; hai byte cuối là checksum. Sequence và checksum thay đổi theo phiên truyền, còn payload field giữ nguyên theo lệnh.
+
+\subsection{B. Kết nối ArduPilot và ArduPilotPlugin bằng UDP}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm,
+  data/.style={draw,rectangle,align=center,text width=68mm,minimum height=10mm,inner sep=2pt,font=\scriptsize},
+  proc/.style={draw,very thick,rectangle,align=center,text width=55mm,minimum height=8mm,inner sep=2pt,font=\scriptsize},
+  arrow/.style={-{Latex[length=1.8mm]},thick}
+]
+\node[font=\small\bfseries] (lh) at (0,0) {ArduPilot $\rightarrow$ plugin};
+\node[data,below=of lh] (l1) {Controller/mixer: servo[0..3]=[1561,1560,1560,1562] $\mu$s};
+\node[proc,below=of l1] (l2) {\texttt{JSON::output\_servos()}};
+\node[data,below=of l2] (l3) {UDP 40 byte, little-endian\\\texttt{1a48 b004 2ac5 0000 1906 1806 1806 1a06 ...}};
+\node[proc,below=of l3] (l4) {\texttt{ReceiveServoPacket()}};
+\node[data,below=of l4] (l5) {magic=18458; rate=1200; count=50474; pwm[0..3]=[1561,1560,1560,1562]};
+\node[proc,below=of l5] (l6) {\texttt{UpdateMotorCommands()} $\rightarrow$ \texttt{ApplyMotorForces()}};
+\node[data,below=of l6] (l7) {ECS: \texttt{JointVelocityCmd} hoặc \texttt{JointForceCmd}};
+
+\node[font=\small\bfseries] (rh) at (82mm,0) {plugin $\rightarrow$ ArduPilot};
+\node[data,below=of rh] (r1) {IMU + position + quaternion + velocity từ Gazebo};
+\node[proc,below=of r1] (r2) {\texttt{CreateStateJSON()}};
+\node[data,below=of r2] (r3) {UDP JSON khoảng 484 byte\\\texttt{position=[0.0021,-0.0003,-2.1994]}\\\texttt{velocity=[0.0006,0.0010,-0.0014]}};
+\node[proc,below=of r3] (r4) {\texttt{SendState()} $\rightarrow$ \texttt{recv\_fdm()}};
+\node[data,below=of r4] (r5) {JSON buffer tại SITL: \texttt{imu}, \texttt{position}, \texttt{quaternion}, \texttt{velocity}};
+\node[proc,below=of r5] (r6) {\texttt{parse\_sensors()}};
+\node[data,below=of r6] (r7) {Sensor/state nội bộ $\rightarrow$ EKF/controller $\rightarrow$ PWM kế tiếp};
+
+\foreach \x/\y in {l1/l2,l2/l3,l3/l4,l4/l5,l5/l6,l6/l7,r1/r2,r2/r3,r3/r4,r4/r5,r5/r6,r6/r7}{\draw[arrow] (\x) -- (\y);}
+\end{tikzpicture}
+\caption{Hai chiều UDP với dữ liệu trước và sau từng hàm xử lý.}
+\label{fig:udp-plugin}
+\end{figure}
+
+\subsection{C. Kết nối ArduPilotPlugin và Gazebo bằng ECS và Gazebo Transport}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm,
+  data/.style={draw,rectangle,align=center,text width=68mm,minimum height=11mm,inner sep=2pt,font=\scriptsize},
+  proc/.style={draw,very thick,rectangle,align=center,text width=54mm,minimum height=9mm,inner sep=2pt,font=\scriptsize},
+  note/.style={draw,dashed,rectangle,align=center,text width=145mm,minimum height=9mm,inner sep=2pt,font=\scriptsize},
+  arrow/.style={-{Latex[length=1.8mm]},thick}
+]
+\node[font=\small\bfseries] (lh) at (0,0) {Control đi vào Gazebo};
+\node[data,below=of lh] (l1) {Plugin: \texttt{controls[i].cmd} đã chuẩn hóa từ PWM};
+\node[proc,below=of l1] (l2) {\texttt{ApplyMotorForces()}};
+\node[data,below=of l2] (l3) {ECS component: \texttt{JointVelocityCmd} / \texttt{JointForceCmd}};
+\node[proc,below=of l3] (l4) {Gazebo Physics + LiftDrag};
+\node[data,below=of l4] (l5) {ECS output: \texttt{WorldPose}, \texttt{WorldLinearVelocity}};
+
+\node[font=\small\bfseries] (rh) at (82mm,0) {Sensor quay về plugin};
+\node[data,below=of rh] (r1) {Gazebo IMU sensor: orientation, angular velocity, linear acceleration};
+\node[proc,below=of r1] (r2) {Sensor publish $\rightarrow$ Gazebo Transport};
+\node[data,below=of r2] (r3) {Protobuf \texttt{gz.msgs.IMU}\\frame=\texttt{sensor\_suite\_link}; $q_w=1$; $a_z=9.8$ m/s$^2$};
+\node[proc,below=of r3] (r4) {\texttt{ImuCb()}};
+\node[data,below=of r4] (r5) {Plugin buffer \texttt{imuMsg} $\rightarrow$ \texttt{CreateStateJSON()}};
+
+\foreach \x/\y in {l1/l2,l2/l3,l3/l4,l4/l5,r1/r2,r2/r3,r3/r4,r4/r5}{\draw[arrow] (\x) -- (\y);}
+\node[note,below=12mm of l5,xshift=41mm] (n) {ECS là component trong bộ nhớ của cùng tiến trình Gazebo, không phải packet mạng. Gazebo Transport mới serialize sensor thành Protobuf và vận chuyển qua ZeroMQ/TCP.};
+\draw[arrow] (l5) -- (n.north west);
+\draw[arrow] (r5) -- (n.north east);
+\end{tikzpicture}
+\caption{Hai cơ chế khác nhau giữa plugin và Gazebo: ECS cho physics, Gazebo Transport cho sensor.}
+\label{fig:plugin-gazebo}
+\end{figure}
+
+\subsection{D. Gazebo và ROS~2 đưa dữ liệu đến visualizer}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=3mm,
+  data/.style={draw,rectangle,align=center,text width=34mm,minimum height=18mm,inner sep=1.5pt,font=\scriptsize},
+  proc/.style={draw,very thick,rectangle,align=center,text width=36mm,minimum height=18mm,inner sep=1.5pt,font=\scriptsize},
+  wire/.style={draw,rectangle,align=center,text width=37mm,minimum height=18mm,inner sep=1.5pt,font=\scriptsize},
+  view/.style={draw,rectangle,align=center,text width=29mm,minimum height=18mm,inner sep=1.5pt,font=\scriptsize},
+  arrow/.style={-{Latex[length=1.8mm]},thick}
+]
+\node[data] (a1) {Gazebo scene + native sensor data};
+\node[proc,right=of a1] (a2) {Gazebo rendering systems};
+\node[wire,right=of a2] (a3) {GPU draw data\\không qua ROS~2};
+\node[view,right=of a3] (a4) {Gazebo GUI};
+
+\node[data,below=of a1] (b1) {\texttt{gz.msgs.Image}\\640$\times$360, RGB8\\data=691200 byte};
+\node[proc,right=of b1] (b2) {\texttt{ros\_gz\_bridge}\\\texttt{convert\_gz\_to\_ros()}};
+\node[wire,right=of b2] (b3) {\texttt{sensor\_msgs/Image}\\CDR=691264 byte\\DDS/RTPS};
+\node[view,right=of b3] (b4) {RViz\\\texttt{ImageDisplay}\\640$\times$360 pixels};
+
+\node[data,below=of b1] (c1) {\texttt{PointCloudPacked}\\16$\times$640 points\\step=32; data=327680 byte};
+\node[proc,right=of c1] (c2) {\texttt{ros\_gz\_bridge}\\point-cloud converter};
+\node[wire,right=of c2] (c3) {\texttt{PointCloud2}\\CDR=327857 byte\\DDS/RTPS};
+\node[view,right=of c3] (c4) {RViz\\\texttt{PointCloud2Display}\\10240 points};
+
+\node[data,below=of c1] (d1) {ROS \texttt{Imu}, pressure, magnetic field, NavSat};
+\node[proc,right=of d1] (d2) {callbacks $\rightarrow$\\\texttt{publish\_markers()}};
+\node[wire,right=of d2] (d3) {\texttt{MarkerArray}\\CDR + DDS/RTPS};
+\node[view,right=of d3] (d4) {RViz\\\texttt{MarkerArray}\\text + arrows};
+
+\foreach \x/\y in {a1/a2,a2/a3,a3/a4,b1/b2,b2/b3,b3/b4,c1/c2,c2/c3,c3/c4,d1/d2,d2/d3,d3/d4}{\draw[arrow] (\x) -- (\y);}
+\node[above=2mm of a1,font=\scriptsize\bfseries] {Dữ liệu Gazebo/ROS};
+\node[above=2mm of a2,font=\scriptsize\bfseries] {Hàm xử lý};
+\node[above=2mm of a3,font=\scriptsize\bfseries] {Dữ liệu sau xử lý};
+\node[above=2mm of a4,font=\scriptsize\bfseries] {Visualizer nhận};
+\end{tikzpicture}
+\caption{Bốn dữ liệu thật đi đến Gazebo GUI hoặc RViz.}
+\label{fig:visualizer-packets}
+\end{figure}
+
+\section*{Video và mã nguồn thực nghiệm}
+
+Video ghi trực tiếp Gazebo, RViz và UAV di chuyển bằng lệnh GUIDED:
+\href{https://drive.google.com/file/d/1D1ceJg4oJFvSS2aUksKp6LQNnHCnOOei/view?usp=sharing}{xem video trên Google Drive}.
+
+Mã nguồn, world cảm biến và cấu hình RViz:
+\href{https://github.com/thanhlamauto/ardu_plugin_gazebo}{GitHub repository}. Toàn bộ lệnh chạy lại nằm trong
+\href{https://github.com/thanhlamauto/ardu_plugin_gazebo/blob/main/docs/closed_loop_runtime_walkthrough_vi.md}{runbook thực nghiệm}.
+
+\section{Cách xác định lỗi theo từng lớp}
+
+Khi RViz không hiển thị, nên kiểm tra theo thứ tự từ nguồn đến đích:
+
+\begin{enumerate}
+  \item \textbf{Gazebo:} thế giới có đang chạy và sensor có tạo message không?
+  \item \textbf{Bridge:} topic Gazebo có được ánh xạ đúng sang loại message ROS~2 không?
+  \item \textbf{ROS~2:} publisher và subscriber có nhìn thấy nhau, cùng domain và QoS tương thích không?
+  \item \textbf{RViz:} display có chọn đúng topic, đúng fixed frame và có TF hợp lệ không?
+\end{enumerate}
+
+Cách chia lớp này giúp tránh nhầm lẫn giữa lỗi sensor, lỗi chuyển đổi message, lỗi middleware và lỗi hiển thị.
+
+\section{Kết luận}
+
+Luồng Gazebo--ROS~2--RViz gồm hai miền truyền thông nối bởi một bridge có kiểu. Gazebo dùng Protobuf trên Gazebo Transport; ROS~2 dùng message chuẩn, CDR và DDS; RViz chỉ làm việc với phía ROS~2. Bridge dịch nội dung của message chứ không chuyển tiếp nguyên byte. Trong đường live không có file raw bắt buộc. Khi cần lưu trữ, rosbag2/MCAP ghi lại message ROS~2, còn packet capture ghi lại dữ liệu ở lớp mạng. Hiểu rõ ranh giới này là nền tảng để thiết kế, quan sát và debug hệ thống robot mô phỏng.
+
+\begin{thebibliography}{5}
+\bibitem{protobuf}
+Google, ``Protocol Buffers Documentation.''
+\url{https://protobuf.dev/overview/}
+
+\bibitem{gztransport}
+Gazebo, ``Gazebo Transport.''
+\url{https://gazebosim.org/api/transport/13/}
+
+\bibitem{bridge}
+Gazebo, ``ROS 2 Integration: ros\_gz\_bridge.''
+\url{https://github.com/gazebosim/ros_gz/tree/jazzy/ros_gz_bridge}
+
+\bibitem{rosmiddleware}
+Open Robotics, ``ROS 2 middleware implementations.''
+\url{https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Different-Middleware-Vendors.html}
+
+\bibitem{rviz}
+Open Robotics, ``RViz User Guide.''
+\url{https://github.com/ros2/rviz/tree/rolling/rviz2}
+\end{thebibliography}
+
+\end{document}
