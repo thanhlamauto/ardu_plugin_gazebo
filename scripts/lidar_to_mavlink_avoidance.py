@@ -1,4 +1,3 @@
-
 import argparse
 import math
 import os
@@ -15,9 +14,6 @@ LIDAR_MIN_M = 0.15
 DEFAULT_SEND_HZ = 5.0
 DEFAULT_MAX_POINTS = 180
 
-# The model places sensor_suite_link at x=0.08 m, z=+0.16 m relative to the
-# vehicle base_link. Coordinates from the Gazebo LiDAR are FLU and are
-# expressed from the sensor origin. The default is therefore BODY_FRD.
 DEFAULT_SENSOR_OFFSET_BODY_FRD: Point = (0.08, 0.0, -0.16)
 
 
