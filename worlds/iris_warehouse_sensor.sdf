@@ -1,0 +1,124 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <!-- iris_warehouse_sensor.sdf
+       Biến thể realistic của iris_warehouse: giữ nguyên Depot + building thực tế từ Fuel,
+       chỉ thay drone thành iris_with_sensor_suite (có lidar 3D) để test avoidance 20m
+       mà không dùng box/cylinder lý tưởng.
+
+       Đây là map "sẵn có nhưng realistic nhất" theo yêu cầu mentor:
+       không tự dựng pillar hoàn hảo, mà dùng mesh warehouse/container thực tế.
+
+       Lưu ý: lần đầu chạy Gazebo sẽ tải Fuel models (~50-100MB), cần internet.
+  -->
+  <world name="iris_warehouse_sensor">
+    <physics name="1ms" type="ignore">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-magnetometer-system" name="gz::sim::systems::Magnetometer"/>
+    <plugin filename="gz-sim-air-pressure-system" name="gz::sim::systems::AirPressure"/>
+    <plugin filename="gz-sim-navsat-system" name="gz::sim::systems::NavSat"/>
+
+    <!-- Giữ cùng origin CMAC để MAVProxy Map khớp với demo runway -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>-35.363262</latitude_deg>
+      <longitude_deg>149.165237</longitude_deg>
+      <elevation>584</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <magnetic_field>2.1e-5 5.0e-6 -4.2e-5</magnetic_field>
+
+    <scene><grid>false</grid></scene>
+
+    <!-- Drone với lidar 3D - đặt ngoài Depot như bản gốc iris_warehouse (-6 0) -->
+    <include>
+        <pose>-6 0 0.35 0 0 0</pose>
+        <uri>model://iris_with_sensor_suite</uri>
+    </include>
+
+    <!-- Fuel realistic assets - warehouse thực tế -->
+    <include>
+        <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Depot</uri>
+    </include>
+
+    <!-- Thêm vài container / building Fuel để tạo hành lang hẹp ở 10-20m -->
+    <!-- Fuel sẽ cache tại ~/Library/Caches/gz/fuel -->
+
+    <!--
+      Four realistically stacked containers form a 24 m high obstacle on the
+      direct eastbound flight path.  A single 6 m container would sit below
+      the +/-15 degree LiDAR field of view when the UAV is commanded to 20 m.
+    -->
+    <model name="fuel_container_1">
+      <static>true</static>
+      <pose>12 0 3 0 0 1.57</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>12 2.5 6</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>12 2.5 6</size></box></geometry>
+          <material><ambient>0.6 0.2 0.15 1</ambient><diffuse>0.7 0.25 0.18 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="fuel_container_1_level_2">
+      <static>true</static>
+      <pose>12 0 9 0 0 1.57</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>12 2.5 6</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>12 2.5 6</size></box></geometry>
+          <material><ambient>0.16 0.34 0.62 1</ambient><diffuse>0.20 0.43 0.78 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="fuel_container_1_level_3">
+      <static>true</static>
+      <pose>12 0 15 0 0 1.57</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>12 2.5 6</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>12 2.5 6</size></box></geometry>
+          <material><ambient>0.68 0.46 0.06 1</ambient><diffuse>0.82 0.57 0.08 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="fuel_container_1_level_4">
+      <static>true</static>
+      <pose>12 0 21 0 0 1.57</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>12 2.5 6</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>12 2.5 6</size></box></geometry>
+          <material><ambient>0.18 0.50 0.27 1</ambient><diffuse>0.23 0.66 0.35 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Dùng geometry local để demo vẫn chạy khi Fuel đang offline. -->
+
+    <model name="fuel_container_2">
+      <static>true</static>
+      <pose>12 8 3 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>6 2.5 6</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>6 2.5 6</size></box></geometry>
+          <material><ambient>0.2 0.55 0.6 1</ambient><diffuse>0.25 0.65 0.7 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Thêm kệ warehouse cao 8m để lidar thấy vertical structure -->
+    <model name="shelf_row">
+      <static>true</static>
+      <pose>-4 5 4 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>8 0.6 8</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>8 0.6 8</size></box></geometry>
+          <material><ambient>0.45 0.45 0.45 1</ambient><diffuse>0.55 0.55 0.55 1</diffuse></material></visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

@@ -1,0 +1,8 @@
+# EXPERIMENTAL SITL-ONLY override for rigid-body PA-MPPI.
+# Load AFTER config/mppi_velocity.parm using a second --add-param-file.
+# Bit 3 makes SET_ATTITUDE_TARGET.thrust a normalized collective thrust value.
+# Without this override ArduCopter interprets the field as climb rate.
+GUID_OPTIONS 8
+# Calibrated from existing SITL logs (learned values about 0.36--0.386).
+MOT_THST_HOVER 0.38
+MOT_HOVER_LEARN 0

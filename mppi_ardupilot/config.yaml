@@ -1,0 +1,72 @@
+# Cấu hình mặc định cho MPPI local planner (companion) + ArduPilot GUIDED.
+# Ghi đè bằng cờ CLI của scripts/mppi_velocity_avoidance.py khi cần.
+
+# --- vòng điều khiển ---
+hz: 10.0            # giữ >= 5 để không vượt GUID_TIMEOUT (3 s)
+
+# --- mô hình quy hoạch ---
+dt: 0.1
+tau: 0.5            # hằng số bám tốc point-mass [s]
+horizon: 30         # 30 x 0.1 s = 3 s lookahead
+samples: 500        # rollout CPU; GPU đặt 1024-2048
+lambda: 1.0         # temperature MPPI
+device: cpu
+seed: 7
+
+# --- giới hạn lệnh u = [vx, vy, vz, yaw_rate] ---
+vmax: 2.0           # tốc ngang [m/s]; demo đầu cứ chậm, ổn mới tăng
+vzmax: 1.0          # tốc đứng [m/s]
+yaw_rate_max: 0.6   # [rad/s]
+
+# --- nhiễu sampling ---
+noise_xy: 0.8
+noise_z: 0.3
+noise_yaw: 0.3
+
+# --- cost ---
+margin: 4.0         # bán kính an toàn obstacle [m] (~ AVOID_MARGIN cũ)
+w_goal: 1.0
+w_terminal: 5.0
+w_obstacle: 300.0
+w_u: 0.05
+w_du: 0.2
+w_yaw: 0.2
+
+# --- làm mượt setpoint giữa các chu kỳ (ràng buộc interface) ---
+command_alpha: 0.45       # 1.0=tắt low-pass; nhỏ hơn=mượt nhưng trễ hơn
+max_accel_xy: 1.5         # [m/s^2]
+max_accel_z: 0.8          # [m/s^2]
+max_yaw_accel: 1.2        # [rad/s^2]
+
+# --- mission ---
+goal: "16,10,20;30,0,20"  # tuyến waypoint ENU [m]; waypoint giữa giúp MPPI
+                           # local không kẹt trước obstacle rộng
+goal_radius: 0.25         # gate SITL chặt; tăng lên khi estimator thật nhiễu
+wp_radius: 2.5
+
+# --- lidar ---
+lidar_topic: /sensor_suite/lidar/points
+odom_topic: /iris/odometry
+max_points: 200
+max_raw_points: 25000
+sensor_offset_body_frd: [0.08, 0.0, -0.16]
+
+# --- an toàn ---
+stale_after_s: 1.0  # sensor cũ hơn -> gửi velocity 0 (hold)
+hard_brake_m: 1.0   # obstacle gần hơn -> velocity 0 (brake)
+planner_timeout_ms: 90.0  # < chu kỳ 100 ms; vượt ngưỡng thì hold
+
+# --- PA-MPPI v0: occupancy map + perception cost ---
+# Bật bằng CLI: --planner pa-mppi
+map_resolution: 0.5
+map_size_x: 80.0
+map_size_y: 80.0
+map_size_z: 40.0
+map_free_inflation: 0.5
+map_occupied_inflation: 0.5
+map_sensor_free_radius: 4.0  # near field certified free by the 360-degree lidar
+w_pa_collision: 500.0
+w_pa_poi: 20.0
+w_pa_occupied: 100.0
+w_pa_unknown: -50.0
+pa_goal_threshold: 0.5

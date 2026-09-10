@@ -134,5 +134,16 @@
       <parent>iris_with_gimbal::iris_with_standoffs::base_link</parent>
       <child>sensor_suite_link</child>
     </joint>
+
+    <!-- Publish the simulated vehicle pose for ROS 2 / RViz. -->
+    <plugin filename="gz-sim-odometry-publisher-system"
+      name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <dimensions>3</dimensions>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <odom_topic>/iris/odometry</odom_topic>
+      <tf_topic>/tf</tf_topic>
+    </plugin>
   </model>
 </sdf>

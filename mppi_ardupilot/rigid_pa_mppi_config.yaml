@@ -1,0 +1,58 @@
+# Experimental Gazebo/SITL configuration for thrust/body-rate PA-MPPI.
+hz: 50.0
+dt: 0.05
+horizon: 20
+samples: 512
+lambda: 1.0
+device: cpu
+seed: 7
+planner_timeout_ms: 18.0  # gate trước deadline điều khiển 20 ms
+
+# Physical model: iris_with_standoffs + gimbal + sensor suite ~= 2.10 kg.
+mass_kg: 2.10
+gravity: 9.80665
+rate_tau: 0.08
+thrust_min_ratio: 0.25
+thrust_max_ratio: 1.80
+body_rate_max_xy: 1.5
+body_rate_max_z: 1.0
+noise_thrust_ratio: 0.18
+noise_body_rate_xy: 0.35
+noise_body_rate_z: 0.25
+hover_thrust_normalized: 0.38  # flight logs learned MOT_THST_HOVER ~= 0.36--0.386
+
+margin: 4.0
+w_goal: 1.0
+w_terminal: 5.0
+w_obstacle: 300.0
+w_rigid_thrust: 2.0
+w_rigid_rate: 1.0
+w_rigid_rate_track: 0.5
+w_rigid_tilt: 12.0
+w_rigid_velocity: 0.5
+w_rigid_altitude: 8.0
+w_rigid_vertical_speed: 3.0
+
+map_resolution: 0.5
+map_size_x: 80.0
+map_size_y: 80.0
+map_size_z: 40.0
+map_free_inflation: 0.5
+map_occupied_inflation: 0.5
+map_sensor_free_radius: 4.0
+w_pa_collision: 500.0
+w_pa_poi: 20.0
+w_pa_occupied: 100.0
+w_pa_unknown: -50.0
+pa_goal_threshold: 0.5
+
+goal: "16,10,20;30,0,20"
+goal_radius: 1.0
+wp_radius: 2.5
+lidar_topic: /sensor_suite/lidar/points
+odom_topic: /iris/odometry
+max_points: 200
+max_raw_points: 25000
+sensor_offset_body_frd: [0.08, 0.0, -0.16]
+stale_after_s: 0.5
+hard_brake_m: 1.0

@@ -4,6 +4,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /Vehicle pose1
         - /3D LiDAR1
         - /RGB Camera1
         - /Depth Camera1
@@ -21,7 +22,52 @@ Visualization Manager:
       Name: Local Grid
       Plane: XY
       Plane Cell Count: 20
-      Reference Frame: sensor_suite_link
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/RobotModel
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Name: Vehicle model
+      TF Prefix: ""
+      Update Interval: 0
+      Visual Enabled: true
+    - Angle Tolerance: 0.1
+      Class: rviz_default_plugins/Odometry
+      Enabled: true
+      Keep: 500
+      Name: Vehicle odometry
+      Position Tolerance: 0.1
+      Shape:
+        Alpha: 1
+        Axes Length: 0.7
+        Axes Radius: 0.05
+        Color: 255; 25; 0
+        Head Length: 0.22
+        Head Radius: 0.08
+        Shaft Length: 0.55
+        Shaft Radius: 0.035
+        Value: Arrow
+      Topic:
+        Depth: 10
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /iris/odometry
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Marker Scale: 0.5
+      Name: TF tree
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Update Interval: 0
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -93,7 +139,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 30; 32; 36
-    Fixed Frame: sensor_suite_link
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -104,15 +150,15 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 11
+      Distance: 24
       Focal Point:
-        X: 1.5
+        X: 0
         Y: 0
-        Z: 0.5
-      Name: Sensor overview
+        Z: 1
+      Name: Vehicle and sensor overview
       Near Clip Distance: 0.01
       Pitch: 0.55
-      Target Frame: sensor_suite_link
+      Target Frame: odom
       Yaw: 3.6
     Saved: ~
 Window Geometry:

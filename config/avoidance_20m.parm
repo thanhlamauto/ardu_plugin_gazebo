@@ -1,0 +1,99 @@
+# avoidance_20m.parm
+# ArduCopter params for 20 m low-altitude obstacle avoidance with Gazebo 3D lidar
+# Load with sim_vehicle.py --add-param-file=.../avoidance_20m.parm
+# OR after SITL boot: param load avoidance_20m.parm then param fetch / reboot if needed
+#
+# This file extends gazebo-iris-gimbal.parm with proximity + avoidance.
+
+# ---- mount / frame (from gazebo-iris-gimbal.parm) ----
+FRAME_CLASS	     1
+FRAME_TYPE	     1
+MOT_PWM_MIN      1100
+MOT_PWM_MAX      1900
+MNT1_TYPE        1
+MNT1_PITCH_MAX   45
+MNT1_PITCH_MIN   -135
+MNT1_ROLL_MAX    30
+MNT1_ROLL_MIN    -30
+MNT1_YAW_MAX     160
+MNT1_YAW_MIN     -160
+RC6_MAX          1900
+RC6_MIN          1100
+RC6_OPTION       212
+RC7_MAX          1900
+RC7_MIN          1100
+RC7_OPTION       213
+RC8_MAX          1900
+RC8_MIN          1100
+RC8_OPTION       214
+SERVO9_FUNCTION  8
+SERVO10_FUNCTION 7
+SERVO11_FUNCTION 6
+
+# ---- dedicated MAVLink 2 port for the LiDAR bridge ----
+# SITL is launched with: -A "--serial1=tcp:2"
+# tcp:2 maps to TCP 5762 for instance 0.
+SERIAL1_PROTOCOL 2
+SERIAL1_BAUD     921
+
+# ---- low-altitude flight ----
+# Bit 6 makes Guided position targets use AC_WPNav_OA.  Without this,
+# MAV_CMD_DO_REPOSITION / MAVProxy `guided LAT LON ALT` bypass BendyRuler.
+GUID_OPTIONS     64
+WP_SPD           1
+WPNAV_SPEED      100
+WPNAV_ACCEL      100
+WPNAV_RADIUS     200
+PSC_POSZ_P       1.0
+PSC_VELZ_P       5.0
+ANGLE_MAX        3000
+
+# ---- fence (optional, keep disabled so AVOID can slide) ----
+FENCE_ENABLE     0
+#FENCE_TYPE       4
+#FENCE_ALT_MAX    30
+#FENCE_RADIUS     80
+
+# ---- proximity: expect OBSTACLE_DISTANCE_3D from companion computer ---
+# PRX1_TYPE 2 = MAVLink (AP_Proximity_MAV)
+PRX1_TYPE        2
+PRX1_ORIENT      0
+PRX1_YAW_CORR    0
+# The bridge sends one OBSTACLE_DISTANCE_3D per representative point.
+PRX1_MIN         0.3
+PRX1_MAX         30
+# Ignore ground: PRX_IGN_GND helps copter
+PRX_IGN_GND      1
+PRX_FILT         1.0
+OA_DB_OUTPUT     1
+
+# ---- simple avoidance (AC_Avoid) - acts in Loiter/AltHold/Guided ---
+# AVOID_ENABLE bitmask in ArduPilot: 1=Fence, 2=Proximity, 4=Beacon.
+# Enable only the proximity input for this demo.
+AVOID_ENABLE     2
+AVOID_MARGIN     4.0
+AVOID_DIST_MAX   8.0
+AVOID_BEHAVE     0
+AVOID_ALT_MIN    1.0
+AVOID_BACKUP_SPD 0.75
+AVOID_BACKUP_DZ  0.20
+
+# ---- object avoidance path planner (BendyRuler / Dijkstra) ----
+# OA_TYPE 0=None, 1=BendyRuler, 2=Dijkstra, 3=Dijkstra+BendyRuler fallback
+OA_TYPE          1
+# OA_MARGIN: keep at least 2 m from database objects (should be < AVOID_MARGIN)
+OA_MARGIN_MAX    5.0
+OA_BR_LOOKAHEAD  15.0
+OA_BR_CONT_RATIO 1.5
+OA_BR_TYPE       1
+OA_DB_SIZE       500
+OA_DB_QUEUE_SIZE 200
+OA_DB_EXPIRE     5
+
+# ---- rangefinder passthrough (kept for compatibility with SITL JSON rng_*) ---
+# When using lidar->MAVLink you do NOT need RNGFND, but we leave RNGFND1 as SITL
+# so that Gazebo plugin's rng_1 still feeds EKF terrain if you wire it.
+RNGFND1_TYPE     0
+RNGFND1_MAX      30
+RNGFND1_MIN      0.15
+RNGFND1_ORIENT   25

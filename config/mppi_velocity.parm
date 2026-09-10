@@ -1,0 +1,67 @@
+# mppi_velocity.parm
+# ArduCopter params for external MPPI local planner (companion-side avoidance).
+# Load with sim_vehicle.py --add-param-file=.../mppi_velocity.parm
+#
+# Unlike avoidance_20m.parm, ArduPilot runs NO avoidance of its own:
+#   OA_TYPE=0, AVOID_ENABLE=0, PRX1_TYPE=0, GUID_OPTIONS=0.
+# A companion node (scripts/mppi_velocity_avoidance.py) consumes the Gazebo
+# 3D lidar directly, runs MPPI, and streams GUIDED velocity setpoints
+# (SET_POSITION_TARGET_LOCAL_NED, velocity-only) over SERIAL1.
+# ArduPilot just tracks (vx, vy, vz); if the stream stops for GUID_TIMEOUT
+# seconds the copter brakes and holds position - that is the safety net.
+
+# ---- mount / frame (unchanged from gazebo-iris-gimbal.parm) ----
+FRAME_CLASS	     1
+FRAME_TYPE	     1
+MOT_PWM_MIN      1100
+MOT_PWM_MAX      1900
+MNT1_TYPE        1
+MNT1_PITCH_MAX   45
+MNT1_PITCH_MIN   -135
+MNT1_ROLL_MAX    30
+MNT1_ROLL_MIN   -30
+MNT1_YAW_MAX     160
+MNT1_YAW_MIN     -160
+RC6_MAX          1900
+RC6_MIN          1100
+RC6_OPTION       212
+RC7_MAX          1900
+RC7_MIN          1100
+RC7_OPTION       213
+RC8_MAX          1900
+RC8_MIN          1100
+RC8_OPTION       214
+SERVO9_FUNCTION  8
+SERVO10_FUNCTION  7
+SERVO11_FUNCTION  6
+
+# ---- dedicated MAVLink 2 port for the MPPI node ----
+# SITL is launched with: -A "--serial1=tcp:2" -> TCP 5762.
+SERIAL1_PROTOCOL 2
+SERIAL1_BAUD     921
+
+# ---- velocity tracking in GUIDED ----
+# GUID_OPTIONS 0: no bit 6, so nothing routes through AC_WPNav_OA; the
+# copter tracks companion velocity targets directly.
+GUID_OPTIONS     0
+# 3 m/s horizontal speed budget shared by MPPI and the velocity controller.
+WP_SPD           3
+WPNAV_SPEED      300
+WPNAV_ACCEL      150
+WPNAV_RADIUS     200
+PSC_POSZ_P       1.0
+PSC_VELZ_P       5.0
+ANGLE_MAX        3000
+
+# ---- fence (optional, keep disabled) ----
+FENCE_ENABLE     0
+
+# ---- ArduPilot avoidance OFF: MPPI on the companion owns obstacle avoidance ----
+AVOID_ENABLE     0
+OA_TYPE          0
+
+# ---- rangefinder passthrough (kept for compatibility with SITL JSON rng_*) ----
+RNGFND1_TYPE     0
+RNGFND1_MAX      30
+RNGFND1_MIN      0.15
+RNGFND1_ORIENT   25
