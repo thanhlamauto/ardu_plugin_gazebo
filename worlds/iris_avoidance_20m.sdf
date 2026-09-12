@@ -1,0 +1,183 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="iris_avoidance_20m">
+    <physics name="1ms" type="ignore">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-magnetometer-system" name="gz::sim::systems::Magnetometer"/>
+    <plugin filename="gz-sim-air-pressure-system" name="gz::sim::systems::AirPressure"/>
+    <plugin filename="gz-sim-navsat-system" name="gz::sim::systems::NavSat"/>
+
+    <!-- Same WGS84 origin as iris_sensor_runway / docs runway demo
+         => MAVProxy MicrosoftSat map aligns (CMAC Australia). -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>-35.363262</latitude_deg>
+      <longitude_deg>149.165237</longitude_deg>
+      <elevation>584</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <magnetic_field>2.1e-5 5.0e-6 -4.2e-5</magnetic_field>
+
+    <scene>
+      <ambient>0.60 0.60 0.60</ambient>
+      <background>0.72 0.82 0.92</background>
+      <shadows>true</shadows>
+    </scene>
+    <light type="directional" name="sun">
+      <pose>0 0 15 0 0 0</pose>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.4 0.2 -0.9</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+
+    <model name="ground">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>120 120 0.2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>120 120 0.2</size></box></geometry>
+          <material>
+            <ambient>0.22 0.26 0.20 1</ambient>
+            <diffuse>0.30 0.36 0.28 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Runway kept for visual reference (optional) -->
+    <include>
+      <uri>model://runway</uri>
+      <pose degrees="true">-29 545 0 0 0 363</pose>
+    </include>
+
+    <!-- === Obstacle course for 20 m low-altitude test ===
+         All heights 12-20 m so that at takeoff 20 m the vehicle
+         must actively avoid horizontally. Spacing creates corridors
+         that BendyRuler / Dijkstra must navigate. -->
+
+    <!-- North wall 18 m high - forces go-around -->
+    <model name="north_wall">
+      <static>true</static>
+      <pose>22 0 9 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.6 40 18</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.6 40 18</size></box></geometry>
+          <material><ambient>0.78 0.78 0.82 1</ambient><diffuse>0.88 0.88 0.92 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Central pillars - create choke points -->
+    <model name="pillar_north">
+      <static>true</static>
+      <pose>10 8 10 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.8</radius><length>20</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.8</radius><length>20</length></cylinder></geometry>
+          <material><ambient>0.65 0.05 0.04 1</ambient><diffuse>0.9 0.08 0.05 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="pillar_south">
+      <static>true</static>
+      <pose>10 -8 9 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.8</radius><length>18</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.8</radius><length>18</length></cylinder></geometry>
+          <material><ambient>0.03 0.18 0.65 1</ambient><diffuse>0.04 0.28 0.95 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="pillar_mid">
+      <static>true</static>
+      <pose>16 0 8 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.5 1.5 16</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>1.5 1.5 16</size></box></geometry>
+          <material><ambient>0.72 0.50 0.02 1</ambient><diffuse>1 0.72 0.04 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- East cluster -->
+    <model name="tower_east">
+      <static>true</static>
+      <pose>30 6 7.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>1.2</radius><length>15</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>1.2</radius><length>15</length></cylinder></geometry>
+          <material><ambient>0.12 0.55 0.22 1</ambient><diffuse>0.18 0.78 0.30 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="tower_west">
+      <static>true</static>
+      <pose>-10 6 7 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>2 2 14</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>2 2 14</size></box></geometry>
+          <material><ambient>0.55 0.08 0.55 1</ambient><diffuse>0.8 0.12 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Corridor walls at 12 m -->
+    <model name="corridor_wall_left">
+      <static>true</static>
+      <pose>5 12 6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>18 0.5 12</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>18 0.5 12</size></box></geometry>
+          <material><ambient>0.50 0.50 0.52 1</ambient><diffuse>0.62 0.62 0.66 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="corridor_wall_right">
+      <static>true</static>
+      <pose>5 -12 6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>18 0.5 12</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>18 0.5 12</size></box></geometry>
+          <material><ambient>0.50 0.50 0.52 1</ambient><diffuse>0.62 0.62 0.66 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Low boxes for depth camera / lidar near-field test -->
+    <model name="red_box_low">
+      <static>true</static>
+      <pose>4 -3 1 0 0 0.25</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.2 1.2 2</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>1.2 1.2 2</size></box></geometry>
+          <material><ambient>0.65 0.05 0.04 1</ambient><diffuse>0.9 0.08 0.05 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="blue_tower_low">
+      <static>true</static>
+      <pose>7 4 3 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.55</radius><length>6</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.55</radius><length>6</length></cylinder></geometry>
+          <material><ambient>0.03 0.18 0.65 1</ambient><diffuse>0.04 0.28 0.95 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://iris_with_sensor_suite</uri>
+      <pose>0 0 0.195 0 0 90</pose>
+    </include>
+  </world>
+</sdf>

@@ -31,7 +31,10 @@ from mppi_ardupilot.mppi_local_planner_node import (
     PlannerState,
     TimingWindow,
     VelocityCommandConditioner,
+    config_from_dict,
     parse_goal,
+    parse_reference_path,
+    resolve_rviz_goal,
 )
 from mppi_ardupilot.occupancy_grid import FREE, OCCUPIED, UNKNOWN, OccupancyGrid3D
 from mppi_ardupilot.pa_mppi_controller import PAMPPIConfig, PerceptionAwareMPPI
@@ -48,12 +51,20 @@ class FakePlanner:
         self.goal = None
         self.obstacles = None
         self.command_calls = 0
+        self.reference_path = None
+        self.route_resets = 0
 
     def update_goal(self, goal):
         self.goal = np.asarray(goal)
 
     def update_obstacles(self, obstacles):
         self.obstacles = obstacles
+
+    def update_reference_path(self, path):
+        self.reference_path = path
+
+    def reset_for_new_route(self):
+        self.route_resets += 1
 
     def command(self, pos, vel, yaw):
         self.command_calls += 1
@@ -146,6 +157,40 @@ class TestMavlinkAndFrames(unittest.TestCase):
 
 
 class TestPlannerSafety(unittest.TestCase):
+    def test_replace_route_resets_terminal_and_warm_start(self):
+        planner = FakePlanner()
+        conditioner = VelocityCommandConditioner(0.1, 0.5, 1.0, 1.0, 1.0)
+        node = LocalPlannerNode(
+            planner, [np.array([1.0, 0.0, 2.0])],
+            command_conditioner=conditioner,
+        )
+        node.reached = True
+        node.wp_index = 0
+        conditioner.previous = np.ones(4)
+        route = [np.array([4.0, -2.0, 3.0])]
+        reference = [np.array([1.0, 1.0, 3.0]), route[0]]
+        node.replace_route(route, reference_path=reference)
+        self.assertFalse(node.reached)
+        self.assertEqual(node.wp_index, 0)
+        self.assertIsNone(conditioner.previous)
+        self.assertEqual(planner.route_resets, 1)
+        np.testing.assert_allclose(planner.goal, route[0])
+        np.testing.assert_allclose(planner.reference_path, reference)
+        with self.assertRaises(ValueError):
+            node.replace_route([np.array([float("nan"), 0.0, 2.0])])
+
+    def test_rviz_goal_keeps_current_or_uses_fixed_altitude(self):
+        clicked = [8.0, -3.0, 0.0]
+        current = [1.0, 2.0, 19.8]
+        np.testing.assert_allclose(
+            resolve_rviz_goal(clicked, current), [8.0, -3.0, 19.8]
+        )
+        np.testing.assert_allclose(
+            resolve_rviz_goal(clicked, current, 20.0), [8.0, -3.0, 20.0]
+        )
+        with self.assertRaises(ValueError):
+            resolve_rviz_goal([float("inf"), 0.0, 0.0], current)
+
     def setUp(self):
         self.fake = FakePlanner()
         self.node = LocalPlannerNode(self.fake, [np.array([5.0, 0.0, 2.0])], hard_brake_m=1.0)
@@ -183,6 +228,21 @@ class TestPlannerSafety(unittest.TestCase):
         self.assertNotEqual(out.event, "reached")
         np.testing.assert_allclose(out.u, [1, 0, 0, 0.1])
 
+    def test_final_goal_approach_speed_is_tapered(self):
+        # Deliberately make the stochastic planner point sideways; the final
+        # arrival gate must replace that translation direction.
+        self.fake.command = lambda pos, vel, yaw: np.array([0.0, 1.0, 0.0, 0.1])
+        node = LocalPlannerNode(
+            self.fake, [np.array([5.0, 0.0, 2.0])], goal_radius=0.25,
+            goal_slowdown_radius=4.0, goal_approach_gain=0.5,
+            goal_min_speed=0.1,
+        )
+        state = PlannerState(np.array([4.5, 0.0, 2.0]), np.zeros(3), 0.0)
+        out = node.step(state, None)
+        # cap = 0.5 * (0.5 - 0.25) = 0.125 m/s
+        self.assertAlmostEqual(np.linalg.norm(out.u[:3]), 0.125)
+        np.testing.assert_allclose(out.u[:3], [0.125, 0.0, 0.0])
+
     def test_normal_command_has_diagnostics(self):
         out = self.node.step(self.state, None)
         np.testing.assert_allclose(out.u, [1, 0, 0, 0.1])
@@ -209,6 +269,34 @@ class TestPlannerSafety(unittest.TestCase):
         self.assertLessEqual(np.linalg.norm(second[:2] - first[:2]), 0.1 + 1e-12)
         self.assertLessEqual(abs(second[2] - first[2]), 0.05 + 1e-12)
         self.assertLessEqual(abs(second[3] - first[3]), 0.2 + 1e-12)
+
+    def test_velocity_command_conditioner_clamps_measured_initial_state(self):
+        conditioner = VelocityCommandConditioner(
+            0.1, 1.0, 1.0, 1.0, 1.0,
+            u_min=[-1.0, -1.0, -0.5, -0.2],
+            u_max=[1.0, 1.0, 0.5, 0.2],
+        )
+        output = conditioner.apply([0.0, 0.0, 0.0, 0.0], [5.0, -5.0, -3.0])
+        self.assertTrue(np.all(output <= [1.0, 1.0, 0.5, 0.2]))
+        self.assertTrue(np.all(output >= [-1.0, -1.0, -0.5, -0.2]))
+
+    def test_predictive_brake_then_recovery(self):
+        node = LocalPlannerNode(
+            self.fake, [np.array([5.0, 0.0, 2.0])],
+            hard_brake_m=1.0, hard_brake_release_m=1.8,
+            hard_brake_delay_s=0.25, brake_accel_m_s2=1.0,
+            recovery_speed_m_s=0.4,
+        )
+        obstacle = np.array([[1.5, 0.0, 2.0]])
+        moving = PlannerState(np.array([0.0, 0.0, 2.0]), np.array([2.0, 0.0, 0.0]), 0.0)
+        braking = node.step(moving, obstacle)
+        self.assertEqual(braking.event, "hold-brake")
+        self.assertGreater(braking.diagnostics["safety_trigger_m"], 1.5)
+        np.testing.assert_allclose(braking.u, 0.0)
+        stopped = PlannerState(np.array([0.0, 0.0, 2.0]), np.zeros(3), 0.0)
+        recovery = node.step(stopped, obstacle)
+        self.assertEqual(recovery.event, "recover-brake")
+        np.testing.assert_allclose(recovery.u[:3], [-0.4, 0.0, 0.0])
 
     def test_hard_brake_bypasses_and_resets_conditioner(self):
         conditioner = VelocityCommandConditioner(0.1, 1.0, 1.0, 1.0, 1.0)
@@ -245,6 +333,15 @@ class TestOccupancyGrid(unittest.TestCase):
 
 
 class TestDiagnostics(unittest.TestCase):
+    def test_empty_timing_window_has_stable_schema(self):
+        result = TimingWindow(deadline_ms=90).summary()
+        self.assertEqual(result["samples"], 0)
+        self.assertEqual(result["deadline_misses"], 0)
+        self.assertEqual(result["mean_ms"], 0.0)
+        self.assertEqual(result["p95_ms"], 0.0)
+        self.assertEqual(result["worst_ms"], 0.0)
+        self.assertEqual(result["deadline_ms"], 90.0)
+
     def test_timing_window(self):
         timing = TimingWindow(deadline_ms=10, window=3)
         for value in (5, 8, 12, 7):
@@ -261,6 +358,11 @@ class TestDiagnostics(unittest.TestCase):
         planner.update_obstacles(np.array([[1.5, 3.0, 2.0]]))
         action = planner.command([0, 0, 2], [0, 0, 0], 0)
         self.assertEqual(action.shape, (4,))
+        applied = np.array([0.1, -0.2, 0.05, -0.03])
+        planner.accept_applied_control(applied)
+        np.testing.assert_allclose(
+            planner.ctrl.get_action_sequence()[0].detach().cpu().numpy(), applied
+        )
         self.assertEqual(planner.predict_trajectory().shape, (6, 3))
         self.assertEqual(planner.sampled_trajectories(3).shape, (3, 6, 3))
         diagnostics = planner.optimizer_diagnostics()
@@ -281,6 +383,135 @@ class TestDiagnostics(unittest.TestCase):
         np.testing.assert_allclose(u_first, u_second, atol=0, rtol=0)
         with self.assertRaises(ValueError):
             second.command([float("nan"), 0, 2], [0, 0, 0], 0)
+
+    def test_global_path_distance_and_cost(self):
+        import torch
+
+        cfg = MPPIConfig(
+            horizon=3, samples=8, device="cpu", w_path=4.0, path_scale_m=2.0,
+            w_goal=0.0, w_obstacle=0.0, w_u=0.0, w_du=0.0, w_yaw=0.0,
+        )
+        planner = QuadMPPI(cfg)
+        planner.update_goal([5, 0, 2])
+        planner.update_reference_path([[0, 0, 2], [5, 0, 2]])
+        points = torch.tensor(
+            [[2.0, 0.0, 2.0], [2.0, 1.0, 2.0], [2.0, 0.0, 4.0]],
+            dtype=torch.double,
+        )
+        np.testing.assert_allclose(
+            planner._path_distance(points).detach().numpy(), [0.0, 1.0, 2.0]
+        )
+        state = torch.tensor(
+            [[0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0],
+             [0.0, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0]],
+            dtype=torch.double,
+        )
+        action = torch.zeros((2, 4), dtype=torch.double)
+        cost = planner._running_cost(state, action)
+        self.assertAlmostEqual(float((cost[1] - cost[0]).item()), 1.0, places=9)
+        planner.update_reference_path(None)
+        np.testing.assert_allclose(planner._path_distance(points).numpy(), 0.0)
+
+    def test_global_path_rejects_nonfinite_and_parser_requires_polyline(self):
+        cfg = MPPIConfig(horizon=2, samples=8, device="cpu")
+        planner = QuadMPPI(cfg)
+        with self.assertRaises(ValueError):
+            planner.update_reference_path([[0, 0, 0], [float("nan"), 0, 0]])
+        with self.assertRaises(SystemExit):
+            parse_reference_path("1,2,3")
+        np.testing.assert_allclose(
+            parse_reference_path("1,2,3;4,5,6")[1], [4, 5, 6]
+        )
+
+    def test_paper_cost_profile_uses_effort_and_collision_indicator(self):
+        import torch
+
+        cfg = MPPIConfig(
+            horizon=3, samples=8, device="cpu", cost_profile="paper",
+            w_goal=0.0, w_terminal=0.0, w_obstacle=999.0, w_du=999.0,
+            w_yaw=999.0, w_path=0.0, w_collision=100.0,
+            collision_radius_m=0.5,
+        )
+        planner = QuadMPPI(cfg)
+        planner.update_obstacles([[0.0, 0.0, 2.0]])
+        state_far = torch.tensor([[2.0, 0.0, 2.0, 0, 0, 0, 0]], dtype=torch.double)
+        state_near = torch.tensor([[0.4, 0.0, 2.0, 0, 0, 0, 0]], dtype=torch.double)
+        action = torch.zeros((1, 4), dtype=torch.double)
+        far = float(planner._running_cost(state_far, action).item())
+        near = float(planner._running_cost(state_near, action).item())
+        self.assertAlmostEqual(far, 0.0, places=12)
+        self.assertAlmostEqual(near, 100.0, places=12)
+
+    def test_paper_cost_profile_applies_input_change_penalty_to_sequence(self):
+        import torch
+
+        cfg = MPPIConfig(
+            horizon=3, samples=8, device="cpu", cost_profile="paper",
+            w_goal=0.0, w_terminal=0.0, w_obstacle=0.0, w_du=0.0,
+            w_yaw=0.0, w_path=0.0, w_collision=0.0,
+            paper_r_u=(0.0, 0.0, 0.0, 0.0),
+            paper_r_delta_u=(1.0, 2.0, 3.0, 4.0),
+        )
+        planner = QuadMPPI(cfg)
+        states = torch.zeros((1, 1, 3, planner.NX), dtype=torch.double)
+        actions = torch.tensor(
+            [[[[0.0, 0.0, 0.0, 0.0],
+               [1.0, 0.0, 0.0, 0.0],
+               [1.0, 2.0, 0.0, 0.0]]]],
+            dtype=torch.double,
+        )
+        # The paper-style implementation evaluates the feasible actions that
+        # were propagated in each rollout, not the pre-conditioner requests.
+        states[0, 0, :, 7:11] = actions[0, 0]
+        # Δu_0=[1,0,0,0] costs 1; Δu_1=[0,2,0,0] costs 8.
+        self.assertAlmostEqual(float(planner._terminal_cost(states, actions).item()), 9.0)
+
+    def test_paper_reference_is_time_indexed_and_progress_is_monotonic(self):
+        import torch
+
+        cfg = MPPIConfig(
+            horizon=3, samples=8, device="cpu", cost_profile="paper",
+            dt=1.0, reference_speed_m_s=1.0, w_path=4.0,
+            w_reference_velocity=2.0, w_goal=0.0, w_terminal=0.0,
+            w_collision=0.0, paper_r_u=(0.0, 0.0, 0.0, 0.0),
+        )
+        planner = QuadMPPI(cfg)
+        planner.update_reference_path([[0, 0, 2], [10, 0, 2]])
+        planner._update_reference_trajectory(np.array([0.0, 0.0, 2.0]))
+        np.testing.assert_allclose(
+            planner.reference_positions.detach().numpy(),
+            [[1, 0, 2], [2, 0, 2], [3, 0, 2]],
+        )
+        state = torch.tensor(
+            [[1.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0, 0, 0, 0],
+             [1.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0, 0, 0, 0]],
+            dtype=torch.double,
+        )
+        action = torch.zeros((2, 4), dtype=torch.double)
+        cost = planner._running_cost(state, action, t=0)
+        self.assertAlmostEqual(float(cost[1] - cost[0]), 4.0)
+        planner._update_reference_trajectory(np.array([4.0, 0.0, 2.0]))
+        progress = planner._path_progress_m
+        planner._update_reference_trajectory(np.array([1.0, 0.0, 2.0]))
+        self.assertEqual(planner._path_progress_m, progress)
+
+    def test_rollout_dynamics_contains_feasible_conditioned_command(self):
+        import torch
+
+        cfg = MPPIConfig(
+            horizon=2, samples=8, device="cpu", dt=0.1,
+            command_alpha=1.0, max_accel_xy=1.0, max_accel_z=0.5,
+            max_yaw_accel=2.0, vmax=1.0, vzmax=0.5, yaw_rate_max=0.2,
+        )
+        planner = QuadMPPI(cfg)
+        state = torch.zeros(planner.NX, dtype=torch.double)
+        requested = torch.tensor([5.0, 5.0, 5.0, 5.0], dtype=torch.double)
+        next_state = planner._dynamics(state, requested)
+        applied = next_state[7:11].numpy()
+        self.assertLessEqual(np.linalg.norm(applied[:2]), 0.1 + 1e-12)
+        self.assertAlmostEqual(applied[2], 0.05)
+        self.assertAlmostEqual(applied[3], 0.2)
+        self.assertTrue(np.all(applied <= cfg.u_max()))
 
     def test_pa_mppi_fuses_map_and_reports_perception_state(self):
         cfg = PAMPPIConfig(horizon=5, samples=32, device="cpu")
@@ -391,6 +622,23 @@ class TestCliParsing(unittest.TestCase):
         self.assertEqual(len(route), 2)
         np.testing.assert_allclose(route[1], [4, 5, 6])
 
+    def test_path_cli_options(self):
+        args = build_parser().parse_args(
+            ["--global-path", "0,0,2;5,0,2", "--w-path", "2.5"]
+        )
+        self.assertEqual(args.global_path, "0,0,2;5,0,2")
+        self.assertEqual(args.w_path, 2.5)
+
+    def test_rviz_goal_cli_options(self):
+        args = build_parser().parse_args([
+            "--rviz-goal-topic", "/goal_pose",
+            "--rviz-goal-frame", "odom",
+            "--rviz-goal-altitude", "20",
+        ])
+        self.assertEqual(args.rviz_goal_topic, "/goal_pose")
+        self.assertEqual(args.rviz_goal_frame, "odom")
+        self.assertEqual(args.rviz_goal_altitude, 20.0)
+
     def test_yaml_runtime_values_and_cli_precedence(self):
         args = build_parser().parse_args([])
         apply_runtime_config(args, {"hz": 7.0, "goal": "1,2,3", "max_points": 99})
@@ -401,6 +649,16 @@ class TestCliParsing(unittest.TestCase):
         explicit = build_parser().parse_args(["--hz", "12"])
         apply_runtime_config(explicit, {"hz": 7.0})
         self.assertEqual(explicit.hz, 12.0)
+
+    def test_yaml_paper_cost_weights_are_loaded(self):
+        cfg = config_from_dict({
+            "cost_profile": "paper",
+            "paper_r_u": [0.1, 0.2, 0.3, 0.4],
+            "paper_r_delta_u": [0.4, 0.3, 0.2, 0.1],
+        })
+        self.assertEqual(cfg.cost_profile, "paper")
+        self.assertEqual(cfg.paper_r_u, [0.1, 0.2, 0.3, 0.4])
+        self.assertEqual(cfg.paper_r_delta_u, [0.4, 0.3, 0.2, 0.1])
 
 
 if __name__ == "__main__":

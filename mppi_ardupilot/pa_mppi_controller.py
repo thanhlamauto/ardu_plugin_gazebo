@@ -1,6 +1,6 @@
 """Perception-Aware MPPI v0 cho pipeline velocity-level hiện tại.
 
-Port này giữ interface và dynamics 7-state của ``QuadMPPI`` nhưng bổ sung hai
+Port này giữ interface velocity-level của ``QuadMPPI`` nhưng bổ sung hai
 thành phần cốt lõi của PA-MPPI (Zhai et al., RA-L 2026): occupancy grid ba
 trạng thái và perception cost ở endpoint của rollout. Đây chưa phải bản tái
 tạo paper-faithful vì paper dùng full rigid-body dynamics, body-rate/thrust và
@@ -59,8 +59,8 @@ class PerceptionAwareMPPI(QuadMPPI):
         self.goal_visible = self.map.line_of_sight(pos, goal)
         return super().command(pos, vel, yaw)
 
-    def _running_cost(self, state, action):
-        cost = super()._running_cost(state, action)
+    def _running_cost(self, state, action, t=None):
+        cost = super()._running_cost(state, action, t)
         if self.map.origin is None:
             return cost
         status = self.map.lookup_torch(state[..., 0:3])

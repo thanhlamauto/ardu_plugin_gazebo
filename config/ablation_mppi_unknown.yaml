@@ -1,0 +1,45 @@
+# Fair unknown-environment ablation: PA controller with perception terms OFF.
+# Keep every non-perception field identical to ablation_pa_mppi_unknown.yaml.
+hz: 10.0
+dt: 0.1
+tau: 0.5
+horizon: 20
+samples: 128
+lambda: 1.0
+device: cpu
+seed: 7
+vmax: 2.0
+vzmax: 1.0
+yaw_rate_max: 0.6
+noise_xy: 0.8
+noise_z: 0.3
+noise_yaw: 0.3
+margin: 4.0
+w_goal: 1.0
+w_terminal: 5.0
+w_obstacle: 300.0
+w_u: 0.05
+w_du: 0.2
+w_yaw: 0.2
+map_resolution: 0.5
+map_size_x: 80.0
+map_size_y: 80.0
+map_size_z: 40.0
+map_free_inflation: 0.5
+map_occupied_inflation: 0.5
+map_sensor_free_radius: 4.0
+w_pa_collision: 500.0
+w_pa_poi: 0.0
+w_pa_occupied: 0.0
+w_pa_unknown: 0.0
+pa_goal_threshold: 0.5
+goal_radius: 1.0
+wp_radius: 2.5
+stale_after_s: 0.5
+hard_brake_m: 1.0
+planner_timeout_ms: 90.0
+lidar_topic: /sensor_suite/lidar/points
+odom_topic: /iris/odometry
+max_points: 200
+max_raw_points: 25000
+sensor_offset_body_frd: [0.08, 0.0, -0.16]

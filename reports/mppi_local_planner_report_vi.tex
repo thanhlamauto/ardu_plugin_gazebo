@@ -1,0 +1,208 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usepackage{fontspec}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage{hyperref}
+
+\setsansfont{Helvetica Neue}
+\setmonofont{Menlo}
+\usetheme{Boadilla}
+\usecolortheme{dolphin}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\raise0.2ex\hbox{\tiny$\blacktriangleright$}}
+\setbeamercolor{structure}{fg=blue!55!black}
+\setbeamercolor{block title}{fg=white,bg=blue!55!black}
+\setbeamercolor{block body}{bg=blue!4}
+\setbeamerfont{frametitle}{series=\bfseries}
+\setbeamerfont{title}{series=\bfseries}
+
+\title{MPPI Local Planner trên Companion Computer}
+\subtitle{Tích hợp LiDAR 3D với ArduPilot GUIDED qua MAVLink}
+\author{Nguyễn Thành Lâm}
+\institute{Báo cáo tiến độ kỹ thuật}
+\date{09/09/2026}
+
+\newcommand{\ok}{\textcolor{green!45!black}{\textbf{Hoàn thành}}}
+\newcommand{\partdone}{\textcolor{orange!80!black}{\textbf{Một phần}}}
+\newcommand{\todo}{\textcolor{red!65!black}{\textbf{Chưa làm}}}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Mục tiêu và quyết định kiến trúc}
+  \begin{block}{Vấn đề}
+    Pipeline \texttt{AP\_Avoidance} yêu cầu tiền xử lý obstacle theo giao thức
+    của ArduPilot. Cách này làm perception và tracking phụ thuộc vào autopilot.
+  \end{block}
+
+  \vspace{0.4em}
+  \textbf{Thiết kế đã chọn}
+  \begin{itemize}
+    \item Companion computer nhận point cloud LiDAR 3D và chạy local planner.
+    \item MPPI sinh $u=[v_x,v_y,v_z,\dot\psi]$ theo thời gian thực.
+    \item ArduPilot ở \texttt{GUIDED} chỉ bám velocity setpoint.
+    \item Avoidance nội bộ của ArduPilot được tắt hoàn toàn.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Luồng dữ liệu đã triển khai}
+  \centering
+  \begin{minipage}{0.92\textwidth}
+    \centering
+    \texttt{LiDAR 3D PointCloud}\quad +\quad
+    \texttt{Odometry / MAVLink telemetry}
+
+    \vspace{0.7em}
+    $\Downarrow$
+
+    \vspace{0.7em}
+    \fbox{\parbox{0.78\textwidth}{\centering
+      Downsample và đổi frame FLU--FRD--ENU/NED\\[0.35em]
+      MPPI: 7-state, 4-action, 500 samples, horizon 3 s}}
+
+    \vspace{0.7em}
+    $\Downarrow$
+
+    \vspace{0.7em}
+    \texttt{SET\_POSITION\_TARGET\_LOCAL\_NED}\quad
+    \texttt{type\_mask = 1479}
+
+    \vspace{0.7em}
+    $\Downarrow$
+
+    \vspace{0.7em}
+    \textbf{ArduPilot GUIDED: attitude control và velocity tracking}
+  \end{minipage}
+\end{frame}
+
+\begin{frame}{Kết quả thực hiện}
+  \renewcommand{\arraystretch}{1.22}
+  \begin{tabular}{>{\RaggedRight\arraybackslash}p{0.38\textwidth}
+                  >{\RaggedRight\arraybackslash}p{0.22\textwidth}
+                  >{\RaggedRight\arraybackslash}p{0.30\textwidth}}
+    \toprule
+    Hạng mục & Trạng thái & Bằng chứng chính \\
+    \midrule
+    Tách avoidance khỏi ArduPilot & \ok & \texttt{OA\_TYPE=0}, \texttt{AVOID\_ENABLE=0} \\
+    Vanilla MPPI local planner & \ok & state 7D, action 4D, predicted path \\
+    MAVLink velocity + yaw rate & \ok & mask 1479, gửi 10 Hz \\
+    LiDAR 3D trong Gazebo & \ok & lọc, downsample, đổi frame \\
+    Global reference & \partdone & waypoint nhập tay \\
+    Edge computer / quad thật & \partdone & có state MAVLink, chưa HIL/flight test \\
+    PA-MPPI & \partdone & v0 + rigid-body experimental \\
+    \bottomrule
+  \end{tabular}
+\end{frame}
+
+\begin{frame}{Bằng chứng kiểm thử}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Offline MPPI, chạy lại 09/09}
+        \begin{itemize}
+          \item Tới đích: \textbf{Có}
+          \item Vanilla: sai số \textbf{0.91 m}, clearance \textbf{6.09 m}
+          \item PA-MPPI v0: sai số \textbf{0.86 m}
+          \item PA-MPPI v0: clearance \textbf{5.85 m}
+          \item Cả hai đạt ngưỡng \textbf{5.00 m}
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Tích hợp}
+        \begin{itemize}
+          \item Gazebo plugin build thành công
+          \item Mask khớp enum \texttt{pymavlink}
+          \item \textbf{18/18} automated tests đạt
+          \item SITL arm, takeoff 20 m, hold, land đạt
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.5em}
+  \alert{Lưu ý:} log bay MPPI cũ nằm trong \texttt{/tmp}. Cần quay và lưu lại
+  video cùng log trong \texttt{output/} để tạo bằng chứng tái lập.
+\end{frame}
+
+\begin{frame}{Đánh giá kỹ thuật}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.49\textwidth}
+      \textbf{Điểm mạnh}
+      \begin{itemize}
+        \item Phân tầng đúng giữa planner và autopilot
+        \item Sửa đúng lỗi mask làm AP bỏ qua velocity
+        \item Module hóa controller, sensor và MAVLink
+        \item Có hold khi sensor stale hoặc obstacle quá gần
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \textbf{Rủi ro còn lại}
+      \begin{itemize}
+        \item Nhánh MAVLink mới xoay LiDAR theo yaw
+        \item Rigid branch chưa bay hover gate trong Gazebo
+        \item Mapper gần-field còn là giả thiết LiDAR 360 độ
+        \item Chưa benchmark trên edge computer
+        \item Waypoint tay chưa phải global planner
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.6em}
+  \begin{block}{Mức hoàn thành}
+    \textbf{8.5/10 cho prototype SITL}; khoảng \textbf{60\% cho triển khai trên
+    quad thật}.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Kế hoạch vòng tiếp theo}
+  \begin{enumerate}
+    \item Quay demo Gazebo + RViz Path, sampled rollouts và MAVLink target.
+    \item So sánh vanilla với PA-MPPI v0 trên cùng kịch bản và random seed.
+    \item Hoàn thiện attitude quaternion cho nhánh edge computer.
+    \item Benchmark 10 Hz: mean, p95, worst-case và
+      deadline miss.
+    \item Tích hợp hit/miss ray từ sensor thật và kiểm thử dropout.
+    \item Port thrust/body-rate dynamics nếu cần tái lập đầy đủ paper.
+  \end{enumerate}
+
+  \vfill
+  \footnotesize
+  Mã nguồn: \url{https://github.com/thanhlamauto/ardu_plugin_gazebo}
+\end{frame}
+
+\begin{frame}{Phạm vi PA-MPPI v0}
+  \small
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{>{\RaggedRight\arraybackslash}p{0.28\textwidth}
+                  >{\RaggedRight\arraybackslash}p{0.30\textwidth}
+                  >{\RaggedRight\arraybackslash}p{0.32\textwidth}}
+    \toprule
+    Thành phần & Port v0 trong repo & Bài báo PA-MPPI \\
+    \midrule
+    Bản đồ & voxel chưa biết/tự do/vật cản & ROG-Map, ray casting \\
+    Perception cost & hướng goal, thưởng vùng chưa biết, phạt vật cản
+      & hai pha theo line-of-sight \\
+    Dynamics & v0 $[p,v,\psi]$; rigid $[p,q,v,\omega]$
+      & rigid-body, thrust và body rates \\
+    Tối ưu & PyTorch, 512 rollout, target 50 Hz
+      & JAX, 17,500 rollout, 50 Hz control \\
+    Autopilot & \texttt{SET\_ATTITUDE\_TARGET}, chưa bay live
+      & low-level controller riêng \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.35em}
+  \alert{Kết luận:} rigid rollout và MAVLink output đã có; cần qua hover gate
+  Gazebo trước khi thử tránh vật cản.
+
+  \vfill
+  \scriptsize Zhai, Reiter, Scaramuzza, ``Perception-Aware MPPI for Quadrotor
+  Exploration,'' IEEE RA-L, 2026.
+\end{frame}
+
+\end{document}

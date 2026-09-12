@@ -1,5 +1,13 @@
 # Demo warehouse: MPPI local planner trên companion, điều khiển ArduPilot bằng velocity MAVLink
 
+Benchmark khó và hướng dẫn tune offline nằm tại
+[`docs/MPPI_TUNING_EXPERIMENTS.md`](MPPI_TUNING_EXPERIMENTS.md). Nên chạy
+benchmark này trước khi thay weight trong Gazebo; các profile benchmark không
+được mặc nhiên xem là cấu hình bay an toàn.
+
+Ba challenge world để visualize và kiểm tra Gazebo được hướng dẫn tại
+[`docs/run_mppi_challenge_worlds_vi.md`](run_mppi_challenge_worlds_vi.md).
+
 Demo này thay BendyRuler (thuật toán avoidance mặc định của ArduPilot) bằng
 **MPPI** ([UM-ARM-Lab/pytorch_mppi](https://github.com/UM-ARM-Lab/pytorch_mppi))
 chạy phía companion, đúng hướng kiến trúc đã chốt với mentor:
@@ -155,11 +163,18 @@ takeoff 20
 ```bash
 cd ~/Projects/ardupilot_gazebo
 export GZ_PARTITION=ardupilot_warehouse_demo
+export ROS_DOMAIN_ID=45
 
 MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
   scripts/mppi_velocity_avoidance.py \
+  --planner mppi \
+  --config mppi_ardupilot/config.yaml \
   --mav tcp:127.0.0.1:5762
 ```
+
+Luôn truyền `--config` nếu muốn các thay đổi trong YAML có hiệu lực. Nếu
+bỏ cờ này, wrapper dùng default trong `MPPIConfig` và runtime defaults; file
+YAML không được hot-reload, do đó phải khởi động lại node sau khi sửa.
 
 Mặc định `--goal "16,10,20;30,0,20"` (m, world ENU Gazebo): bay vòng phía bắc
 stack container tại `x=12` rồi tới đích phía đông ~30 m — tương đương lệnh
@@ -185,6 +200,35 @@ Lệnh velocity từng chu kỳ được low-pass và giới hạn slew-rate b�
 `command_alpha`, `max_accel_xy`, `max_accel_z`, `max_yaw_accel`. Đây là ràng
 buộc interface do project bổ sung để giảm quỹ đạo khấp khuỷu, không phải
 một kết quả Gazebo hay một thành phần được quy cho bài báo PA-MPPI.
+Trong `goal_slowdown_radius`, arrival controller thay hướng tịnh tiến ngẫu nhiên
+của MPPI bằng vector xác định hướng thẳng tới goal, đồng thời giới hạn
+tốc độ theo sai số để tránh bay vượt rồi quay vòng lại. MPPI vẫn
+quyết định hướng ở ngoài arrival gate. Lệnh sau conditioner/envelope
+được phản hồi vào nominal sequence của MPPI, giữ warm-start khớp lệnh
+thực sự gửi cho ArduPilot.
+
+### Call graph để debug
+
+```text
+scripts/mppi_velocity_avoidance.py:main
+  -> load_config/build_cfg/parse_goal
+  -> mppi_local_planner_node.py:run
+       -> gz.transport subscribe odometry + PointCloudPacked
+       -> lidar_to_mavlink_avoidance.py:_read_gz_points
+       -> lidar_preprocess.py:scan_to_world_enu
+       -> LocalPlannerNode.step
+            -> QuadMPPI.command -> pytorch_mppi.MPPI.command
+            -> VelocityCommandConditioner + goal arrival envelope
+            -> QuadMPPI.accept_applied_control (warm-start feedback)
+       -> enu_to_ned_vel/yaw_enu_to_ned_rate
+       -> ArduPilotInterface.send_velocity_ned
+       -> SET_POSITION_TARGET_LOCAL_NED mask 1479
+```
+
+ROS bridge/RViz chỉ hiển thị, không nằm trong control path. Vệt mũi tên đỏ
+trong RViz là history của `/iris/odometry`; nominal/sampled MPPI chỉ xuất hiện
+khi truyền các cờ `--rviz-traj-topic`/`--rviz-samples-topic` và Terminal 5
+dùng cùng `ROS_DOMAIN_ID=45` với RViz.
 
 ### State source: odom hay MAVLink telemetry?
 
@@ -245,6 +289,11 @@ thể chạy node với `--no-mav` để chỉ xem log MPPI mà không điều k
 | `--noise-xy/--noise-z/--noise-yaw` | 0.8 / 0.3 / 0.3 | sigma nhiễu sampling |
 | `--lambda` | 1.0 | temperature MPPI |
 | `--tau` | 0.5 | hằng số bám tốc của mô hình điểm-mass (giả lập giới hạn gia tốc) |
+| `--w-path` | 0 | trọng số bám global path; 0 = tắt |
+| `--path-scale-m` | 1.0 | scale chuẩn hóa lỗi khoảng cách tới path [m] |
+| `--global-path` | (tắt) | polyline ENU `x,y,z;x,y,z;...`, dùng khi `w_path>0` |
+| `--cost-profile` | project | `paper` chỉ bật paper-mapped effort/reference/collision terms |
+| `--collision-radius-m` | 0.5 | adapter bán kính point-cloud cho `paper` collision indicator |
 | `--device` | cpu | đổi `cuda` nếu companion có GPU |
 | `--rviz-traj-topic` | (tắt) | publish predicted rollout ra `nav_msgs/Path`, vd `/mppi/predicted_path` |
 | `--config` | (không) | file yaml ghi đè mặc định (mẫu: `mppi_ardupilot/config.yaml`) |
@@ -255,8 +304,18 @@ Mô hình quy hoạch: state `[p, v, yaw]` (7 chiều), action
 Cost mỗi bước: khoảng cách tới waypoint đang bám + softplus(margin −
 khoảng cách obstacle gần nhất, đã trừ offset để bằng 0 ngay tại biên
 margin) + norm điều khiển + yaw bám hướng bay (tỉ lệ tốc ngang); cost
-cuối: bình phương khoảng cách tới đích. Chi tiết trong
+cuối: bình phương khoảng cách tới đích. Khi bật `w_path`, thêm khoảng cách
+bình phương tới polyline global path sau chuẩn hóa `path_scale_m`; đây là
+điều chỉnh cấp project theo phần position-reference cost trong Minařík et al.
+(arXiv:2407.09812), không phải reproduction đầy đủ. Chi tiết trong
 `mppi_ardupilot/mppi_controller.py` (`QuadMPPI`).
+
+Để đối chiếu cost, dùng profile `config/experiments/mppi_paper_cost_only.yaml`
+và `--planner mppi`; profile này tắt các heuristic project. `R_\Delta` trong
+Eq. 16 được tính từ toàn bộ action sequence ở terminal callback và xuất hiện
+trong breakdown với khóa `input_change`. Tuy vậy đây vẫn là adaptation
+velocity-level, không phải reproduction đầy đủ của paper: state/reference theo
+thời gian, dynamics và collision geometry khác.
 
 ### Vì sao mask phải là 1479?
 

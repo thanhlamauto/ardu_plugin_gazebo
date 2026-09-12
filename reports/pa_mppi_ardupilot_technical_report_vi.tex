@@ -1,0 +1,767 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,top=24mm,bottom=25mm,left=26mm,right=24mm]{geometry}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{caption}
+
+\setmainfont{Times New Roman}
+\setsansfont{Helvetica Neue}
+\setmonofont{Menlo}[Scale=0.84]
+\definecolor{navy}{HTML}{17365D}
+\definecolor{blue}{HTML}{1F5A94}
+\definecolor{lightblue}{HTML}{EAF2F8}
+\definecolor{darkgray}{HTML}{454545}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=navy,
+  citecolor=navy,
+  urlcolor=blue,
+  pdftitle={Thiết kế và kiểm chứng PA-MPPI trên companion computer với ArduPilot},
+  pdfauthor={Nguyễn Thành Lâm}
+}
+
+\pagestyle{plain}
+\renewcommand{\abstractname}{Tóm tắt}
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\setlength{\emergencystretch}{2em}
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0.25em}
+\setlist{nosep,leftmargin=1.6em}
+\captionsetup{font=small,labelfont=bf}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\vect}[1]{\bm{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{\vspace{-1.5em}\textbf{Thiết kế và kiểm chứng PA-MPPI trên companion computer\vspace{0.2em}\\
+với ArduPilot và Gazebo}}
+\author{Nguyễn Thành Lâm\\[0.3em]
+\small Báo cáo tiến độ kỹ thuật}
+\date{13 tháng 09 năm 2026 -- evidence-first revision}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+Báo cáo trình bày quá trình chuyển tầng tránh vật cản từ
+\code{AP\_Avoidance} của ArduPilot sang companion computer. Hệ thống nhận
+point cloud LiDAR 3D, tối ưu quỹ đạo bằng Model Predictive Path Integral
+(MPPI), sau đó truyền setpoint cho ArduPilot ở chế độ \code{GUIDED}. Ba mức
+triển khai được đánh giá: vanilla MPPI với lệnh vận tốc, PA-MPPI v0 với bản đồ
+occupancy ba trạng thái và perception cost, và nhánh rigid-body experimental
+với trạng thái $[\vect p,\vect q,\vect v,\vect\omega]$ cùng lệnh collective
+thrust/body rate. Bản velocity-level có time-indexed global reference đã đạt
+terminal trong ba lần chạy Gazebo/SITL (right-angle, narrow-gate và slalom,
+mỗi map một seed). Nhánh rigid-body đã vượt qua kiểm tra hover, quaternion,
+packet MAVLink và closed-loop clear-air offline, nhưng chưa qua hover gate live
+trong Gazebo. Kết quả hỗ trợ tính khả thi của kiến trúc, không phải chứng nhận
+robustness hay an toàn phần cứng.
+\end{abstract}
+
+\noindent\textbf{Từ khóa:} MPPI, PA-MPPI, quadrotor, ArduPilot, MAVLink,
+LiDAR 3D, Gazebo, companion computer.
+
+\vspace{0.8em}
+\noindent\fcolorbox{navy}{lightblue}{\parbox{0.92\textwidth}{
+\textbf{Trạng thái bằng chứng tại ngày 13/09/2026:}
+\textbf{VERIFIED OFFLINE}: 40/40 unit tests và benchmark analytical 3 map
+$\times$ 3 seed. \textbf{VERIFIED GAZEBO/SITL, ONE SEED}: velocity-level
+right-angle, narrow-gate và slalom. \textbf{IMPLEMENTED, NOT LIVE-VERIFIED}:
+rigid body-rate/thrust và PA-MPPI unknown-space ablation.
+\textbf{PENDING GAZEBO}: rigid hover/body-rate và C-wall ablation.
+\textbf{PENDING EDGE/HARDWARE}: runtime/thermal, sensor model, HIL và flight.}}
+
+\clearpage
+\begingroup
+\small
+\tableofcontents
+\endgroup
+\clearpage
+
+\section{Bối cảnh và mục tiêu}
+
+Pipeline tuần trước đưa obstacle vào \code{AP\_Avoidance} thông qua MAVLink.
+Cách này yêu cầu companion computer chuyển dữ liệu cảm biến sang representation
+và vòng đời mà ArduPilot quản lý. Tuy nhiên, protocol không bắt buộc tạo
+persistent obstacle ID: \code{OBSTACLE\_DISTANCE\_3D} cho phép
+\code{UINT16\_MAX} khi ID không biết \cite{mavlinkArdupilotmega2026}; target
+handler cũng không đọc field này \cite{ardupilotSourceF808}. Mentor đề xuất tách
+hoàn toàn local planner khỏi autopilot: companion computer tự xử lý perception,
+sinh trajectory và gửi lệnh điều khiển; ArduPilot chỉ đảm nhiệm ổn định bay và
+tracking setpoint.
+
+Mục tiêu kỹ thuật của giai đoạn này gồm:
+
+\begin{enumerate}
+  \item xây dựng baseline MPPI không phụ thuộc \code{AP\_Avoidance};
+  \item tích hợp LiDAR 3D, state estimation và MAVLink thành một vòng kín;
+  \item bổ sung perception-aware objective theo PA-MPPI \cite{zhai2026pamppi};
+  \item tiến dần từ velocity-level model tới rigid-body model;
+  \item định nghĩa tiêu chí kiểm thử có thể tái lập trước khi chạy trên phần cứng.
+\end{enumerate}
+
+Phạm vi hiện tại là Gazebo và ArduPilot SITL. Báo cáo không xem kết quả offline
+hoặc SITL là bằng chứng đủ cho flight test trên quadrotor thật.
+
+\subsection*{Định danh phiên bản và quy tắc nguồn}
+
+\begingroup\small
+Project được audit tại commit
+\texttt{910c6a824fad0ca38615f93a0a17fc2c36d591cf}. ArduPilot là dependency ngoài
+repository, không phải vendored/submodule, tại commit
+\texttt{f808f78ce5a518ca96f2fb36420608b2b6254367}; MAVLink gitlink tương ứng là
+\texttt{71d925850d7ddb01d0e56defc1046f9d9d3bf8ae}. Protocol specification chỉ là
+thẩm quyền về message fields; source đúng commit là thẩm quyền cuối về hành vi
+firmware \cite{mavlinkCommon2026,ardupilotSourceF808}. Claim audit chi tiết nằm
+trong \code{docs/SOURCE\_AUDIT.md}.
+\endgroup
+
+\section{Kiến trúc hệ thống}
+
+\subsection{Phân tầng điều khiển}
+
+Luồng dữ liệu triển khai trong repository được tóm tắt như sau:
+
+\begin{center}
+\fcolorbox{navy}{lightblue}{\parbox{0.88\textwidth}{\centering
+LiDAR 3D + Gazebo odometry hoặc MAVLink telemetry\\
+$\Downarrow$\\
+lọc, downsample, đổi frame, occupancy mapping\\
+$\Downarrow$\\
+MPPI / PA-MPPI trên companion computer\\
+$\Downarrow$\\
+velocity target hoặc thrust/body-rate target qua MAVLink\\
+$\Downarrow$\\
+ArduPilot GUIDED $\rightarrow$ motor controller $\rightarrow$ Gazebo physics}}
+\end{center}
+
+Avoidance nội bộ của ArduPilot được tắt bằng \code{OA\_TYPE=0},
+\code{AVOID\_ENABLE=0} và \code{PRX1\_TYPE=0}. Do đó point cloud không đi qua
+\code{OBSTACLE\_DISTANCE\_3D}, \code{AP\_Proximity} hoặc obstacle database của
+ArduPilot.
+
+\subsection{Tại sao dùng kiến trúc này?}
+
+ArduPilot cung cấp Guided setpoint interfaces và stabilization nội bộ
+\cite{ardupilotGuidedDocs2026}; đồng thời có proximity/Simple Avoidance và
+BendyRuler \cite{ardupilotSimpleAvoidance2026,ardupilotBendyRuler2026}.
+\textbf{PROJECT DESIGN DECISION}: perception, occupancy mapping và PA-MPPI nằm
+ở companion vì optimizer cần truy cập trực tiếp map ba trạng thái và perception
+objective \cite{zhai2026pamppi}. Việc tắt AP OA trong experiment tránh hai
+avoidance loop cùng sửa lệnh; nó không có nghĩa AP avoidance vốn không dùng được.
+
+\begin{table}[ht]
+\centering\small
+\caption{Nguồn ràng buộc so với lựa chọn engineering.}
+\begin{tabularx}{\textwidth}{L{0.21\textwidth}L{0.30\textwidth}Y}
+\toprule
+\textbf{Decision} & \textbf{Source-supported constraint} & \textbf{Our design choice / why}\\
+\midrule
+Companion planning & Guided nhận external setpoints; PA-MPPI dùng online map. & Giữ map/optimizer ngoài AP để không dịch internal representation.\\
+Disable AP OA & AP OA là một stack độc lập. & Tắt trong ablation để tránh hai avoidance loop.\\
+Velocity baseline & Guided hỗ trợ velocity/yaw-rate. & Reduced model để tách planner khỏi low-level validation.\\
+Three-state map & Paper dùng unknown/free/occupied. & Fixed NumPy/Torch prototype; không gọi là ROG-Map.\\
+Perception/unknown & Paper reward frontier và phạt non-free collision. & Port endpoint ray/LOS; giữ unknown collision policy.\\
+Rigid branch & Paper dùng collective thrust/body rates. & Reduced closed-loop model, experimental only.\\
+MAVLink interfaces & Spec/source hỗ trợ local velocity và target source nhận full rate vector. & Mask 1479 cho baseline; mask 128 + GUID=8 gate cho rigid.\\
+50 Hz/rollouts & Paper: 50 Hz, 17,500 rollouts. & Rigid target 50 Hz, 512 rollouts do compute budget; phải benchmark live.\\
+Safety gates & Low-level command giảm margin bảo vệ. & GUID readback, stale/brake/timeout, NaN và saturation gates.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Các module phần mềm}
+
+\begin{table}[ht]
+\centering
+\caption{Cấu trúc phần mềm chính.}
+\begin{tabularx}{\textwidth}{L{0.34\textwidth}Y}
+\toprule
+\textbf{Module} & \textbf{Trách nhiệm} \\
+\midrule
+\code{mppi\_controller.py} & Vanilla MPPI, state 7 chiều và velocity command. \\
+\code{occupancy\_grid.py} & Voxel map unknown/free/occupied và ray integration. \\
+\code{pa\_mppi\_controller.py} & Perception-aware cost trên velocity-level model. \\
+\code{rigid\_body\_pa\_mppi.py} & Rigid-body rollout, quaternion và thrust/body-rate command. \\
+\code{mavlink\_interface.py} & Telemetry, velocity target và \code{SET\_ATTITUDE\_TARGET}. \\
+\code{mppi\_local\_planner\_node.py} & Vòng điều khiển, waypoint, safety gate, diagnostics và RViz. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Vanilla MPPI velocity-level}
+
+\textbf{PROJECT DESIGN DECISION}: đây là tầng A trong staged validation. Nó
+kiểm tra local planning trong khi vẫn giao attitude và motor stabilization cho
+ArduPilot. Bằng chứng bên ngoài chỉ hỗ trợ việc Guided nhận velocity targets
+\cite{ardupilotGuidedDocs2026,mavlinkCommon2026}; mô hình giảm bậc này không
+được quy cho paper PA-MPPI.
+
+\subsection{Mô hình dự đoán}
+
+Baseline giữ ArduPilot ở tầng velocity tracking. State và control là
+
+\begin{equation}
+\vect x = [\vect p^\top,\vect v^\top,\psi]^\top \in \R^7,
+\qquad
+\vect u = [\vect v_{cmd}^\top,\dot\psi_{cmd}]^\top \in \R^4.
+\end{equation}
+
+Mô hình point-mass với first-order velocity lag được rời rạc hóa thành
+
+\begin{align}
+\vect v_{k+1} &= \vect v_k + \alpha(\vect v_{cmd,k}-\vect v_k),
+& \alpha &= \min(\Delta t/\tau,1),\\
+\vect p_{k+1} &= \vect p_k + \Delta t\,\vect v_{k+1},\\
+\psi_{k+1} &= \psi_k + \Delta t\,\dot\psi_{cmd,k}.
+\end{align}
+
+Đây là mô hình giảm bậc có chủ ý. Attitude, motor dynamics và lực khí động được
+đóng bên trong ArduPilot và Gazebo thay vì tối ưu trực tiếp. State rollout được
+mở rộng thêm setpoint khả thi trước đó $u^{applied}_{k-1}$; low-pass, slew-rate
+limit và saturation giống tầng MAVLink được áp dụng bên trong dynamics trước
+khi tính $\vect v_{k+1}$. Đây là PROJECT DESIGN DECISION để prediction không
+giả định bước nhảy control mà interface thực không gửi được.
+
+\subsection{Tối ưu MPPI}
+
+Tại mỗi chu kỳ, $N$ control sequence được tạo bằng cách thêm nhiễu Gaussian
+vào nominal sequence. Với tổng cost $S_j$ của rollout thứ $j$, trọng số là
+
+\begin{equation}
+w_j = \frac{\exp(-(S_j-S_{\min})/\lambda)}
+{\sum_{i=1}^{N}\exp(-(S_i-S_{\min})/\lambda)}.
+\end{equation}
+
+Control sequence mới là trung bình có trọng số của các rollout. Cost baseline
+gồm khoảng cách tới waypoint, obstacle clearance, control effort, độ thay đổi
+control, yaw alignment và terminal distance. Obstacle cost dùng softplus quanh
+safe margin để giữ gradient chi phí mềm nhưng vẫn xử lý được point cloud rời rạc.
+Sampling, importance weighting và receding-horizon update dựa trên MPPI/
+information-theoretic MPC \cite{williams2018itmppi}; project không claim tái tạo
+mọi theoretical correction term của implementation trong paper.
+
+\subsection{Cost bám global path (bản velocity-level)}
+
+Minařík et al. xây dựng cost reference-tracking bằng tổng cost input và độ đổi
+input (Eq.~16), sau đó cộng metric giữa state rollout và reference state theo
+thời gian (Eq.~17--18) \cite{minarik2024agilemppi}. Metric vị trí của paper là
+weighted squared error; ngoài vị trí còn có quaternion, vận tốc và body-rate.
+Đây là nguồn tham khảo cho việc bổ sung tracking cost, không phải bằng chứng
+rằng mọi thành phần đó đã có trong baseline này.
+
+Global planner/mission cung cấp polyline $\mathcal P$ trong ENU. Mỗi chu kỳ,
+vị trí hiện tại được chiếu lên path để thu progress $s_0$; progress không được
+lùi so với chu kỳ trước. Với tốc độ reference $v_r$, từng bước horizon dùng
+$s_k=s_0+(k+1)v_r\Delta t$, từ đó nội suy $\vect p_k^{ref}$ và lấy sai phân hữu
+hạn cho $\vect v_k^{ref}$. Profile paper-only dùng
+
+\begin{equation}
+  J_{\mathrm{ref}} = \sum_{k=0}^{H-1}\left[
+  w_{p}
+  \left(\frac{\|\vect p_k-\vect p_k^{ref}\|_2}{s_{\mathrm{path}}}\right)^2
+  + w_v\|\vect v_k-\vect v_k^{ref}\|_2^2\right].
+\end{equation}
+
+Baseline project vẫn có tùy chọn nearest-polyline
+
+\begin{equation}
+  J_{\mathrm{polyline}} = w_{\mathrm{path}}
+  \sum_{k=0}^{H-1}
+  \left(\frac{d(\vect p_k,\mathcal P)}{s_{\mathrm{path}}}\right)^2,
+  \qquad
+  d(\vect p,\mathcal P)=\min_{\text{segment }e\in\mathcal P}
+  \|\vect p-\operatorname{proj}_{e}(\vect p)\|_2 .
+\end{equation}
+
+với $d$ là projection lên segment gần nhất. Path được truyền qua
+\code{--global-path}; \code{--goal} vẫn quyết định active waypoint và điều kiện
+kết thúc.
+
+Đây là \textbf{PROJECT DESIGN DECISION}, không phải reproduction đầy đủ của
+Eq.~17--18: position/velocity đã time-indexed nhưng chưa có quaternion/body-rate
+reference, dynamics rigid-body hay motor feasibility của paper. Polyline cũng
+không phải collision certificate; path xuyên obstacle tạo xung đột tracking--
+safety và phải được kiểm tra clearance trước khi chạy.
+
+\subsection{Đối chiếu toàn bộ cost với paper}
+
+Bảng dưới đây tách các thành phần có cơ sở từ Minařík et al. khỏi heuristic
+được thêm cho bài toán velocity-level. Paper Eq.~16--18 và Eq.~22 là nguồn
+tham khảo trực tiếp \cite{minarik2024agilemppi}; profile thử nghiệm
+\code{mppi\_paper\_cost\_only.yaml} chỉ bật các hàng được đánh dấu.
+
+\begin{table}[ht]
+\centering\small
+\caption{Đối chiếu cost project và profile paper-only.}
+\label{tab:cost-audit}
+\begin{tabularx}{\textwidth}{L{0.23\textwidth}L{0.31\textwidth}Y}
+\toprule
+\textbf{Cost hiện tại} & \textbf{Đối chiếu paper} & \textbf{Xử lý trong paper-only} \\
+\midrule
+Running goal distance & Paper dùng metric giữa state và reference state theo thời gian; không có active-waypoint heuristic riêng. & Tắt $w_{goal}$. \\
+Terminal goal distance & Profile đã phạt reference state ở mọi bước; không cần active-waypoint terminal heuristic riêng. & Tắt $w_{terminal}$. \\
+Softplus proximity & Không phải collision indicator Eq.~22. & Tắt; thay bằng $c_{obs}\mathbf{1}_{x\in\mathcal C_{obs}}$. \\
+Control effort & Cùng nhóm với Eq.~16, nhưng paper dùng ma trận chéo $R$. & Dùng $R=\operatorname{diag}(0.01,0.05,0.05,0.10)$ sau ánh xạ velocity-level. \\
+$R_{\Delta}$ input-change & Eq.~16 phạt $\Delta u_j^\mathsf{T}R_{\Delta}\Delta u_j$. & Dùng $R_{\Delta}=\operatorname{diag}(0.05,0.10,0.10,0.30)$ trên chuỗi action. \\
+$w_{du}(u-v)$ & Không phải $\Delta u_j=u_{j+1}-u_j$ của Eq.~16. & Tắt; thay bằng $R_{\Delta}$ tính trên successive controls trong terminal callback. \\
+Yaw heuristic & Không có term tương ứng trực tiếp trong Eq.~16--18. & Tắt. \\
+Time-indexed global path & Paper dùng full reference state theo thời gian. & Bật $\vect p_k^{ref}$ và $\vect v_k^{ref}$; thiếu attitude/body-rate. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Trong profile paper-only, phần input-change được tính theo
+\begin{equation}
+J_{\Delta u}=\sum_{j=0}^{H-2}
+\Delta u_j^\mathsf{T}R_{\Delta}\Delta u_j,
+\qquad \Delta u_j=u_{j+1}-u_j,
+\end{equation}
+trên toàn bộ chuỗi control khả thi của mỗi rollout tại terminal callback. Vì action của
+baseline là $[v_x,v_y,v_z,\dot\psi]$ thay vì $[F_t,\omega_d]$, ma trận
+$R_{\Delta}$ của paper chỉ được ánh xạ theo thứ tự control này; đây là
+adaptation có chủ đích, không phải khẳng định tương đương về vật lý.
+
+\section{PA-MPPI v0}
+
+\subsection{Occupancy map ba trạng thái}
+
+PA-MPPI cần phân biệt vùng đã biết và chưa biết. Bản đồ voxel dùng quy ước
+
+\begin{equation}
+G(\vect p) \in \{-1,0,1\},
+\quad
+-1:\text{ unknown},\;0:\text{ free},\;1:\text{ occupied}.
+\end{equation}
+Đây là ba trạng thái và unknown-space safety policy từ paper
+\cite{zhai2026pamppi}; backend dưới đây là implementation riêng của project.
+
+Với mỗi LiDAR endpoint, voxel trên ray được đánh dấu free và endpoint được đánh
+dấu occupied. Occupied được ghi sau để không bị ray lân cận xóa. Vì point cloud
+Gazebo sau downsample chỉ giữ hit endpoint, mapper hiện đánh dấu một vùng gần
+sensor là free. Đây là giả thiết thực dụng cho prototype, không thay thế việc
+tích hợp đầy đủ max-range/miss ray của sensor thật.
+
+\subsection{Perception-aware objective}
+
+Khi chưa có line-of-sight trực tiếp tới goal, terminal cost được bổ sung bằng
+
+\begin{equation}
+\ell_{perception} = c_{PoI}(1-\langle \hat{\vect x}_B,
+\hat{\vect d}_{goal}\rangle)^2
++ c_{occ}\,\bm{1}_{G(\vect r(t^*))=1}
++ c_{unk}\,\bm{1}_{G(\vect r(t^*))=-1}.
+\end{equation}
+
+Thành phần đầu hướng trục camera/body-x về goal. Hai thành phần sau phạt ray
+đụng occupied voxel và thưởng endpoint nhìn vào unknown frontier. Collision
+cost coi mọi voxel không phải free là không an toàn. Perception cost được tắt
+khi goal đã nhìn thấy trực tiếp, phù hợp cấu trúc hai pha trong
+\cite{zhai2026pamppi}.
+
+PA-MPPI v0 vẫn dùng velocity-level dynamics. Mục đích của v0 là kiểm chứng
+occupancy/perception integration trên interface ổn định trước khi hạ xuống tầng
+thrust/body rate.
+Đây là tầng B và là \textbf{PROJECT DESIGN DECISION}: unit test xác nhận v0 dùng
+đúng cùng baseline dynamics, nhằm tách câu hỏi perception-aware planning khỏi
+câu hỏi low-level thrust/body-rate.
+
+\section{Rigid-body PA-MPPI experimental}
+
+Đây là tầng C. Control space tiến gần formulation của paper hơn
+\cite{zhai2026pamppi}, nhưng prediction model, mapper, rollout scale và validation
+không khớp hoàn toàn; vì vậy tên đúng là ``experimental'', không phải full
+reproduction.
+
+\subsection{State, control và hệ trục}
+
+Nhánh experimental dùng
+
+\begin{equation}
+\vect x=[\vect p_W^\top,\vect q_{WB}^\top,\vect v_W^\top,
+\vect\omega_B^\top]^\top\in\R^{13},
+\quad
+\vect u=[c,\vect\omega_{cmd}^\top]^\top\in\R^4.
+\end{equation}
+
+Quaternion $\vect q_{WB}=[q_w,q_x,q_y,q_z]$ biến đổi vector body FLU của
+Gazebo sang world ENU. Control $c$ là collective thrust theo newton;
+$\vect\omega_{cmd}$ là body rate FLU. Trước khi gửi MAVLink, phép đổi
+
+\begin{equation}
+[p,q,r]_{FRD}=[p,-q,-r]_{FLU}
+\end{equation}
+
+đưa body rate về quy ước FRD của ArduPilot.
+
+\subsection{Dynamics rời rạc}
+
+Với $\vect e_3=[0,0,1]^\top$, gia tốc trong ENU là
+
+\begin{equation}
+\dot{\vect v}_W = \frac{c}{m}R(\vect q_{WB})\vect e_3
++[0,0,-g]^\top.
+\end{equation}
+
+Quaternion kinematics và body-rate tracking được mô hình hóa bởi
+
+\begin{align}
+\dot{\vect q}_{WB} &= \frac{1}{2}\vect q_{WB}\otimes[0,\vect\omega_B],\\
+\vect\omega_{k+1} &= \vect\omega_k+
+\alpha_\omega(\vect\omega_{cmd,k}-\vect\omega_k),
+&\alpha_\omega&=\min(\Delta t/\tau_\omega,1).
+\end{align}
+
+Forward Euler được dùng cho velocity, quaternion và rate; position dùng thêm
+$\tfrac12\vect a\Delta t^2$. Quaternion được chuẩn hóa sau mỗi bước. Model hiện
+mô tả response của closed-loop body-rate controller bằng first-order lag. Phần
+vật lý chỉ gồm thrust acceleration và quaternion kinematics; phần inner-loop là
+approximation của ArduPilot. Nó chưa mô phỏng torque, moment of inertia, rotor
+allocation, drag, battery hoặc motor lag tách biệt như dynamics trong paper
+\cite{zhai2026pamppi}. Đây là reduced closed-loop prediction model; không có
+inertia value nào được suy đoán.
+
+Khối lượng 2.10 kg được cộng từ SDF: iris/IMU/bốn rotor
+$1.5+0.15+4(0.025)=1.75$ kg, gimbal 0.23 kg và sensor pod 0.12 kg. Giá trị phụ
+thuộc đúng include tree; center of mass và inertia tổng chưa được nhận dạng.
+Hover force là $c_h=mg$. Ánh xạ từ newton sang thrust
+chuẩn hóa dùng
+
+\begin{equation}
+T_{norm}=T_{hover,norm}\frac{c}{mg},
+\end{equation}
+
+với $T_{hover,norm}=0.38$. Đây là calibration assumption từ historical log
+\code{logs/00000002.BIN}, trong đó ArduPilot từng học
+\code{MOT\_THST\_HOVER} khoảng 0.363--0.386. Nó phải được revalidate nếu đổi
+mass/model/propeller/plugin.
+
+\subsection{Frame contract}
+
+MAVLink \code{LOCAL\_NED} quy định north/east/down và z altitude âm
+\cite{mavlinkCommon2026}. Các transform không được xem là đúng chỉ vì unit test
+pass; convention và runtime data source cũng phải khớp.
+
+\begin{table}[ht]
+\centering\footnotesize
+\caption{Interface contract cho coordinate frames.}
+\begin{tabularx}{\textwidth}{L{0.20\textwidth}L{0.19\textwidth}L{0.23\textwidth}Y}
+\toprule
+\textbf{Source $\to$ destination} & \textbf{Convention/units} & \textbf{Code} & \textbf{Evidence/status}\\
+\midrule
+Gazebo world ENU $\to$ LOCAL NED & $(E,N,U)\to(N,E,-U)$, m và m/s & \code{enu\_to\_ned\_vel}, \code{ned\_to\_enu\_pos} & Spec + round-trip/sign test; live origin pending.\\
+Body FLU $\to$ body FRD & $(x,y,z)\to(x,-y,-z)$ & point transform; \code{body\_flu\_rates\_to\_frd} & deterministic test.\\
+Yaw NED $\to$ ENU & $\psi_E=\pi/2-\psi_N$ & \code{yaw\_ned\_to\_enu} & cardinal test.\\
+Yaw-rate ENU $\to$ NED & $\dot\psi_N=-\dot\psi_E$ & \code{yaw\_enu\_to\_ned\_rate} & sign test.\\
+Gazebo quaternion $\to$ ENU rotation & message xyzw; internal wxyz, Hamilton & \code{quat\_to\_rot} & identity/norm tests.\\
+LiDAR/camera $\to$ body/world & SDF offset; odom full attitude & \code{scan\_to\_world\_enu} & source review; live frame pending.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\code{Odometry.twist.angular} hiện được giả định là body FLU. Exact installed
+Gazebo plugin convention và một maneuver có dấu vẫn phải xác nhận trước rigid
+live gate; đây là \textbf{UNVERIFIED/PENDING}.
+
+\section{Tích hợp MAVLink và các điều kiện an toàn}
+
+\subsection{Velocity target}
+
+Vanilla và PA-MPPI v0 gửi \code{SET\_POSITION\_TARGET\_LOCAL\_NED}. Type mask
+1479 bỏ position, acceleration và yaw; velocity cùng yaw-rate vẫn được sử dụng.
+Mask đã được đối chiếu với enum của dialect \code{ardupilotmega} và handler
+ArduCopter target commit \cite{mavlinkCommon2026,ardupilotSourceF808}. Dạng
+symbolic là $1+2+4+64+128+256+1024=1479$; velocity và yaw-rate ignore bits đều
+clear. Fallback velocity-only thêm yaw-rate-ignore 2048, tạo mask 3527.
+
+\subsection{Goal tương tác từ RViz}
+
+Node có thể subscribe \code{geometry\_msgs/PoseStamped} từ tool
+\code{2D Goal Pose} trên topic \code{/goal\_pose}. Goal chỉ được chấp nhận khi
+frame là \code{odom}; frame khác bị từ chối vì implementation chưa tự áp dụng
+TF. Mỗi click thay route đang chạy, xóa terminal/recovery latch, reset output
+conditioner và MPPI warm start. Vì tool 2D thường phát $z=0$, project bỏ giá trị
+$z$ trong message và giữ altitude hiện tại, hoặc dùng altitude ENU cố định từ
+\code{--rviz-goal-altitude}. Đây là \textbf{PROJECT INTERFACE DECISION} nhằm
+tránh một thao tác XY vô tình tạo lệnh hạ xuống đất.
+
+Trong paper profile, mỗi click tạo reference thẳng từ state hiện tại tới goal.
+Do đó giao diện này thay việc nhập \code{Fly To}/tọa độ thủ công, nhưng không
+phải global planner: operator vẫn phải đặt waypoint trung gian trong dead-end,
+U-wall hoặc path bị che khuất. Callback topic và logic thay route đã được kiểm
+tra offline; chuyến bay Gazebo điều khiển hoàn toàn bằng click còn PENDING.
+
+\subsection{Thrust và body-rate target}
+
+Rigid branch gửi \code{SET\_ATTITUDE\_TARGET} với mask 128: attitude quaternion
+bị bỏ qua, cả ba body rate và thrust được giữ lại. ArduCopter không chấp nhận
+body-rate vector thiếu một phần. Mask được dựng từ
+\code{ATTITUDE\_TARGET\_TYPEMASK\_ATTITUDE\_IGNORE}, không phải magic decimal
+\cite{mavlinkCommon2026}.
+
+Có discrepancy phải giữ công khai: trang ``Copter Commands in Guided Mode''
+hiện nói ba body-rate fields không được hỗ trợ và mask nên bằng 7
+\cite{ardupilotGuidedDocs2026}. Ngược lại, source target commit
+\code{f808f78...}, \code{GCS\_MAVLink\_Copter.cpp:892--966}, nhận quaternion,
+nhận đủ cả ba rates, hoặc cho phép cả ba cùng ignored; partial rate vector làm
+handler gọi hold \cite{ardupilotSourceF808}. Vì project khóa commit này,
+implementation theo source behavior nhưng không che giấu khác biệt tài liệu.
+
+Trường \code{thrust} chỉ mang nghĩa normalized thrust khi bit 3 của tham số
+\code{GUID\_OPTIONS} được bật. Vì vậy cấu hình phải đặt giá trị này bằng 8.
+Nếu giữ giá trị 0, ArduPilot diễn giải cùng trường thành climb-rate. Node đọc
+lại parameter qua MAVLink và từ chối phát lệnh nếu giá trị không bằng 8. Bằng
+chứng source là \code{mode.h:1208--1217}, \code{mode\_guided.cpp:651--655} và
+handler lines 943--965 tại target commit \cite{ardupilotSourceF808}.
+
+Các gate bổ sung gồm:
+
+\begin{itemize}
+  \item bắt buộc cờ \code{--experimental-attitude-control};
+  \item chỉ hỗ trợ Gazebo odometry ở giai đoạn hiện tại;
+  \item control frequency tối thiểu 20 Hz, khuyến nghị 50 Hz;
+  \item thrust được giới hạn trong $[0,1]$ trước khi gửi;
+  \item NaN/Inf trong rate hoặc thrust làm packet bị từ chối;
+  \item planner vượt timeout cấu hình thì không phát control mới;
+  \item stale, hard-brake, reached và Ctrl+C chuyển sang velocity-zero target,
+  không phát zero thrust.
+\end{itemize}
+
+File \code{config/mppi\_attitude\_sitl.parm} đặt \code{GUID\_OPTIONS=8},
+\code{MOT\_THST\_HOVER=0.38} và tắt hover learning cho thí nghiệm tái lập.
+
+\section{Thiết kế kiểm thử}
+
+\subsection{Automated tests}
+
+Test suite dùng \code{unittest} và chạy trong env \code{ardupilot-rviz}. Các
+nhóm test chính được liệt kê trong Bảng~\ref{tab:tests}.
+
+\begin{table}[ht]
+\centering
+\caption{Phạm vi automated tests.}
+\label{tab:tests}
+\begin{tabularx}{\textwidth}{L{0.30\textwidth}Y}
+\toprule
+\textbf{Nhóm} & \textbf{Nội dung} \\
+\midrule
+Frame và MAVLink & ENU/NED, FLU/FRD, quaternion cơ sở, velocity mask 1479,
+attitude mask 128, partial-rate rejection, GUID gate, NaN/Inf và saturation. \\
+Planner safety & stale state, hard brake, timeout, reached, waypoint và diagnostics. \\
+Occupancy/PA-MPPI & unknown/free/occupied, ray traversal, LOS, perception reward,
+unknown collision và identical baseline dynamics. \\
+Rigid-body & hover equilibrium, quaternion norm, body-rate response, thrust
+mapping và một MPPI optimizer step. \\
+Closed-loop clear-air & 80 chu kỳ tới goal 1 m, kiểm tra sai số đích và dải cao độ. \\
+Configuration & YAML runtime fields và ưu tiên CLI override. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Offline obstacle scenario}
+
+Obstacle giả lập là một mặt stack container tại $x=12$ m, $y\in[-6,6]$ m và
+$z\in[0,24]$ m. UAV bắt đầu tại $(0,0,20)$ m và bám tuyến waypoint
+$(16,10,20)\rightarrow(30,0,20)$. Điều kiện đạt gồm:
+
+\begin{equation}
+\|\vect p_T-\vect p_{goal}\|<1\text{ m},
+\qquad d_{min}\geq margin+1\text{ m}=5\text{ m}.
+\end{equation}
+
+Waypoint trung gian đóng vai trò global direction tối thiểu. Nó phá tính đối
+xứng trái/phải trước obstacle rộng, một trường hợp mà local MPPI có thể tạo
+trung bình control gần bằng không.
+
+\section{Kết quả}
+
+\begin{table}[ht]
+\centering
+\caption{Kết quả định lượng cập nhật ngày 13/09/2026.}
+\label{tab:results}
+\footnotesize
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\textwidth}{L{0.31\textwidth}L{0.20\textwidth}Y}
+\toprule
+\textbf{Thí nghiệm} & \textbf{Kết quả} & \textbf{Chỉ số} \\
+\midrule
+Automated test suite & Đạt offline & 40/40 test; exact command lưu trong changelog. \\
+Vanilla MPPI obstacle & Đạt offline & seed 7; final error 0.93 m; minimum clearance 6.30 m. \\
+PA-MPPI v0 obstacle & Đạt offline & seed 7; final error 0.92 m; minimum clearance 6.11 m. \\
+Global-path reference smoke & Đạt offline & seed 7; final error 0.23 m; minimum point clearance 5.85 m. \\
+Paper-reference benchmark & Đạt offline & 3 map $\times$ seed 7/11/19: 9/9 terminal; point-radius analytical adapter. \\
+Right-angle Gazebo/SITL & Đạt, một seed & 128 cycles; final error 0.235 m; path 23.15 m; min point clearance 2.19 m. \\
+Narrow-gate Gazebo/SITL & Đạt, một seed & 192 cycles; final error 0.230 m; path 35.50 m; min point clearance 2.07 m. \\
+Slalom Gazebo/SITL & Đạt, một seed & 193 cycles; final error 0.220 m; path 37.67 m; min point clearance 1.30 m. \\
+Rigid hover dynamics & Đạt & position/velocity numerical error bằng 0;
+quaternion norm bằng 1. \\
+Rigid closed-loop unit gate & Đạt offline & 80 cycles; asserted final error $<0.5$ m và altitude trong 1.5--2.5 m; seed 7. \\
+Rigid live Gazebo hover & Pending & Chưa chạy nhánh rigid body-rate/thrust trong Gazebo. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Ba run velocity-level live đều giữ cao độ trong khoảng 19.81--20.41 m và không
+ghi deadline miss ở target 10 Hz. Đây chỉ là một seed trên mỗi map. Clearance
+là khoảng cách tâm odometry--điểm LiDAR, chưa trừ footprint; slalom đạt 1.30 m,
+thấp hơn collision radius rollout 1.5 m, nên chưa thể suy ra safety. Rigid
+branch giữ hover trong internal model nhưng chưa có benchmark live/edge.
+
+JSONL logger hiện ghi timestamp/state age, position, velocity, quaternion, body
+rates, nominal/sent control, thrust, map status, clearance, goal/LOS, costs,
+rollout statistics, selected trajectory, deadline/saturation/failsafe và seed.
+\code{scripts/plot\_mppi\_experiment.py} chuẩn bị các plot trajectory, altitude,
+velocity, commanded/measured rates, thrust, clearance, goal distance, latency và
+MPPI-vs-PA comparison; không synthetic-fill field bị thiếu.
+
+\section{Thảo luận}
+
+\subsection{Mức độ đáp ứng yêu cầu mentor}
+
+Kiến trúc hiện tại đáp ứng ý chính: obstacle avoidance và local planning nằm
+ở companion computer; ArduPilot không cần obstacle ID và chỉ bám setpoint.
+Vanilla MPPI là baseline chạy được. PA-MPPI v0 chứng minh occupancy/perception
+cost. Rigid branch đã đưa control space tới thrust/body rate như hướng của bài
+báo, nhưng mới ở mức offline-verified experimental path.
+
+\subsection{Khoảng cách tới bản triển khai trong bài báo}
+
+\begin{table}[ht]
+\centering
+\caption{So sánh phạm vi hiện tại với PA-MPPI \cite{zhai2026pamppi}.}
+\footnotesize
+\begin{tabularx}{\textwidth}{L{0.18\textwidth}L{0.29\textwidth}L{0.31\textwidth}Y}
+\toprule
+\textbf{Feature} & \textbf{Paper} & \textbf{Current implementation} & \textbf{Status/reason} \\
+\midrule
+State/control & $p,q,v,\omega$; thrust/rates & velocity $p,v,\psi$ or rigid $p,q,v,\omega$ & v0 reduced; rigid experimental.\\
+Prediction & Full quad dynamics incl. torque/inertia & point-mass lag or thrust + first-order rate lag & Not full reproduction.\\
+Map & ROG-Map; 3 states; 0.1 m, $5\times5\times2$ m & fixed NumPy/Torch grid; near-field heuristic & Backend differs.\\
+Collision unknown & $G(p)\neq0$ penalized & same policy when map exists & Implemented offline.\\
+Perception/axis & camera/body-x + goal ray & heading-x v0; body-x rigid & v0 approximation.\\
+Ray/LOS phase & terminal DDA; two phases & terminal sampled ray; LOS switch & Different ray implementation.\\
+Rollouts/horizon & 17,500 / 15 & 500/30 default; 128/20 ablation; 512/20 rigid & Reduced compute scale.\\
+Timing & $\Delta t_{pred}=0.1$s, 50 Hz control & velocity 0.1 s/10 Hz; rigid 0.05 s/50 Hz target & Live deadline pending.\\
+Framework & JAX + Agilicious & PyTorch + pytorch-mppi & Differs.\\
+Mapping input & Depth + ROG-Map & Gazebo LiDAR hit endpoints & Sensor model differs.\\
+Environment & Flightmare; C-wall/hole/4-wall; HIL/real & simple offline wall; Gazebo prepared & Matching evaluation pending.\\
+Real flight & Demonstrated in paper & None & Pending hardware.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Do các khác biệt này, nhánh hiện tại phải được gọi là ``PA-MPPI v0'' hoặc
+``rigid-body PA-MPPI experimental'', không phải reproduction đầy đủ.
+
+\subsection{Rủi ro kỹ thuật còn lại}
+
+\begin{itemize}
+  \item Hover thrust phụ thuộc model, propeller và battery model. Giá trị 0.38
+  phải hiệu chỉnh lại nếu SDF hoặc motor configuration thay đổi.
+  \item Khối lượng 2.10 kg là tổng xấp xỉ từ model components; center of mass
+  và inertia tổng chưa được nhận dạng chính xác.
+  \item Gazebo odometry angular velocity cần được xác nhận thực nghiệm đúng
+  body FLU trong mọi cấu hình plugin.
+  \item Nhánh MAVLink state hiện chỉ đủ cho velocity planner; rigid branch chưa
+  chuyển quaternion/rate từ estimator ArduPilot sang frame nội bộ.
+  \item Sensor dropout, latency, obstacle động và estimator noise chưa được đưa
+  vào Monte Carlo evaluation.
+  \item Velocity-zero fallback đổi GUIDED submode nhưng không thay thế một
+  independent safety controller hoặc người giám sát khi thử attitude control.
+\end{itemize}
+
+\section{Lộ trình kiểm chứng tiếp theo}
+
+\begin{enumerate}
+  \item \textbf{Hover gate:} takeoff bằng velocity/position controller, bật
+  rigid node với goal ngắn trong không gian trống, theo dõi altitude, attitude,
+  thrust target và mode.
+  \item \textbf{Body-rate gate:} áp goal lệch 1 m theo từng trục, giới hạn rate,
+  đo tracking delay để cập nhật $\tau_\omega$.
+  \item \textbf{Clear-air route:} bay nhiều waypoint không obstacle; đo final
+  error, overshoot, thrust saturation và deadline miss.
+  \item \textbf{Static obstacle:} bật occupancy/perception cost với một stack
+  container, sau đó tăng độ phức tạp môi trường.
+  \item \textbf{Ablation:} so sánh vanilla, PA-MPPI v0 và rigid PA-MPPI bằng
+  cùng seed/scenario theo success rate, clearance, path length, smoothness và
+  compute p95.
+  \item \textbf{Edge computer:} tích hợp timestamp và full attitude transform;
+  sau đó benchmark tài nguyên và nhiệt độ.
+  \item \textbf{Hardware gate:} HIL/tether test trước; chỉ flight test khi có
+  geofence, mode switch và pilot override đã kiểm chứng.
+\end{enumerate}
+
+Simple wall có waypoint trung gian chỉ là baseline regression, không chứng minh
+lợi ích perception. Fair experiment tương lai dùng C-wall/U-shaped occlusion với
+cùng start, goal, world, dynamics, limits, horizon, base cost và seed; chỉ bật/tắt
+perception terms. Hai config cố định là \code{config/ablation\_mppi\_unknown.yaml}
+và \code{config/ablation\_pa\_mppi\_unknown.yaml}. Metrics bắt buộc gồm success
+rate, time-to-goal, path length, minimum clearance, control smoothness, planner
+cycles, compute mean/p95/worst, deadline misses, mapped free space và time tới
+lần đầu goal visible. Toàn bộ gate/abort/log name nằm trong
+\code{docs/GAZEBO\_RUN\_CHECKLIST.md}; hiện chưa gate nào được đánh dấu pass.
+
+\section{Kết luận}
+
+Repository đã chuyển được obstacle avoidance khỏi ArduPilot và hình thành một
+pipeline local planning có thể thay đổi model/control level mà không sửa tầng
+perception hoặc mission interface. Vanilla MPPI và PA-MPPI v0 đã chạy qua
+obstacle scenario offline. Rigid-body experimental đã bổ sung quaternion,
+thrust/body-rate control, \code{SET\_ATTITUDE\_TARGET}, calibration và safety
+gate, đồng thời vượt qua 23 automated tests/offline gates. Kết quả đủ để chuyển
+sang hover gate trong Gazebo, nhưng chưa đủ để tuyên
+bố hoàn thành rigid PA-MPPI hoặc triển khai trên quadrotor thật.
+
+\appendix
+\section{Lệnh tái lập}
+
+\subsection{Automated tests}
+
+\begin{verbatim}
+KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 \
+  /opt/miniconda3/envs/ardupilot-rviz/bin/python \
+  -m unittest discover -s tests -p 'test_mppi*.py' -v
+\end{verbatim}
+
+\subsection{Rigid-body offline gate}
+
+\begin{verbatim}
+KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 \
+  /opt/miniconda3/envs/ardupilot-rviz/bin/python \
+  scripts/mppi_velocity_avoidance.py \
+  --planner rigid-pa-mppi \
+  --config mppi_ardupilot/rigid_pa_mppi_config.yaml \
+  --sim-test
+\end{verbatim}
+
+\subsection{Rigid-body live gate trong Gazebo}
+
+\begin{verbatim}
+MAVLINK20=1 KMP_DUPLICATE_LIB_OK=TRUE OMP_NUM_THREADS=1 \
+  /opt/miniconda3/envs/ardupilot-rviz/bin/python \
+  scripts/mppi_velocity_avoidance.py \
+  --planner rigid-pa-mppi \
+  --config mppi_ardupilot/rigid_pa_mppi_config.yaml \
+  --experimental-attitude-control \
+  --state-source odom --goal "1,0,20" \
+  --mav tcp:127.0.0.1:5762 \
+  --diag-jsonl output/log/rigid_hover_gate.jsonl
+\end{verbatim}
+
+\bibliographystyle{unsrt}
+\bibliography{reports/pa_mppi_sources}
+
+\end{document}

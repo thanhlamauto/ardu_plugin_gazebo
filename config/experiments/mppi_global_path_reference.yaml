@@ -1,0 +1,6 @@
+# Optional path-tracking profile for the velocity-level MPPI.
+# Supply a collision-checked ENU polyline with --global-path (or add the
+# global_path key here).  This profile intentionally leaves safety/dynamics
+# fields at MPPIConfig defaults so the ablation can change only path tracking.
+w_path: 0.5
+path_scale_m: 1.0

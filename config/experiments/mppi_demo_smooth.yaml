@@ -1,0 +1,65 @@
+# Demo profile for the three fixed Gazebo routes in
+# docs/RUN_3_MPPI_MAPS_QUICKSTART_VI.md.
+#
+# This keeps the paper-derived cost categories used by
+# mppi_paper_cost_only.yaml, but the timing, velocity-level control mapping,
+# command conditioner and arrival gates are PROJECT ENGINEERING CHOICES.
+# It is intentionally separate so the source-audit profile is not silently
+# changed merely to improve a demonstration.
+cost_profile: paper
+
+hz: 10.0
+dt: 0.1
+tau: 0.5
+horizon: 30
+samples: 500
+lambda: 100.0
+
+# Smooth-demo envelope.  0.85 m/s keeps the reference reachable after the
+# low-pass/slew limiter; vmax remains a hard upper bound, not a target speed.
+vmax: 1.5
+vzmax: 0.8
+reference_speed_m_s: 0.85
+
+# Time-indexed global-reference and collision terms.
+w_path: 400.0
+path_scale_m: 1.0
+w_reference_velocity: 40.0
+w_terminal: 0.0
+w_collision: 1000000.0
+collision_radius_m: 1.5
+
+# Project-only objective terms remain disabled in the paper-cost profile.
+w_goal: 0.0
+w_obstacle: 0.0
+w_u: 0.0
+w_du: 0.0
+w_yaw: 0.0
+
+# Velocity-level adaptation of Minařík et al.'s effort/input-change terms.
+paper_r_u: [0.01, 0.05, 0.05, 0.10]
+paper_r_delta_u: [0.05, 0.10, 0.10, 0.30]
+
+# Compared with the audit profile (alpha=0.45, accel=1.5), these limits trade
+# traversal time for visibly smoother commands and easier ArduPilot tracking.
+command_alpha: 0.35
+max_accel_xy: 0.9
+max_accel_z: 0.6
+max_yaw_accel: 0.9
+
+# Begin tapering only at the final waypoint.  A 0.35 m terminal gate avoids a
+# noisy estimator hovering just outside the old 0.25 m strict inequality.
+goal_slowdown_radius: 4.0
+goal_approach_gain: 0.5
+goal_min_speed: 0.10
+goal_radius: 0.35
+wp_radius: 1.25
+
+# Last-resort live safety layer.  These values do not make a geometrically
+# infeasible narrow slot safe; use only the documented clearance-checked route.
+hard_brake_m: 1.0
+hard_brake_release_m: 1.8
+hard_brake_delay_s: 0.25
+recovery_speed_m_s: 0.35
+stale_after_s: 1.0
+planner_timeout_ms: 90.0

@@ -87,6 +87,10 @@ class RigidBodyPAMPPI:
 
         self.torch = torch
         self.cfg = cfg or RigidBodyPAMPPIConfig()
+        if self.cfg.path_scale_m <= 0 or not np.isfinite(self.cfg.path_scale_m):
+            raise ValueError("path_scale_m phải hữu hạn và lớn hơn 0")
+        if self.cfg.w_path < 0 or not np.isfinite(self.cfg.w_path):
+            raise ValueError("w_path phải hữu hạn và không âm")
         torch.manual_seed(int(self.cfg.seed))
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(int(self.cfg.seed))
@@ -96,6 +100,7 @@ class RigidBodyPAMPPI:
         dtype = torch.double
         self.goal = torch.zeros(3, dtype=dtype, device=device)
         self.obstacles = None
+        self.reference_path = None  # [M,3] ENU polyline, optional
         self.map = OccupancyGrid3D(
             OccupancyGridConfig(
                 resolution=self.cfg.map_resolution,
@@ -201,6 +206,26 @@ class RigidBodyPAMPPI:
             self.cfg.margin - nearest, beta=beta
         ) - math.log(2.0) / beta
 
+    def _path_distance(self, position):
+        """Distance to the optional ENU global reference polyline."""
+        torch = self.torch
+        if self.reference_path is None or self.reference_path.shape[0] == 0:
+            return torch.zeros(
+                position.shape[:-1], dtype=position.dtype, device=position.device
+            )
+        flat = position.reshape(-1, 3)
+        if self.reference_path.shape[0] == 1:
+            d2 = ((flat - self.reference_path[0]) ** 2).sum(dim=-1)
+        else:
+            a = self.reference_path[:-1]
+            ab = self.reference_path[1:] - a
+            denom = (ab * ab).sum(dim=-1).clamp_min(1e-12)
+            rel = flat[:, None, :] - a[None, :, :]
+            t = ((rel * ab[None, :, :]).sum(dim=-1) / denom[None, :]).clamp(0.0, 1.0)
+            residual = rel - t[..., None] * ab[None, :, :]
+            d2 = (residual * residual).sum(dim=-1).min(dim=-1).values
+        return torch.sqrt(d2.clamp_min(0.0)).reshape(position.shape[:-1])
+
     def _running_cost(self, state, action):
         cfg = self.cfg
         p = state[..., 0:3]
@@ -209,6 +234,7 @@ class RigidBodyPAMPPI:
         omega = state[..., 10:13]
         _, body_z = self._body_axes_world(quat)
         goal_distance = self.torch.linalg.vector_norm(p - self.goal, dim=-1)
+        path_cost = (self._path_distance(p) / cfg.path_scale_m) ** 2
         hover_error = (action[..., 0] / cfg.hover_thrust_n - 1.0) ** 2
         rate_effort = (action[..., 1:4] ** 2).sum(dim=-1)
         rate_track = ((action[..., 1:4] - omega) ** 2).sum(dim=-1)
@@ -219,6 +245,7 @@ class RigidBodyPAMPPI:
         vertical_speed = vel[..., 2].square()
         cost = (
             cfg.w_goal * goal_distance
+            + cfg.w_path * path_cost
             + cfg.w_obstacle * self._obstacle_cost(p)
             + cfg.w_rigid_thrust * hover_error
             + cfg.w_rigid_rate * rate_effort
@@ -258,6 +285,20 @@ class RigidBodyPAMPPI:
         self.goal = self.torch.as_tensor(
             np.asarray(goal, dtype=np.float64), dtype=self.torch.double,
             device=self.goal.device,
+        )
+
+    def update_reference_path(self, path) -> None:
+        """Set optional global reference polyline in the ENU working frame."""
+        if path is None:
+            self.reference_path = None
+            return
+        arr = np.asarray(path, dtype=np.float64)
+        if arr.ndim != 2 or arr.shape[1] != 3 or arr.shape[0] < 1:
+            raise ValueError("reference path phải có dạng [M,3], M >= 1")
+        if not np.isfinite(arr).all():
+            raise ValueError("reference path chứa NaN/Inf")
+        self.reference_path = self.torch.as_tensor(
+            arr, dtype=self.torch.double, device=self.goal.device
         )
 
     def update_obstacles(self, points) -> None:
@@ -356,7 +397,7 @@ class RigidBodyPAMPPI:
             self._last_state_np, dtype=torch.double, device=self.goal.device
         )
         totals = {
-            "goal": 0.0, "obstacle": 0.0, "thrust": 0.0, "body_rate": 0.0,
+            "goal": 0.0, "path": 0.0, "obstacle": 0.0, "thrust": 0.0, "body_rate": 0.0,
             "rate_tracking": 0.0, "tilt": 0.0, "velocity": 0.0,
             "altitude": 0.0, "vertical_speed": 0.0, "collision": 0.0,
             "perception": 0.0,
@@ -367,6 +408,10 @@ class RigidBodyPAMPPI:
             _, body_z = self._body_axes_world(quat)
             distance = torch.linalg.vector_norm(p - self.goal)
             totals["goal"] += cfg.w_goal * float(distance.item())
+            path_distance = self._path_distance(p)
+            totals["path"] += cfg.w_path * float(
+                (path_distance / cfg.path_scale_m).square().item()
+            )
             totals["obstacle"] += cfg.w_obstacle * float(self._obstacle_cost(p).item())
             totals["thrust"] += cfg.w_rigid_thrust * float((action[0] / cfg.hover_thrust_n - 1.0).square().item())
             totals["body_rate"] += cfg.w_rigid_rate * float(action[1:4].square().sum().item())

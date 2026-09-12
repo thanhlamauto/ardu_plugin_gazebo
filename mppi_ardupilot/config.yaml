@@ -31,12 +31,31 @@ w_obstacle: 300.0
 w_u: 0.05
 w_du: 0.2
 w_yaw: 0.2
+w_path: 0.0        # bám global polyline; 0 = tắt (engineering choice)
+path_scale_m: 1.0  # scale lỗi path trước khi bình phương [m]
+w_reference_velocity: 0.0 # paper profile: bám v_ref theo từng bước
+reference_speed_m_s: 1.0  # time-parameterize global path [m/s]
+# global_path: "x0,y0,z0;x1,y1,z1"  # hoặc truyền --global-path
+# Điều khiển tương tác: RViz 2D Goal Pose publish /goal_pose trong frame odom.
+# rviz_goal_topic: /goal_pose
+# rviz_goal_frame: odom
+# rviz_goal_altitude: 20.0 # bỏ key này để giữ cao độ tại thời điểm click
+cost_profile: project
+w_collision: 1000000.0
+collision_radius_m: 0.5
+# Chỉ dùng khi cost_profile=paper; thứ tự [vx, vy, vz, yaw_rate] là mapping
+# velocity-level của project, không phải control [thrust, body-rates] nguyên bản.
+paper_r_u: [0.01, 0.05, 0.05, 0.10]
+paper_r_delta_u: [0.05, 0.10, 0.10, 0.30]
 
 # --- làm mượt setpoint giữa các chu kỳ (ràng buộc interface) ---
 command_alpha: 0.45       # 1.0=tắt low-pass; nhỏ hơn=mượt nhưng trễ hơn
 max_accel_xy: 1.5         # [m/s^2]
 max_accel_z: 0.8          # [m/s^2]
 max_yaw_accel: 1.2        # [rad/s^2]
+goal_slowdown_radius: 4.0 # [m], bắt arrival envelope gần goal cuối
+goal_approach_gain: 0.5   # speed cap = gain * (distance - goal_radius)
+goal_min_speed: 0.10      # [m/s], tránh dừng tiệm cận ngoài terminal gate
 
 # --- mission ---
 goal: "16,10,20;30,0,20"  # tuyến waypoint ENU [m]; waypoint giữa giúp MPPI
@@ -54,6 +73,9 @@ sensor_offset_body_frd: [0.08, 0.0, -0.16]
 # --- an toàn ---
 stale_after_s: 1.0  # sensor cũ hơn -> gửi velocity 0 (hold)
 hard_brake_m: 1.0   # obstacle gần hơn -> velocity 0 (brake)
+hard_brake_release_m: 1.8 # hysteresis: clearance để thoát recovery
+hard_brake_delay_s: 0.25  # bù quãng đường do delay khi tính ngưỡng phanh
+recovery_speed_m_s: 0.4   # sau khi dừng, lùi khỏi bề mặt gần nhất
 planner_timeout_ms: 90.0  # < chu kỳ 100 ms; vượt ngưỡng thì hold
 
 # --- PA-MPPI v0: occupancy map + perception cost ---

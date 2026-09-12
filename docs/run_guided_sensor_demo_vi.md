@@ -172,7 +172,11 @@ Sau khi UAV giữ độ cao 20 m:
 4. Quan sát UAV bẻ đường vòng (Dijkstra/BendyRuler) và `AC_Avoid` kẹp velocity khi cách vật < `AVOID_MARGIN=4 m`.
 5. Chờ UAV đến điểm đó rồi mới chọn điểm tiếp theo.
 
-Nút `2D Goal Pose` của RViz chỉ publish `/goal_pose`; setup này không dùng nút đó để điều khiển ArduPilot. Lệnh bay theo bản đồ vẫn phải đi từ `Fly To` của MAVProxy Map để tạo MAVLink `MAV_CMD_DO_REPOSITION`.
+Trong demo AP_Avoidance cũ ở mục này, nút `2D Goal Pose` chỉ publish
+`/goal_pose` và không tạo `MAV_CMD_DO_REPOSITION`; vì vậy `Fly To` vẫn áp dụng
+cho riêng demo đó. Node MPPI mới có thể subscribe trực tiếp `/goal_pose` bằng
+`--rviz-goal-topic /goal_pose`, rồi tự gửi velocity setpoint qua MAVLink; xem
+`RUN_3_MPPI_MAPS_QUICKSTART_VI.md`.
 
 MAVProxy dùng tọa độ của điểm vừa click để gửi `MAV_CMD_DO_REPOSITION` trong
 một MAVLink `COMMAND_INT`. Nhờ `GUID_OPTIONS=64`, ArduCopter chuyển target này

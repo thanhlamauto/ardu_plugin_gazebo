@@ -109,7 +109,18 @@ tmp/
 terrain/
 scripts/__pycache__/
 output/video/
+output/log/
 output/pdf/*.log
+output/pdf/*.aux
+output/pdf/*.bbl
+output/pdf/*.blg
+output/pdf/*.fdb_latexmk
+output/pdf/*.fls
+output/pdf/*.nav
+output/pdf/*.out
+output/pdf/*.snm
+output/pdf/*.toc
+output/pdf/*.xdv
 reports/evidence/
 /-
 

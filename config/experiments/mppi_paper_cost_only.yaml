@@ -1,0 +1,73 @@
+# Experimental objective mapped from Minařík et al. (2024), Eq. 16--18 and 22.
+# Keep this separate from project profiles: it deliberately disables the
+# project's running waypoint/proximity/yaw and terminal terms. Pass a
+# collision-checked --global-path in the same ENU frame as the state; the
+# controller time-parameterizes it into p_ref[j] and v_ref[j].
+cost_profile: paper
+
+# Runtime and prediction scale for the current velocity-level adaptation.
+hz: 10.0
+dt: 0.1
+tau: 0.5
+horizon: 30
+samples: 500
+# Do not copy the paper's lambda=1e-4 across different state/control units.
+# A deterministic offline sweep selected 100 for this velocity-level model;
+# one seed on each of three Gazebo worlds reached the terminal on 2026-09-13,
+# but multi-seed robustness remains unverified.
+lambda: 100.0
+vmax: 1.5
+vzmax: 0.8
+reference_speed_m_s: 1.0
+
+# Paper Eq. 18 reference categories adapted to the reduced state. Position and
+# velocity are time-indexed; quaternion/body-rate reference terms are absent
+# because this branch commands velocity and yaw-rate, not rigid-body inputs.
+w_path: 400.0
+path_scale_m: 1.0
+w_reference_velocity: 40.0
+# Eq. 17--18 already penalizes every time-indexed reference state.  A
+# separate active-waypoint terminal attraction is a project term, so it is
+# disabled in this paper-cost experiment.
+w_terminal: 0.0
+
+# Paper Eq. 22 collision coefficient.  The radius is only the adapter from
+# point-cloud samples to a collision set for this project.
+w_collision: 1000000.0
+# The paper's collision set contains the vehicle geometry.  With LiDAR hit
+# points this radius is a conservative point-cloud adapter (vehicle footprint
+# plus uncertainty), not a paper parameter.
+collision_radius_m: 1.5
+
+# Disable project-only objective terms.
+w_goal: 0.0
+w_obstacle: 0.0
+w_u: 0.0
+w_du: 0.0
+w_yaw: 0.0
+
+# Paper Table II R diagonal, mapped to [vx, vy, vz, yaw_rate] for this
+# velocity-level experiment.  This mapping is not the paper's rigid-body
+# control interface and must be reported as an adaptation.
+paper_r_u: [0.01, 0.05, 0.05, 0.10]
+# Paper Eq. 16 R_delta diagonal, applied to successive predicted controls.
+# The current velocity-level mapping uses the same order as paper_r_u.
+paper_r_delta_u: [0.05, 0.10, 0.10, 0.30]
+
+# The same bounds are simulated inside every rollout and enforced again at
+# the MAVLink boundary.
+command_alpha: 0.45
+max_accel_xy: 1.5
+max_accel_z: 0.8
+max_yaw_accel: 1.2
+
+# Project safety layer (not claimed by the paper): predictive stopping gate,
+# hysteresis, then a slow retreat from the closest observed surface.
+hard_brake_m: 1.0
+hard_brake_release_m: 1.8
+hard_brake_delay_s: 0.25
+recovery_speed_m_s: 0.4
+goal_radius: 0.25
+wp_radius: 1.0
+stale_after_s: 1.0
+planner_timeout_ms: 90.0

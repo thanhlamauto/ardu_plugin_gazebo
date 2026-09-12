@@ -1,0 +1,244 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper,top=18mm,bottom=19mm,left=21mm,right=21mm]{geometry}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{caption}
+
+\setmainfont{Times New Roman}
+\setsansfont{Helvetica Neue}
+\setmonofont{Menlo}[Scale=0.82]
+\definecolor{navy}{HTML}{17365D}
+\definecolor{blue}{HTML}{1F5A94}
+\definecolor{lightblue}{HTML}{EAF2F8}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=navy,
+  citecolor=navy,
+  urlcolor=blue,
+  pdftitle={Báo cáo tuần: MPPI bám global path và điều khiển goal từ RViz},
+  pdfauthor={Nguyễn Thành Lâm}
+}
+\setlength{\parindent}{1.1em}
+\setlength{\parskip}{0.18em}
+\setlist{nosep,leftmargin=1.45em}
+\captionsetup{font=small,labelfont=bf}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{\vspace{-2.2em}\textbf{Báo cáo tiến độ tuần\\
+MPPI bám global path và điều khiển goal từ RViz}}
+\author{Nguyễn Thành Lâm\\[-0.1em]
+\small Companion-computer local planning cho ArduPilot}
+\date{13 tháng 09 năm 2026}
+
+\begin{document}
+\maketitle
+\vspace{-1.7em}
+
+\begin{center}
+\fcolorbox{navy}{lightblue}{\parbox{0.91\textwidth}{\centering
+\textbf{Video demo:} \href{https://drive.google.com/file/d/1I1VxN6-6Y3Gt8kxY8ieNvlvMMkvvLxLJ/view?usp=sharing}{Google Drive}\quad
+\textbf{Mã nguồn:} \href{https://github.com/thanhlamauto/ardu_plugin_gazebo}{GitHub -- thanhlamauto/ardu\_plugin\_gazebo}}}
+\end{center}
+
+\begin{abstract}
+Tuần này hệ thống local planning trên companion computer được nâng từ MPPI
+điểm-đến-điểm lên MPPI bám global path theo thời gian, đồng thời bổ sung giao
+diện chọn goal trực tiếp trong RViz. Planner nhận odometry và point cloud LiDAR
+3D, sinh velocity/yaw-rate setpoint rồi gửi ArduPilot qua MAVLink. Ba tuyến
+right-angle, narrow-gate và slalom đã đạt terminal trong Gazebo/SITL với một
+seed mỗi map. Kết quả cho thấy pipeline hoạt động, nhưng chưa chứng minh độ bền
+đa seed, rigid-body PA-MPPI hay an toàn phần cứng.
+\end{abstract}
+
+\noindent\textbf{Từ khóa:} MPPI, global-path tracking, RViz, MAVLink,
+ArduPilot, Gazebo, LiDAR 3D.
+
+\section{Mục tiêu và kết quả chính}
+
+Mục tiêu kỹ thuật là giữ perception và local optimization ở companion
+computer, còn ArduPilot đảm nhiệm stabilization và tracking setpoint. Đây là
+lựa chọn kiến trúc của project; không hàm ý stack tránh vật cản của ArduPilot
+không sử dụng được. Guided mode và MAVLink cung cấp interface velocity target
+phù hợp cho cách phân tầng này \cite{ardupilotGuidedDocs2026,mavlinkCommon2026}.
+
+Các kết quả chính trong tuần:
+\begin{enumerate}
+  \item thêm cost bám global path theo thời gian dựa trên cấu trúc reference
+  tracking của Minařík et al. \cite{minarik2024agilemppi};
+  \item mô phỏng cùng command conditioner trong rollout và tại MAVLink output;
+  \item thêm predictive brake, timeout/stale-data gate và terminal handling;
+  \item hiển thị nominal trajectory cùng top-$K$ sampled trajectories trong RViz;
+  \item nhận \code{/goal\_pose} từ công cụ \code{2D Goal Pose}, cho phép thay
+  goal mà không dùng thao tác \code{Fly To};
+  \item tạo profile demo mượt riêng, không sửa ngược profile dùng cho audit.
+\end{enumerate}
+
+\begin{table}[h]
+\centering\small
+\caption{Trạng thái bằng chứng tại thời điểm báo cáo.}
+\begin{tabularx}{\textwidth}{L{0.30\textwidth}Y}
+\toprule
+\textbf{Trạng thái} & \textbf{Phạm vi}\\
+\midrule
+Verified offline & 41/41 unit tests; deterministic point-mass smoke test.\\
+Verified Gazebo/SITL, one seed & Velocity-level MPPI trên ba fixed routes.\\
+Implemented, chưa live-verified & RViz-click flight hoàn chỉnh; profile demo mượt mới.\\
+Pending & Rigid-body hover/body-rate, PA-MPPI unknown-space ablation, edge computer và hardware.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Kiến trúc và luồng thực thi}
+
+\begin{center}
+\fcolorbox{navy}{lightblue}{\parbox{0.90\textwidth}{\centering
+LiDAR 3D + Gazebo odometry
+$\rightarrow$ đổi frame/downsample
+$\rightarrow$ MPPI hoặc PA-MPPI
+$\rightarrow$ MAVLink velocity setpoint
+$\rightarrow$ ArduPilot GUIDED
+$\rightarrow$ motors/Gazebo}}
+\end{center}
+
+Baseline dùng trạng thái vật lý
+$x=[p_x,p_y,p_z,v_x,v_y,v_z,\psi]$ và lệnh
+$u=[v_x^{cmd},v_y^{cmd},v_z^{cmd},\dot\psi^{cmd}]$. Rollout còn lưu lệnh đã
+qua conditioner ở bước trước để mô hình dự đoán đúng giới hạn thay đổi lệnh.
+Mô hình này cố ý giảm bậc: attitude và motor dynamics vẫn do ArduPilot xử lý.
+
+Các module chính gồm:
+\begin{itemize}
+  \item \code{mppi\_controller.py}: dynamics, sampling, cost và trajectory;
+  \item \code{mppi\_local\_planner\_node.py}: vòng điều khiển, safety gates,
+  waypoint, RViz và logging;
+  \item \code{mavlink\_interface.py}: chuyển ENU/NED và gửi setpoint;
+  \item \code{scripts/mppi\_velocity\_avoidance.py}: CLI và nạp YAML;
+  \item \code{occupancy\_grid.py}, \code{pa\_mppi\_controller.py}: nhánh
+  perception-aware experimental.
+\end{itemize}
+
+RViz chỉ gửi \code{PoseStamped}; node lấy $x,y$ từ click và giữ độ cao hiện tại
+hoặc dùng độ cao cấu hình. Mỗi click reset route, terminal state, conditioner
+và MPPI warm start. Arm, takeoff và emergency mode vẫn tách khỏi goal interface
+để người vận hành giữ quyền kiểm soát chuyến bay.
+
+\section{Cost MPPI dùng trong thí nghiệm}
+
+MPPI lấy mẫu nhiều chuỗi lệnh, tính tổng cost $J_i$ cho rollout $i$, rồi ưu tiên
+rollout có cost thấp. Trọng số được viết gọn như sau \cite{williams2018itmppi}:
+\begin{equation}
+  a_i = \exp\!\left(-\frac{J_i-J_{min}}{\lambda}\right),
+  \qquad w_i = \frac{a_i}{\sum_j a_j}.
+\end{equation}
+Nominal control được cập nhật bằng trung bình có trọng số của nhiễu sampled và
+chỉ lệnh đầu tiên được gửi đi; quá trình lặp lại ở chu kỳ sau.
+
+Profile bám path sử dụng tổng cost đơn giản
+\begin{equation}
+  J = J_{path}+J_{vel}+J_{input}+J_{smooth}+J_{collision}.
+\end{equation}
+Ý nghĩa từng thành phần:
+\begin{align}
+J_{path} &= c_p\sum_k \|p_k-p_k^{ref}\|^2,
+&\text{bám vị trí trên global path},\\
+J_{vel} &= c_v\sum_k \|v_k-v_k^{ref}\|^2,
+&\text{bám tốc độ tham chiếu},\\
+J_{input} &= \sum_k u_k^T R u_k,
+&\text{tránh lệnh điều khiển quá lớn},\\
+J_{smooth} &= \sum_k (u_k-u_{k-1})^T R_{\Delta}(u_k-u_{k-1}),
+&\text{giảm thay đổi lệnh},\\
+J_{collision} &= C\sum_k \mathbf{1}[d_k<r_{safe}],
+&\text{phạt rollout đi vào vùng va chạm}.
+\end{align}
+
+Trong đó $p_k^{ref},v_k^{ref}$ là reference tại đúng bước dự đoán; $d_k$ là
+khoảng cách từ rollout tới point cloud; $C$ là hệ số phạt lớn. Cấu trúc
+reference/input/collision được đối chiếu với Minařík et al.
+\cite{minarik2024agilemppi}. Việc ánh xạ sang velocity command, bán kính point-cloud,
+weights số và conditioner là lựa chọn engineering của project, không phải bản
+sao nguyên tham số paper.
+
+PA-MPPI v0 bổ sung map ba trạng thái $\{unknown,free,occupied\}$. Khi goal bị
+che khuất, perception term ưu tiên trajectory mở rộng vùng nhìn thấy; collision
+term coi vùng chưa xác nhận free là không an toàn. Ý tưởng này theo PA-MPPI
+\cite{zhai2026pamppi}, nhưng mapper NumPy/Torch hiện tại chỉ là prototype và
+không được gọi là reproduction đầy đủ.
+
+\section{Thử nghiệm Gazebo/SITL}
+
+Ba thí nghiệm dùng cùng velocity-level controller, seed 7, Gazebo Harmonic và
+ArduPilot commit \code{f808f78c}. Global path được cung cấp trước; LiDAR và
+odometry đi qua pipeline live. Bảng chỉ báo cáo log đã ghi, không nội suy sang
+profile demo mới.
+
+\begin{table}[h]
+\centering\small
+\caption{Kết quả live đã ghi với profile paper-cost ngày 13/09/2026.}
+\begin{tabularx}{\textwidth}{L{0.20\textwidth}rrrrY}
+\toprule
+\textbf{Map} & \textbf{Cycles} & \textbf{Final error} & \textbf{Path} & \textbf{Min clearance} & \textbf{Compute mean/p95}\\
+\midrule
+Right angle & 128 & 0.235 m & 23.15 m & 2.19 m & 14.5/14.9 ms\\
+Narrow gate & 192 & 0.230 m & 35.50 m & 2.07 m & 13.3/14.7 ms\\
+Slalom & 193 & 0.220 m & 37.67 m & 1.30 m & 13.6/15.5 ms\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Không run nào ghi deadline miss, \code{hold-brake} hoặc \code{recover-brake}.
+Tuy nhiên, clearance là khoảng cách từ tâm odometry tới điểm LiDAR gần nhất,
+chưa trừ footprint UAV. Giá trị 1.30 m ở slalom thấp hơn collision radius cấu
+hình 1.50 m; do đó cần kiểm tra sensor latency, footprint và nhiều seed trước
+khi kết luận safety.
+
+Trong map narrow-gate, route demo đi qua cửa tường lớn rồi vòng phía bắc hai
+cột; nó không xuyên khe nhỏ giữa hai cột. Route xuyên khe nhỏ là stress-test,
+từng gây local minimum hoặc hard brake, nên không được trình bày như kết quả
+demo thành công.
+
+\section{Tune cho demo và bài học}
+
+Profile \code{mppi\_demo\_smooth.yaml} giữ nguyên năm nhóm cost trên nhưng đổi
+các tham số interface: reference speed $1.0\rightarrow0.85$ m/s,
+max acceleration $1.5\rightarrow0.9$ m/s$^2$, command smoothing
+$0.45\rightarrow0.35$, waypoint radius $1.0\rightarrow1.25$ m và goal radius
+$0.25\rightarrow0.35$ m. Sweep candidate offline cho thấy RMS gia tốc lệnh
+giảm khoảng 18\% trên các slalom seed đã chạy. Đây là evidence offline; chưa có
+log live để gán kết quả Gazebo cho profile mới.
+
+Các bài học thực nghiệm:
+\begin{enumerate}
+  \item kiểm tra bề rộng khả thi sau khi trừ footprint và uncertainty trước
+  khi tune weights;
+  \item global path quyết định homotopy, còn MPPI tối ưu chuyển động cục bộ;
+  \item tăng samples/horizon không tự phá được local minimum hình học;
+  \item terminal gate quá chặt làm UAV đứng sát goal nhưng node chưa kết thúc;
+  \item mọi thay đổi YAML yêu cầu restart planner; mỗi run phải dùng log riêng;
+  \item một video hoặc một seed chỉ chứng minh pipeline chạy được, không chứng
+  minh robustness.
+\end{enumerate}
+
+\section{Kết luận và công việc tiếp theo}
+
+Tuần này đã hoàn thiện luồng velocity-level từ sensing đến MAVLink, bổ sung
+global-path cost, visualization sampled trajectories và goal interface trên
+RViz. Ba fixed-route run cho thấy controller đạt terminal trong SITL; unit test
+hiện đạt 41/41. Phần còn thiếu là live verification cho profile mượt và RViz
+click, ablation MPPI/PA-MPPI trong môi trường unknown, rigid-body hover gate và
+đánh giá trên edge computer.
+
+Thứ tự tiếp theo là: (1) ghi log RViz-click trên ba map; (2) chạy nhiều seed với
+cùng route và safety limits; (3) đo success, clearance, smoothness và compute
+p95; (4) chỉ sau đó mới chuyển sang rigid-body và hardware gate.
+
+\bibliographystyle{unsrt}
+\bibliography{pa_mppi_sources}
+
+\end{document}

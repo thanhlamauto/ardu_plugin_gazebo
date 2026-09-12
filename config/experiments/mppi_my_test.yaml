@@ -1,0 +1,53 @@
+# EXPERIMENTAL SITL-ONLY profile.
+# Gazebo counterpart of benchmark profile `safe_tight`.
+# Offline: preserved margin in recorded seeds, but stalled at the narrow gate.
+# The name is historical shorthand, not a safety certification.
+
+hz: 10.0
+dt: 0.1
+tau: 0.5
+horizon: 30
+samples: 256
+lambda: 3.0
+device: cpu
+seed: 7
+
+vmax: 0.8
+vzmax: 1.0
+yaw_rate_max: 0.6
+noise_xy: 0.9
+noise_z: 0.3
+noise_yaw: 0.3
+
+margin: 2.0
+w_goal: 2.0
+w_terminal: 10.0
+w_obstacle: 24.0
+w_u: 0.05
+w_du: 0.2
+w_yaw: 0.2
+w_path: 0.0
+path_scale_m: 1.0
+# global_path: "x0,y0,z0;x1,y1,z1;x2,y2,z2"
+cost_profile: project
+
+command_alpha: 0.45
+max_accel_xy: 0.5
+max_accel_z: 0.8
+max_yaw_accel: 1.2
+goal_slowdown_radius: 3.0
+goal_approach_gain: 0.45
+goal_min_speed: 0.10
+
+goal_radius: 0.25
+wp_radius: 1.25
+state_source: odom
+lidar_topic: /sensor_suite/lidar/points
+odom_topic: /iris/odometry
+max_points: 200
+max_raw_points: 25000
+sensor_offset_body_frd: [0.08, 0.0, -0.16]
+
+hard_brake_m: 0.5
+stale_after_s: 1.0
+planner_timeout_ms: 90.0

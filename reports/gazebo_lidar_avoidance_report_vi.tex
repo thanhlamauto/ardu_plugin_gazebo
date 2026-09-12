@@ -1,0 +1,252 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[left=25mm,right=25mm,top=20mm,bottom=18mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{ragged2e}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit}
+\usepackage{float}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\definecolor{demogreen}{HTML}{08783E}
+
+\renewcommand{\abstractname}{Tóm tắt}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\refname}{Tài liệu tham khảo}
+
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{2em}
+\setlist{leftmargin=1.8em,itemsep=2pt,topsep=4pt}
+\captionsetup{font=small,labelfont=bf}
+
+\title{Báo cáo tìm hiểu và thực nghiệm\\
+Tránh vật cản bằng LiDAR 3D trên ArduPilot--Gazebo}
+\author{Nguyễn Thanh Lâm}
+\date{Ngày 6 tháng 9 năm 2026}
+
+\begin{document}
+\maketitle
+\vspace{-1.2em}
+\begin{center}
+\small
+\href{https://drive.google.com/file/d/1zR5dzNd2X10FpFaAOa5IzSibcBF2wXll/view}{\textcolor{demogreen}{\underline{\textbf{Video demo: Xem tại Google Drive}}}}\\[3pt]
+\href{https://github.com/thanhlamauto/ardu_plugin_gazebo/blob/3411b9a/scripts/lidar_to_mavlink_avoidance.py}{\textcolor{demogreen}{\underline{\textbf{Code bridge: Xem trên GitHub}}}}
+\end{center}
+\vspace{0.4em}
+
+\begin{abstract}
+Báo cáo ghi lại việc nối LiDAR 3D trong Gazebo với ArduPilot SITL để thử nghiệm tránh vật cản. Bridge đọc point cloud, lọc điểm lỗi, đổi từ FLU sang BODY\_FRD và gửi các điểm đại diện bằng MAVLink~2. ArduPilot nhận dữ liệu qua \texttt{AP\_Proximity}; \texttt{AC\_Avoid} giới hạn vận tốc khi UAV đến gần vật cản, còn BendyRuler chọn hướng vòng dựa trên OA Database. Trong world warehouse, UAV đã vòng qua cụm container, tới đích và hạ cánh an toàn.
+\end{abstract}
+
+\section{Mục tiêu và phạm vi}
+
+Mục tiêu là cho UAV bay ở độ cao khoảng 20~m, phát hiện vật cản bằng LiDAR 3D và đi tới vị trí được chỉ định mà không va chạm. Công việc được chia thành bốn phần:
+
+\begin{itemize}
+  \item tìm đúng module xử lý LiDAR và vật cản trong ArduPilot;
+  \item xây dựng bridge đưa point cloud từ Gazebo vào ArduPilot SITL;
+  \item cấu hình proximity, Simple Avoidance và BendyRuler;
+  \item quan sát dữ liệu cảm biến trên RViz và kiểm tra hành vi bay trong Gazebo.
+\end{itemize}
+
+Báo cáo chỉ đi theo đường dữ liệu từ LiDAR tới khối tránh vật cản. Điều khiển động cơ, mô hình động lực học và chi tiết từng hàm của ArduPilot không nằm trong phạm vi này.
+
+\section{Tìm hiểu hệ thống}
+
+\subsection{Phân biệt hai nhánh avoidance trong ArduPilot}
+
+Trong ArduPilot có hai nhóm tên gần giống nhau. \texttt{AP\_Avoidance} xử lý nguy cơ va chạm với phương tiện bay khác, thường dựa trên ADS-B. LiDAR dùng để tránh tường, cây hoặc công trình gần UAV nên đi qua \texttt{AP\_Proximity} và \texttt{AC\_Avoidance}. Vì vậy báo cáo không khảo sát \texttt{AP\_Avoidance}.
+
+\subsection{Kiến trúc xử lý vật cản}
+
+Hình~\ref{fig:architecture} tóm tắt đường đi của dữ liệu. ArduPilot không đọc trực tiếp message của Gazebo nên cần bridge chuyển point cloud sang MAVLink. Từ \texttt{Boundary\_3D}, dữ liệu được dùng cho cả giới hạn vận tốc và lập đường vòng.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=7mm and 7mm,
+  box/.style={draw,rounded corners=1.5pt,align=center,minimum height=11mm,text width=27mm,font=\small,inner sep=2pt},
+  arrow/.style={-{Latex[length=2mm]},thick}
+]
+\node[box] (lidar) {Gazebo\\LiDAR 3D};
+\node[box,right=of lidar] (bridge) {Bridge\\PointCloud $\to$ MAVLink};
+\node[box,right=of bridge] (prox) {AP\_Proximity\\MAV backend};
+\node[box,right=of prox] (bound) {Boundary\_3D\\biên cục bộ};
+\node[box,below=of prox] (avoid) {AC\_Avoid\\Simple Avoidance};
+\node[box,below=of bound] (db) {OA Database\\vật cản world};
+\node[box,below=of db] (br) {BendyRuler\\đích tạm};
+\draw[arrow] (lidar) -- (bridge);
+\draw[arrow] (bridge) -- (prox);
+\draw[arrow] (prox) -- (bound);
+\draw[arrow] (bound.south) |- (avoid.east);
+\draw[arrow] (bound) -- (db);
+\draw[arrow] (db) -- (br);
+\end{tikzpicture}
+\caption{Đường dữ liệu LiDAR trong bài thực nghiệm.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{AP\_Proximity và bản tin OBSTACLE\_DISTANCE\_3D}
+
+\texttt{AP\_Proximity} cung cấp một giao diện chung cho nhiều nguồn cảm biến khoảng cách. Backend được chọn bằng tham số; trong bài này \texttt{PRX1\_TYPE=2} chọn backend MAVLink. Nhờ đó các khối phía sau không cần biết điểm đo ban đầu đến từ LiDAR thật hay Gazebo.
+
+Bridge gửi một bản tin \path{OBSTACLE_DISTANCE_3D} cho mỗi điểm đại diện. Bản tin chứa tọa độ $(x,y,z)$, giới hạn đo và loại cảm biến. Frame phải là \path{MAV_FRAME_BODY_FRD}: $x$ hướng trước, $y$ hướng phải, $z$ hướng xuống. Từ ba tọa độ này, ArduPilot tự tính khoảng cách, yaw và pitch.
+
+Các điểm của một scan dùng chung \texttt{time\_boot\_ms} để backend biết khi nào bắt đầu một scan mới. Bản tin này chỉ có trong MAVLink~2, nên bridge không thể chạy với MAVLink~1.
+
+Phần đóng gói message trong bridge tham khảo \href{https://mavlink.io/en/messages/ardupilotmega.html#OBSTACLE_DISTANCE_3D}{\textcolor{demogreen}{\underline{đặc tả MAVLink message 11037}}}. Bảng~\ref{tab:obstacle-fields} đối chiếu từng field với giá trị đang gửi.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\textwidth}{@{}>{\ttfamily}p{31mm}>{\RaggedRight\arraybackslash}p{43mm}>{\RaggedRight\arraybackslash}X@{}}
+\toprule
+\normalfont Field & Giá trị trong bridge & Ý nghĩa \\
+\midrule
+time\_boot\_ms & \normalfont thời gian monotonic, ms & Các điểm cùng scan dùng chung timestamp. \\
+sensor\_type & \normalfont \texttt{LASER} & Nguồn đo là LiDAR. \\
+frame & \normalfont \texttt{BODY\_FRD} & $x$ trước, $y$ phải, $z$ xuống. \\
+obstacle\_id & \normalfont \texttt{0xFFFF} & Không có ID vì bridge chưa theo dõi từng vật thể. \\
+x & \normalfont \texttt{x\_frd}, m & Tọa độ trước--sau của điểm. \\
+y & \normalfont \texttt{y\_frd}, m & Tọa độ trái--phải của điểm. \\
+z & \normalfont \texttt{z\_frd}, m & Tọa độ lên--xuống của điểm. \\
+min\_distance & \normalfont 0.15 m & Khoảng đo nhỏ nhất của LiDAR. \\
+max\_distance & \normalfont 30 m & Khoảng đo lớn nhất của LiDAR. \\
+\bottomrule
+\end{tabularx}
+\caption{Các field của \texttt{OBSTACLE\_DISTANCE\_3D} được dùng trong bridge.}
+\label{tab:obstacle-fields}
+\end{table}
+
+\subsection{Boundary\_3D}
+
+ArduPilot không giữ nguyên point cloud. \texttt{Boundary\_3D} chia vùng quanh UAV thành 8 hướng yaw và 5 lớp pitch, tổng cộng 40 mặt; mỗi mặt giữ vật cản gần nhất. Boundary gắn với thân UAV và được cập nhật theo scan mới. Nó phù hợp với phản ứng tức thời, không dùng để ghi nhớ môi trường lâu dài.
+
+\subsection{OA Database}
+
+OA Database không phải map hình học của Gazebo. Đây là danh sách vật cản ArduPilot tạo từ các điểm vừa quan sát. Mỗi phần tử có vị trí 3D so với EKF origin, bán kính ước lượng và thời điểm cập nhật. Điểm trong BODY\_FRD được đưa sang hệ world bằng vị trí và hướng UAV từ AHRS/EKF:
+\begin{equation}
+  \mathbf{p}^{world}_{obs}
+  = \mathbf{p}^{world}_{uav}
+  + \mathbf{R}_{body\rightarrow world}\mathbf{p}^{body}_{obs}.
+\end{equation}
+Điểm mới đi qua queue rồi được so với danh sách hiện có. Điểm gần một obstacle cũ sẽ làm mới timestamp và bán kính; điểm khác biệt được thêm thành phần tử mới. Cấu hình hiện tại cho phép lưu 500 phần tử, queue 200 điểm và xóa obstacle không được nhìn lại sau 5~s. Database vì thế chỉ chứa vùng LiDAR vừa quét, không chứa sẵn toàn bộ warehouse.
+
+\subsection{Simple Avoidance và BendyRuler}
+
+Hàm \texttt{adjust\_velocity()} của \texttt{AC\_Avoid} kiểm tra vận tốc mong muốn với proximity boundary. Với \texttt{AVOID\_BEHAVE=0}, nó giảm thành phần vận tốc hướng vào vật cản nhưng vẫn cho UAV trượt sang bên. Nếu UAV đã vào trong khoảng an toàn, khối này có thể yêu cầu lùi lại.
+
+BendyRuler dùng OA Database để thử nhiều đoạn đường quanh hướng tới waypoint. Mỗi đoạn được chấm theo khoảng cách nhỏ nhất tới vật cản; hướng đạt margin yêu cầu và còn tiến về đích sẽ được chọn làm đích tạm. Như vậy \texttt{AC\_Avoid} là lớp bảo vệ gần UAV, còn BendyRuler quyết định đường vòng.
+
+Dijkstra chủ yếu xử lý fence hoặc vùng cấm đã biết trước. Thí nghiệm đặt \texttt{OA\_TYPE=1}, nên chỉ dùng BendyRuler, không dùng chế độ kết hợp Dijkstra--BendyRuler.
+
+\section{Cài đặt bridge Gazebo--ArduPilot}
+
+\subsection{Lý do cần bridge riêng}
+
+Plugin ArduPilot--Gazebo đã trao đổi lệnh motor và trạng thái mô phỏng, nhưng gói SITL JSON chỉ có một số giá trị rangefinder đơn, không mang LiDAR 3D $640\times16$. Nhánh ROS--Gazebo hiện có phục vụ RViz, chưa đưa dữ liệu vào \texttt{AP\_Proximity}. Phần còn thiếu được bổ sung bằng \texttt{lidar\_to\_mavlink\_avoidance.py}.
+
+\subsection{Chuỗi xử lý trong bridge}
+
+LiDAR có 640 tia ngang, 16 tia dọc, tần số 10~Hz và tầm đo 0.15--30~m. Mỗi scan có tối đa 10,240 điểm. Bridge xử lý theo thứ tự:
+
+\begin{enumerate}
+  \item đọc topic \texttt{/sensor\_suite/lidar/}\allowbreak\texttt{points} dưới dạng \texttt{gz.msgs.}\allowbreak\texttt{PointCloudPacked};
+  \item giải mã $x$, $y$, $z$, sau đó bỏ điểm không hữu hạn hoặc ngoài tầm đo;
+  \item Đổi từ Gazebo FLU (trước--trái--lên) sang BODY\_FRD (trước--phải--xuống), đồng thời cộng offset lắp cảm biến:
+  \begin{equation}
+    (x_f,y_f,z_f)=(0.08+x_g,\;-y_g,\;-0.16-z_g).
+  \end{equation}
+  \item chia theo ô yaw/pitch $5^{\circ}\times5^{\circ}$, giữ điểm gần nhất trong mỗi ô và lấy tối đa 180 điểm;
+  \item gửi từng điểm bằng MAVLink~2 tới TCP 5762 của \texttt{SERIAL1}; các điểm cùng scan dùng chung timestamp.
+\end{enumerate}
+
+Chọn điểm theo ô góc vẫn giữ được vật cản ở nhiều hướng nhưng giảm đáng kể lưu lượng. Bridge gửi ở 5~Hz; trong lần chạy thử, mỗi scan thường còn 40--75 điểm sau lọc.
+
+Đường điều khiển dùng backend Gazebo trực tiếp. Callback chỉ giữ scan mới nhất, vì vậy log có thể báo \texttt{dropped=N} khi xử lý không kịp tốc độ LiDAR. Đây là chủ ý để tránh gửi dữ liệu cũ. ROS~2 vẫn chạy riêng cho RViz; tùy chọn \texttt{--ros} chỉ dùng khi muốn lấy đầu vào từ PointCloud2.
+
+\subsection{Kết nối MAVLink và cấu hình ArduPilot}
+
+Tùy chọn \texttt{--serial1=tcp:2} mở \path{tcp:127.0.0.1:5762} trên SITL instance 0. Bridge chờ heartbeat trước khi gửi. Địa chỉ \texttt{udpout:14550} không được dùng vì đó là đường output của MAVProxy trong cấu hình này.
+
+Bảng~\ref{tab:params} liệt kê các tham số chính. Đáng chú ý, \texttt{GUID\_OPTIONS=64} đưa position target của Guided qua \texttt{AC\_WPNav\_OA}. Nếu thiếu bit này, UAV vẫn nhận lệnh nhưng BendyRuler không tham gia chọn đường.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}>{\ttfamily}p{38mm}p{18mm}>{\RaggedRight\arraybackslash}X@{}}
+\toprule
+\normalfont Tham số & Giá trị & Vai trò \\
+\midrule
+SERIAL1\_PROTOCOL & 2 & MAVLink 2 cho cổng bridge. \\
+PRX1\_TYPE & 2 & Chọn \texttt{AP\_Proximity\_MAV}. \\
+PRX1\_MIN / PRX1\_MAX & 0.3 / 30 & Giới hạn khoảng cách dùng ở proximity. \\
+AVOID\_ENABLE & 2 & Bật tránh vật cản từ proximity. \\
+AVOID\_MARGIN & 4.0 & Khoảng an toàn của Simple Avoidance. \\
+OA\_TYPE & 1 & Chọn BendyRuler. \\
+OA\_BR\_LOOKAHEAD & 15 & Độ dài nhìn trước khi thử hướng. \\
+OA\_DB\_QUEUE\_SIZE & 200 & Chứa một frame đã rút gọn tối đa 180 điểm. \\
+GUID\_OPTIONS & 64 & Đưa target Guided qua waypoint avoidance. \\
+\bottomrule
+\end{tabularx}
+\caption{Các tham số chính của cấu hình tránh vật cản.}
+\label{tab:params}
+\end{table}
+
+\section{Thiết lập và quy trình thực nghiệm}
+
+\subsection{Môi trường thử}
+
+World thử nghiệm là \texttt{iris\_warehouse\_sensor.sdf}. UAV xuất phát gần Depot; bốn container xếp cao 24~m nằm trên đường bay về phía đông. UAV bay ở 20~m nên LiDAR vẫn nhìn thấy cụm này trong góc quét dọc $\pm15^{\circ}$. Gazebo và MAVProxy dùng chung mốc WGS84 $(-35.363262,\ 149.165237)$ để quy đổi lệnh trên bản đồ sang world mô phỏng.
+
+Hệ thống được chạy trong năm terminal: Gazebo server, Gazebo GUI, SITL/MAVProxy, ROS~2/RViz và bridge LiDAR--MAVLink. Các tiến trình Gazebo dùng chung \texttt{GZ\_PARTITION}. Phía ROS~2 dùng \texttt{ROS\_DOMAIN\_ID=45}.
+
+\subsection{Các bước kiểm tra}
+
+SITL được nạp file \texttt{avoidance\_20m.parm}; bridge LiDAR chỉ chạy sau khi cổng 5762 đã mở. Trước khi cất cánh, kiểm tra:
+
+\begin{itemize}
+  \item RViz có ảnh RGB, depth, point cloud, RobotModel, TF và odometry;
+  \item bridge nhận đúng topic, kết nối system 1:1 bằng MAVLink~2 và in số điểm gửi;
+  \item MAVProxy nhận \texttt{DISTANCE\_SENSOR}; khoảng cách phía trước có \texttt{orientation=0};
+  \item các tham số \texttt{PRX1\_TYPE}, \texttt{AVOID\_ENABLE}, \texttt{OA\_TYPE}, \texttt{GUID\_OPTIONS} và kích thước OA queue đúng giá trị thiết kế.
+\end{itemize}
+
+UAV được chuyển sang Guided, arm và cất cánh tới 20~m. Khi độ cao ổn định, lệnh
+\begin{center}
+\texttt{guided -35.363262 149.165600 20}
+\end{center}
+đặt đích ở phía sau cụm container. Nếu tắt avoidance, đường thẳng tới đích đi xuyên qua vật cản.
+
+\section{Kết quả và đánh giá}
+
+Bridge kết nối được với SITL qua TCP 5762. Log cho thấy scan gốc có 10,240 điểm, kèm số điểm còn lại sau lọc, khoảng cách gần nhất và số frame bị bỏ. Trên MAVProxy, \texttt{DISTANCE\_SENSOR} thay đổi theo khoảng cách tới container, cho thấy dữ liệu đã vào \texttt{AP\_Proximity}.
+
+Khi UAV tiến gần container, giá trị khoảng cách giảm dần. UAV bẻ sang một bên trước vật cản rồi quay lại hướng đích; vệt odometry trên RViz thể hiện rõ đoạn vòng này. Khoảng cách nhỏ nhất trong các lần kiểm tra vào khoảng 5--6~m. Cuối hành trình MAVProxy báo \texttt{MISSION\_ITEM\_REACHED}; sau lệnh Land, UAV hạ cánh và chuyển sang \texttt{DISARMED}.
+
+Kết quả mới dừng ở một kịch bản tĩnh. Số lần chạy chưa đủ để đánh giá tỉ lệ thành công, thời gian xử lý hoặc ảnh hưởng của nhiễu. Nếu tăng tốc độ bay, số điểm hay tần số gửi, cần đo lại độ trễ và mức đầy của OA queue.
+
+\section{Kết luận}
+
+Bridge đã đưa được point cloud của Gazebo vào đúng nhánh tránh vật cản của ArduPilot. BODY\_FRD, MAVLink~2, timestamp chung theo scan và \texttt{GUID\_OPTIONS=64} là các điểm cần giữ đúng khi chạy lại. Bước tiếp theo là thử nhiều tốc độ và cách bố trí vật cản, đọc log \texttt{GUIP}/\texttt{OABR}, rồi mới chuyển sang Dijkstra--BendyRuler hoặc vật cản chuyển động.
+
+\section*{Tài liệu tham khảo}
+{\scriptsize
+\noindent [1] Report Mentor, \emph{Gazebo 3D LiDAR $\rightarrow$ ArduPilot Object Avoidance}, slide nội bộ, 2026.\par
+\noindent [2] ArduPilot, mã nguồn \texttt{AP\_Proximity}, \texttt{AC\_Avoidance}, \texttt{AP\_OADatabase} và \texttt{AP\_OABendyRuler}.\par
+\noindent [3] Nguyễn Thanh Lâm, \emph{Demo warehouse: tránh vật cản bằng LiDAR 3D}, repository \texttt{ardupilot\_gazebo}, 2026.
+\par\noindent [4] MAVLink, \href{https://mavlink.io/en/messages/ardupilotmega.html#OBSTACLE_DISTANCE_3D}{\emph{ArduPilotMega: OBSTACLE\_DISTANCE\_3D (11037)}}, tài liệu message definition.
+}
+
+\end{document}

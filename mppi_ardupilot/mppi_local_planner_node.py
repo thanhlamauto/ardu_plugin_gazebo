@@ -36,6 +36,9 @@ from .mavlink_interface import ArduPilotInterface
 from .mppi_controller import MPPIConfig, QuadMPPI
 
 DEFAULT_GOAL = "16,10,20;30,0,20"
+SAFE_HOLD_EVENTS = frozenset(
+    ("hold-stale", "hold-brake", "hold-timeout", "hold-await-goal", "reached")
+)
 
 
 @dataclass
@@ -56,7 +59,7 @@ class PlannerStep:
     u: np.ndarray  # [vx, vy, vz, yaw_rate] frame làm việc ENU
     nearest_m: float
     goal_dist_m: float
-    event: str = ""  # "hold-stale", "hold-brake", "reached", "waypoint", ""
+    event: str = ""  # hold/recover/reached/waypoint/command state
     diagnostics: Optional[dict] = None
 
 
@@ -64,7 +67,8 @@ class VelocityCommandConditioner:
     """Low-pass and slew-limit velocity commands between planner cycles."""
 
     def __init__(self, dt: float, alpha: float, max_accel_xy: float,
-                 max_accel_z: float, max_yaw_accel: float) -> None:
+                 max_accel_z: float, max_yaw_accel: float, *,
+                 u_min=None, u_max=None) -> None:
         if dt <= 0 or not 0.0 < alpha <= 1.0:
             raise ValueError("dt must be > 0 and command alpha in (0, 1]")
         limits = np.asarray([max_accel_xy, max_accel_z, max_yaw_accel], dtype=float)
@@ -75,6 +79,16 @@ class VelocityCommandConditioner:
         self.max_accel_xy = float(max_accel_xy)
         self.max_accel_z = float(max_accel_z)
         self.max_yaw_accel = float(max_yaw_accel)
+        self.u_min = None if u_min is None else np.asarray(u_min, dtype=float)
+        self.u_max = None if u_max is None else np.asarray(u_max, dtype=float)
+        if (self.u_min is None) != (self.u_max is None):
+            raise ValueError("u_min and u_max must be provided together")
+        if self.u_min is not None and (
+            self.u_min.shape != (4,) or self.u_max.shape != (4,)
+            or not np.isfinite(self.u_min).all() or not np.isfinite(self.u_max).all()
+            or np.any(self.u_min >= self.u_max)
+        ):
+            raise ValueError("command bounds must be finite four-vectors with min < max")
         self.previous: Optional[np.ndarray] = None
 
     def reset(self) -> None:
@@ -89,6 +103,8 @@ class VelocityCommandConditioner:
             if measured.shape != (3,) or not np.isfinite(measured).all():
                 raise ValueError("measured velocity must be a finite 3-vector")
             self.previous = np.r_[measured, 0.0]
+            if self.u_min is not None:
+                self.previous = np.clip(self.previous, self.u_min, self.u_max)
 
         target = self.previous + self.alpha * (raw - self.previous)
         delta = target - self.previous
@@ -101,6 +117,8 @@ class VelocityCommandConditioner:
         delta[3] = np.clip(delta[3], -self.max_yaw_accel * self.dt,
                            self.max_yaw_accel * self.dt)
         self.previous = self.previous + delta
+        if self.u_min is not None:
+            self.previous = np.clip(self.previous, self.u_min, self.u_max)
         return self.previous.copy()
 
 
@@ -115,8 +133,16 @@ class LocalPlannerNode:
         wp_radius: float = 2.5,
         goal_radius: float = 1.0,
         hard_brake_m: float = 1.0,
+        hard_brake_release_m: Optional[float] = None,
+        hard_brake_delay_s: float = 0.25,
+        brake_accel_m_s2: float = 1.5,
+        recovery_speed_m_s: float = 0.4,
         planner_timeout_ms: Optional[float] = None,
         command_conditioner: Optional[VelocityCommandConditioner] = None,
+        reference_path: Optional[List[np.ndarray]] = None,
+        goal_slowdown_radius: Optional[float] = None,
+        goal_approach_gain: float = 0.5,
+        goal_min_speed: float = 0.1,
     ) -> None:
         if not waypoints:
             raise ValueError("cần ít nhất 1 waypoint")
@@ -125,11 +151,69 @@ class LocalPlannerNode:
         self.wp_radius = wp_radius
         self.goal_radius = goal_radius
         self.hard_brake_m = hard_brake_m
+        self.hard_brake_release_m = (
+            hard_brake_m + 0.8 if hard_brake_release_m is None
+            else hard_brake_release_m
+        )
+        self.hard_brake_delay_s = hard_brake_delay_s
+        self.brake_accel_m_s2 = brake_accel_m_s2
+        self.recovery_speed_m_s = recovery_speed_m_s
+        if self.hard_brake_m < 0 or self.hard_brake_release_m < self.hard_brake_m:
+            raise ValueError("hard-brake release must be >= trigger distance")
+        if min(self.brake_accel_m_s2, self.recovery_speed_m_s) <= 0:
+            raise ValueError("brake acceleration and recovery speed must be > 0")
+        if self.hard_brake_delay_s < 0:
+            raise ValueError("hard-brake delay must be >= 0")
         self.planner_timeout_ms = planner_timeout_ms
         self.command_conditioner = command_conditioner
+        self.reference_path = None if reference_path is None else [
+            np.asarray(point, dtype=np.float64) for point in reference_path
+        ]
+        self.goal_slowdown_radius = goal_slowdown_radius
+        self.goal_approach_gain = goal_approach_gain
+        self.goal_min_speed = goal_min_speed
         self.wp_index = 0
         self.reached = False
+        self.recovery_active = False
+        self._recovery_has_braked = False
         planner.update_goal(self.waypoints[0])
+        if self.reference_path is not None and hasattr(planner, "update_reference_path"):
+            planner.update_reference_path(self.reference_path)
+
+    def replace_route(
+        self, waypoints: List[np.ndarray], *,
+        reference_path: Optional[List[np.ndarray]] = None,
+    ) -> None:
+        """Atomically replace the active route, e.g. from an RViz goal click."""
+        if not waypoints:
+            raise ValueError("route mới cần ít nhất một waypoint")
+        route = [np.asarray(point, dtype=np.float64) for point in waypoints]
+        if any(point.shape != (3,) or not np.isfinite(point).all() for point in route):
+            raise ValueError("mọi waypoint phải là finite 3-vector ENU")
+        reference = None
+        if reference_path is not None:
+            reference = [np.asarray(point, dtype=np.float64) for point in reference_path]
+            if any(point.shape != (3,) or not np.isfinite(point).all()
+                   for point in reference):
+                raise ValueError("reference path phải gồm finite 3-vector ENU")
+            if len(reference) < 2:
+                raise ValueError("reference path mới cần ít nhất hai điểm")
+
+        self.waypoints = route
+        self.reference_path = reference
+        self.wp_index = 0
+        self.reached = False
+        self.recovery_active = False
+        self._recovery_has_braked = False
+        if self.command_conditioner is not None:
+            self.command_conditioner.reset()
+        if hasattr(self.planner, "reset_for_new_route"):
+            self.planner.reset_for_new_route()
+        elif hasattr(self.planner, "reset_applied_control"):
+            self.planner.reset_applied_control()
+        self.planner.update_goal(route[0])
+        if hasattr(self.planner, "update_reference_path"):
+            self.planner.update_reference_path(reference)
 
     def step(
         self, state: Optional[PlannerState], obstacles
@@ -143,8 +227,13 @@ class LocalPlannerNode:
             self.planner.update_occupancy(state.pos, obstacles)
         self.planner.update_obstacles(obstacles)
         nearest = float("inf")
+        nearest_point = None
         if obstacles is not None and len(obstacles) > 0:
-            nearest = float(np.linalg.norm(np.asarray(obstacles) - state.pos, axis=1).min())
+            obstacle_array = np.asarray(obstacles, dtype=np.float64)
+            distances = np.linalg.norm(obstacle_array - state.pos, axis=1)
+            nearest_index = int(np.argmin(distances))
+            nearest = float(distances[nearest_index])
+            nearest_point = obstacle_array[nearest_index]
         if self.reached:
             goal_dist = float(np.linalg.norm(state.pos - self.waypoints[-1]))
             return PlannerStep(np.zeros(4), nearest, goal_dist, "reached")
@@ -162,10 +251,52 @@ class LocalPlannerNode:
             if self.command_conditioner is not None:
                 self.command_conditioner.reset()
             return PlannerStep(np.zeros(4), nearest, goal_dist, "reached")
-        if nearest < self.hard_brake_m:
+        closing_speed = 0.0
+        safety_trigger_m = self.hard_brake_m
+        if nearest_point is not None and nearest > 1e-9:
+            toward_obstacle = (nearest_point - state.pos) / nearest
+            closing_speed = max(0.0, float(np.dot(state.vel, toward_obstacle)))
+            safety_trigger_m += (
+                closing_speed * self.hard_brake_delay_s
+                + closing_speed**2 / (2.0 * self.brake_accel_m_s2)
+            )
+        if self.recovery_active and nearest >= self.hard_brake_release_m:
+            self.recovery_active = False
+            self._recovery_has_braked = False
             if self.command_conditioner is not None:
                 self.command_conditioner.reset()
-            return PlannerStep(np.zeros(4), nearest, goal_dist, "hold-brake")
+            if hasattr(self.planner, "reset_applied_control"):
+                self.planner.reset_applied_control()
+        if self.hard_brake_m > 0 and (
+            self.recovery_active or nearest < safety_trigger_m
+        ):
+            newly_triggered = not self.recovery_active
+            self.recovery_active = True
+            if self.command_conditioner is not None:
+                self.command_conditioner.reset()
+            if hasattr(self.planner, "reset_applied_control"):
+                self.planner.reset_applied_control()
+            safety_diag = {
+                "closing_speed_m_s": closing_speed,
+                "safety_trigger_m": safety_trigger_m,
+                "hard_brake_release_m": self.hard_brake_release_m,
+            }
+            horizontal_speed = float(np.linalg.norm(state.vel[0:2]))
+            if newly_triggered or horizontal_speed > 0.25 or nearest_point is None:
+                self._recovery_has_braked = True
+                return PlannerStep(
+                    np.zeros(4), nearest, goal_dist, "hold-brake", safety_diag
+                )
+            away_xy = state.pos[0:2] - nearest_point[0:2]
+            away_norm = float(np.linalg.norm(away_xy))
+            if away_norm < 1e-6:
+                return PlannerStep(
+                    np.zeros(4), nearest, goal_dist, "hold-brake", safety_diag
+                )
+            recovery = np.zeros(4)
+            recovery[0:2] = self.recovery_speed_m_s * away_xy / away_norm
+            safety_diag["recovery_direction_enu"] = recovery[0:3].tolist()
+            return PlannerStep(recovery, nearest, goal_dist, "recover-brake", safety_diag)
         if getattr(self.planner, "requires_rigid_body_state", False):
             if state.quat_wxyz is None or state.omega_body_flu is None:
                 return PlannerStep(
@@ -178,8 +309,25 @@ class LocalPlannerNode:
         else:
             u = self.planner.command(state.pos, state.vel, state.yaw)
             raw_u = np.asarray(u, dtype=np.float64).copy()
+            if (
+                self.wp_index == len(self.waypoints) - 1
+                and self.goal_slowdown_radius is not None
+                and goal_dist < self.goal_slowdown_radius
+            ):
+                speed_cap = max(
+                    self.goal_min_speed,
+                    self.goal_approach_gain * max(goal_dist - self.goal_radius, 0.0),
+                )
+                # Near the final goal, do not let a low-ESS stochastic sample
+                # choose the translation direction.  Use a deterministic
+                # arrival vector; MPPI remains responsible outside this gate.
+                goal_error = self.waypoints[-1] - state.pos
+                u = np.asarray(u, dtype=np.float64).copy()
+                u[0:3] = goal_error * (speed_cap / max(goal_dist, 1e-9))
             if self.command_conditioner is not None:
                 u = self.command_conditioner.apply(u, state.vel)
+            if hasattr(self.planner, "accept_applied_control"):
+                self.planner.accept_applied_control(u)
         diagnostics = self.planner.optimizer_diagnostics()
         if not getattr(self.planner, "requires_rigid_body_state", False):
             diagnostics["raw_control"] = raw_u.tolist()
@@ -195,20 +343,49 @@ class LocalPlannerNode:
         return PlannerStep(u, nearest, goal_dist, event, diagnostics)
 
 
-def parse_goal(text: str) -> List[np.ndarray]:
-    """'x,y,z' hoặc tuyến 'x,y,z;x,y,z;...' (m, ENU)."""
+def parse_goal(text) -> List[np.ndarray]:
+    """Parse ``x,y,z`` route text or a YAML list of 3-vectors (m, ENU)."""
     waypoints: List[np.ndarray] = []
-    for part in text.split(";"):
+    parts = text.split(";") if isinstance(text, str) else text
+    if parts is None:
+        raise SystemExit("[error] route rỗng")
+    for part in parts:
         try:
-            values = [float(v) for v in part.split(",")]
-        except ValueError as exc:
-            raise SystemExit(f"[error] --goal phải là 'x,y,z;...' (m, ENU): {exc}")
+            values = [float(v) for v in part.split(",")] if isinstance(part, str) else [float(v) for v in part]
+        except (TypeError, ValueError) as exc:
+            raise SystemExit(f"[error] route phải là 'x,y,z;...' (m, ENU): {exc}")
         if len(values) != 3:
             raise SystemExit("[error] mỗi waypoint phải có đúng 3 thành phần x,y,z")
         waypoints.append(np.asarray(values, dtype=np.float64))
     if not waypoints:
-        raise SystemExit("[error] --goal rỗng")
+        raise SystemExit("[error] route rỗng")
     return waypoints
+
+
+def parse_reference_path(text) -> List[np.ndarray]:
+    """Parse a global reference polyline; at least two points are required."""
+    path = parse_goal(text)
+    if len(path) < 2:
+        raise SystemExit("[error] --global-path cần ít nhất 2 điểm")
+    return path
+
+
+def resolve_rviz_goal(clicked_xyz, current_position, altitude_m=None) -> np.ndarray:
+    """Convert RViz's planar goal into a safe 3-D ENU goal.
+
+    RViz ``2D Goal Pose`` normally publishes z=0.  We intentionally ignore
+    that z value: keep the current flight altitude unless an explicit fixed
+    altitude is configured.
+    """
+    clicked = np.asarray(clicked_xyz, dtype=np.float64)
+    current = np.asarray(current_position, dtype=np.float64)
+    if (clicked.shape != (3,) or current.shape != (3,)
+            or not np.isfinite(clicked).all() or not np.isfinite(current).all()):
+        raise ValueError("RViz goal và current position phải là finite 3-vector ENU")
+    altitude = current[2] if altitude_m is None else float(altitude_m)
+    if not np.isfinite(altitude):
+        raise ValueError("RViz goal altitude phải hữu hạn")
+    return np.array([clicked[0], clicked[1], altitude], dtype=np.float64)
 
 
 def load_config(path: Optional[str]) -> dict:
@@ -228,7 +405,11 @@ def config_from_dict(d: dict) -> MPPIConfig:
         "dt", "tau", "horizon", "samples", "lambda", "vmax", "vzmax",
         "yaw_rate_max", "noise_xy", "noise_z", "noise_yaw", "margin",
         "w_goal", "w_terminal", "w_obstacle", "w_u", "w_du", "w_yaw",
+        "w_path", "path_scale_m", "w_reference_velocity", "reference_speed_m_s",
+        "cost_profile", "w_collision", "collision_radius_m", "paper_r_u",
+        "paper_r_delta_u",
         "command_alpha", "max_accel_xy", "max_accel_z", "max_yaw_accel",
+        "goal_slowdown_radius", "goal_approach_gain", "goal_min_speed",
         "device", "seed",
     ):
         if key in d:
@@ -238,29 +419,76 @@ def config_from_dict(d: dict) -> MPPIConfig:
 
 # -- RViz: predicted trajectory ------------------------------------------------
 class RvizTrajPublisher:
-    """Publish nominal Path and optional top sampled rollouts to RViz."""
+    """Publish MPPI paths and optionally receive ``2D Goal Pose`` clicks."""
 
-    def __init__(self, topic: str = "/mppi/predicted_path", *,
-                 samples_topic: Optional[str] = None, frame_id: str = "odom") -> None:
+    def __init__(self, topic: Optional[str] = "/mppi/predicted_path", *,
+                 samples_topic: Optional[str] = None,
+                 goal_topic: Optional[str] = None,
+                 frame_id: str = "odom") -> None:
         try:
             import rclpy
+            from geometry_msgs.msg import PoseStamped
             from nav_msgs.msg import Path
             from visualization_msgs.msg import MarkerArray
         except ImportError as exc:
             raise SystemExit(
-                "[error] --rviz-traj-topic cần rclpy + nav_msgs trong env."
+                "[error] RViz trajectory/goal I/O cần rclpy, geometry_msgs, "
+                "nav_msgs và visualization_msgs trong env."
             ) from exc
-        rclpy.init()
+        self._owns_rclpy = not rclpy.ok()
+        if self._owns_rclpy:
+            rclpy.init()
         self._rclpy = rclpy
         self._Path = Path
         self._MarkerArray = MarkerArray
         self.node = rclpy.create_node("mppi_traj_pub")
-        self.pub = self.node.create_publisher(Path, topic, 10)
+        self.pub = self.node.create_publisher(Path, topic, 10) if topic else None
         self.samples_pub = (
             self.node.create_publisher(MarkerArray, samples_topic, 10)
             if samples_topic else None
         )
         self.frame_id = frame_id
+        self._goal_lock = threading.Lock()
+        self._pending_goal = None
+        self._goal_error = None
+        self._goal_revision = 0
+        self.goal_sub = (
+            self.node.create_subscription(PoseStamped, goal_topic, self._on_goal, 10)
+            if goal_topic else None
+        )
+
+    def _on_goal(self, msg) -> None:
+        frame = msg.header.frame_id or self.frame_id
+        with self._goal_lock:
+            if frame != self.frame_id:
+                self._goal_error = (
+                    f"bỏ goal frame '{frame}'; cần '{self.frame_id}' "
+                    "(chưa hỗ trợ TF transform goal)"
+                )
+                return
+            xyz = np.array([
+                msg.pose.position.x, msg.pose.position.y, msg.pose.position.z
+            ], dtype=np.float64)
+            if not np.isfinite(xyz).all():
+                self._goal_error = "bỏ RViz goal chứa NaN/Inf"
+                return
+            self._goal_revision += 1
+            self._pending_goal = (self._goal_revision, xyz)
+
+    def spin_once(self) -> None:
+        self._rclpy.spin_once(self.node, timeout_sec=0.0)
+
+    def take_goal(self):
+        with self._goal_lock:
+            goal = self._pending_goal
+            self._pending_goal = None
+            return goal
+
+    def take_goal_error(self):
+        with self._goal_lock:
+            error = self._goal_error
+            self._goal_error = None
+            return error
 
     def publish(self, traj, sampled=None) -> None:
         from geometry_msgs.msg import Point, PoseStamped
@@ -277,7 +505,8 @@ class RvizTrajPublisher:
             )
             pose.pose.orientation.w = 1.0
             msg.poses.append(pose)
-        self.pub.publish(msg)
+        if self.pub is not None:
+            self.pub.publish(msg)
         if self.samples_pub is None:
             return
         markers = self._MarkerArray()
@@ -304,6 +533,11 @@ class RvizTrajPublisher:
             markers.markers.append(marker)
         self.samples_pub.publish(markers)
 
+    def close(self) -> None:
+        self.node.destroy_node()
+        if self._owns_rclpy and self._rclpy.ok():
+            self._rclpy.shutdown()
+
 
 class TimingWindow:
     """Rolling compute-time benchmark with deadline accounting."""
@@ -322,7 +556,18 @@ class TimingWindow:
 
     def summary(self) -> dict:
         if not self.values:
-            return {}
+            # Safe-hold cycles (notably interactive RViz before the first
+            # click) deliberately do not execute MPPI.  Keep the diagnostics
+            # schema stable instead of making every consumer special-case an
+            # empty timing window.
+            return {
+                "mean_ms": 0.0,
+                "p95_ms": 0.0,
+                "worst_ms": 0.0,
+                "deadline_ms": self.deadline_ms,
+                "deadline_misses": 0,
+                "samples": 0,
+            }
         values = np.asarray(self.values, dtype=float)
         return {
             "mean_ms": float(values.mean()),
@@ -358,10 +603,15 @@ def run_sim_test(args) -> None:
     node = LocalPlannerNode(
         planner, waypoints, wp_radius=args.wp_radius,
         goal_radius=args.goal_radius, hard_brake_m=0.0,
+        reference_path=args.global_path,
         command_conditioner=VelocityCommandConditioner(
             args.cfg.dt, args.cfg.command_alpha, args.cfg.max_accel_xy,
             args.cfg.max_accel_z, args.cfg.max_yaw_accel,
+            u_min=args.cfg.u_min(), u_max=args.cfg.u_max(),
         ),
+        goal_slowdown_radius=args.cfg.goal_slowdown_radius,
+        goal_approach_gain=args.cfg.goal_approach_gain,
+        goal_min_speed=args.cfg.goal_min_speed,
     )
     for step in range(600):
         st = PlannerState(pos=pos.copy(), vel=vel.copy(), yaw=yaw)
@@ -386,7 +636,12 @@ def run_sim_test(args) -> None:
     dist_goal = float(np.linalg.norm(pos - waypoints[-1]))
     print(f"[sim-test] done: reached={reached} final_goal_dist={dist_goal:.2f}m "
           f"min_clearance={min_clearance:.2f}m")
-    if not reached or min_clearance < args.cfg.margin + 1.0:
+    required_clearance = (
+        args.cfg.collision_radius_m
+        if args.cfg.cost_profile == "paper"
+        else args.cfg.margin + 1.0
+    )
+    if not reached or min_clearance < required_clearance:
         raise SystemExit("[sim-test] FAILED: planner không né hoặc không tới đích")
     print("[sim-test] PASSED")
 
@@ -494,23 +749,43 @@ def run(args) -> None:
     node = LocalPlannerNode(
         planner, args.goal, wp_radius=args.wp_radius,
         goal_radius=args.goal_radius, hard_brake_m=args.hard_brake_m,
+        hard_brake_release_m=args.hard_brake_release_m,
+        hard_brake_delay_s=args.hard_brake_delay_s,
+        brake_accel_m_s2=cfg.max_accel_xy,
+        recovery_speed_m_s=args.recovery_speed_m_s,
+        reference_path=args.global_path,
         planner_timeout_ms=args.planner_timeout_ms,
         command_conditioner=(
             None if rigid_mode else VelocityCommandConditioner(
                 period,
                 cfg.command_alpha, cfg.max_accel_xy,
                 cfg.max_accel_z, cfg.max_yaw_accel,
+                u_min=cfg.u_min(), u_max=cfg.u_max(),
             )
         ),
+        goal_slowdown_radius=(None if rigid_mode else cfg.goal_slowdown_radius),
+        goal_approach_gain=cfg.goal_approach_gain,
+        goal_min_speed=cfg.goal_min_speed,
     )
     traj_pub = None
-    if args.rviz_traj_topic:
+    if args.rviz_traj_topic or args.rviz_samples_topic or args.rviz_goal_topic:
         traj_pub = RvizTrajPublisher(
-            args.rviz_traj_topic, samples_topic=args.rviz_samples_topic
+            args.rviz_traj_topic,
+            samples_topic=args.rviz_samples_topic,
+            goal_topic=args.rviz_goal_topic,
+            frame_id=args.rviz_goal_frame,
         )
-        print(f"[rviz] publish predicted trajectory -> {args.rviz_traj_topic}")
+        if args.rviz_traj_topic:
+            print(f"[rviz] publish predicted trajectory -> {args.rviz_traj_topic}")
         if args.rviz_samples_topic:
             print(f"[rviz] publish top-{args.rviz_top_k} samples -> {args.rviz_samples_topic}")
+        if args.rviz_goal_topic:
+            altitude = (
+                "giữ cao độ hiện tại" if args.rviz_goal_altitude is None
+                else f"z={args.rviz_goal_altitude:g}m ENU"
+            )
+            print(f"[rviz] subscribe goal <- {args.rviz_goal_topic} "
+                  f"frame={args.rviz_goal_frame}; {altitude}")
 
     latest_scan = _Latest()
     latest_odom = _Latest()
@@ -522,17 +797,31 @@ def run(args) -> None:
         if not gz_node.subscribe(odometry_pb2.Odometry, args.odom_topic,
                                  lambda msg: latest_odom.update(msg.SerializeToString())):
             raise SystemExit(f"[error] không subscribe được {args.odom_topic}")
-    print(f"[mppi] state={args.state_source} "
-          f"route={' -> '.join(f'({w[0]:g},{w[1]:g},{w[2]:g})' for w in args.goal)} ENU "
-          f"vmax={cfg.vmax} margin={cfg.margin} H={cfg.horizon} N={cfg.samples} hz={args.hz}")
+    route_text = (
+        f"RViz dynamic via {args.rviz_goal_topic}"
+        if args.rviz_goal_topic
+        else " -> ".join(f"({w[0]:g},{w[1]:g},{w[2]:g})" for w in args.goal)
+    )
+    print(f"[mppi] state={args.state_source} route={route_text} ENU "
+          f"vmax={cfg.vmax} margin={cfg.margin} H={cfg.horizon} N={cfg.samples} hz={args.hz} "
+          f"w_path={cfg.w_path:g} cost_profile={cfg.cost_profile}")
+    if cfg.w_path > 0 and args.global_path is not None:
+        print(f"[path] tracking {len(args.global_path)} reference points, "
+              f"scale={cfg.path_scale_m:g}m")
+    elif cfg.w_path > 0 and args.rviz_goal_topic:
+        print("[path] chưa có reference; mỗi RViz click sẽ tạo path current->goal")
 
     pos_prev: Optional[np.ndarray] = None
+    pos_prev_stamp: Optional[float] = None
     vel_est = np.zeros(3)
     cycle = 0
     next_tick = time.monotonic()
     send_zero = np.zeros(4)
     timing = TimingWindow(deadline_ms=period * 1000.0, window=args.benchmark_window)
     goal_announced = False
+    awaiting_rviz_goal = bool(args.rviz_goal_topic)
+    goal_source = "rviz" if awaiting_rviz_goal else "cli"
+    goal_revision = 0
     diag_file = None
     if args.diag_jsonl:
         diag_path = Path(args.diag_jsonl)
@@ -593,6 +882,12 @@ def run(args) -> None:
             else:
                 next_tick = now
 
+            if traj_pub is not None:
+                traj_pub.spin_once()
+                goal_error = traj_pub.take_goal_error()
+                if goal_error:
+                    print(f"[rviz] {goal_error}")
+
             # 1. state: odom (SITL ground truth) hoặc MAVLink telemetry
             state: Optional[PlannerState] = None
             pos_enu = rot = yaw_ned = pos_ned = None
@@ -601,6 +896,7 @@ def run(args) -> None:
                 if odom_payload is None or odom_age > args.stale_after_s:
                     print("[mppi] chờ /iris/odometry...")
                     pos_prev = None
+                    pos_prev_stamp = None
                     send_u(send_zero, safe_hold=True)
                     log_missing_state(odom_age, "stale-odometry")
                     cycle += 1
@@ -609,13 +905,21 @@ def run(args) -> None:
                 odom.ParseFromString(odom_payload)
                 pos_enu = np.array([odom.pose.position.x, odom.pose.position.y,
                                     odom.pose.position.z])
+                odom_sample_stamp = time.monotonic() - float(odom_age)
                 q = odom.pose.orientation
                 rot = quat_to_rot(q.x, q.y, q.z, q.w)
                 yaw = yaw_enu_from_rot(rot)
-                if pos_prev is not None:
-                    raw_v = np.clip((pos_enu - pos_prev) * args.hz, -cfg.vmax, cfg.vmax)
-                    vel_est = 0.5 * vel_est + 0.5 * raw_v
+                if pos_prev is not None and pos_prev_stamp is not None:
+                    sample_dt = odom_sample_stamp - pos_prev_stamp
+                    if 1e-3 < sample_dt <= args.stale_after_s:
+                        raw_v = (pos_enu - pos_prev) / sample_dt
+                        # Reject impossible differentiation spikes without
+                        # forcing vertical velocity through the XY limit.
+                        raw_v[0:2] = np.clip(raw_v[0:2], -2.0 * cfg.vmax, 2.0 * cfg.vmax)
+                        raw_v[2] = np.clip(raw_v[2], -2.0 * cfg.vzmax, 2.0 * cfg.vzmax)
+                        vel_est = 0.5 * vel_est + 0.5 * raw_v
                 pos_prev = pos_enu
+                pos_prev_stamp = odom_sample_stamp
                 state = PlannerState(
                     pos=pos_enu,
                     vel=vel_est.copy(),
@@ -644,6 +948,26 @@ def run(args) -> None:
                                      source_age_s=mav.get_state_age_s(),
                                      source_timestamp_s=time.time() - mav.get_state_age_s())
 
+            if traj_pub is not None and args.rviz_goal_topic:
+                pending_goal = traj_pub.take_goal()
+                if pending_goal is not None:
+                    goal_revision, clicked_xyz = pending_goal
+                    goal = resolve_rviz_goal(
+                        clicked_xyz, state.pos, args.rviz_goal_altitude
+                    )
+                    reference = None
+                    if np.linalg.norm(goal - state.pos) > 1e-6:
+                        reference = [state.pos.copy(), goal.copy()]
+                    node.replace_route([goal], reference_path=reference)
+                    awaiting_rviz_goal = False
+                    goal_source = "rviz"
+                    goal_announced = False
+                    print(
+                        f"[rviz] goal#{goal_revision} accepted ENU="
+                        f"({goal[0]:.2f},{goal[1]:.2f},{goal[2]:.2f}); "
+                        "đã thay route và reset MPPI warm start"
+                    )
+
             # 2-3. LiDAR scan -> obstacle cloud trong frame làm việc
             scan_payload, scan_age = latest_scan.get()
             obstacles = None
@@ -671,6 +995,17 @@ def run(args) -> None:
             if not lidar_ok:
                 out = PlannerStep(np.zeros(4), float("inf"), float("inf"), "hold-stale")
                 print(f"[mppi] lidar stale/khuyết (age={scan_age:.2f}s) -> zero velocity")
+            elif awaiting_rviz_goal:
+                nearest = float("inf")
+                if obstacles is not None and len(obstacles) > 0:
+                    nearest = float(np.linalg.norm(obstacles - state.pos, axis=1).min())
+                out = PlannerStep(
+                    np.zeros(4), nearest, float("inf"), "hold-await-goal",
+                    {"planner": "mppi", "compute_ms": 0.0, "cost": {},
+                     "reason": "waiting for RViz 2D Goal Pose"},
+                )
+                if cycle % args.diag_every == 0:
+                    print(f"[rviz] chờ goal trên {args.rviz_goal_topic}; giữ velocity zero")
             else:
                 out = node.step(state, obstacles)
                 just_reached = out.event == "reached" and not goal_announced
@@ -681,15 +1016,19 @@ def run(args) -> None:
                     goal_announced = True
                     print(f"[mppi] ĐÃ TỚI ĐÍCH sau {cycle} chu kỳ; giữ nguyên vị trí.")
                 elif out.event == "hold-brake":
-                    print(f"[mppi] obstacle {out.nearest_m:.2f}m < "
-                          f"{args.hard_brake_m}m -> zero velocity")
+                    threshold = (out.diagnostics or {}).get(
+                        "safety_trigger_m", args.hard_brake_m
+                    )
+                    print(f"[mppi] predictive brake: obstacle {out.nearest_m:.2f}m < "
+                          f"trigger {threshold:.2f}m -> zero velocity")
+                elif out.event == "recover-brake":
+                    print(f"[mppi] recovery: obstacle {out.nearest_m:.2f}m -> "
+                          f"retreat ({out.u[0]:+.2f},{out.u[1]:+.2f})m/s")
             send_u(
                 out.u,
-                safe_hold=out.event in ("hold-stale", "hold-brake", "hold-timeout", "reached"),
+                safe_hold=out.event in SAFE_HOLD_EVENTS,
             )
-            if traj_pub is not None and out.event not in (
-                "hold-stale", "hold-brake", "hold-timeout", "reached"
-            ):
+            if traj_pub is not None and out.event not in SAFE_HOLD_EVENTS:
                 traj_pub.publish(
                     planner.predict_trajectory(),
                     planner.sampled_trajectories(args.rviz_top_k),
@@ -717,9 +1056,9 @@ def run(args) -> None:
                     "cost": {},
                 }
                 compute_ms = float(diagnostics.get("compute_ms", 0.0))
-                if out.diagnostics:
+                if compute_ms > 0.0:
                     timing.add(compute_ms)
-                safe_hold = out.event in ("hold-stale", "hold-brake", "hold-timeout", "reached")
+                safe_hold = out.event in SAFE_HOLD_EVENTS
                 if rigid_mode and not safe_hold:
                     from .rigid_body_pa_mppi import body_flu_rates_to_frd
                     sent_mavlink = {
@@ -757,7 +1096,19 @@ def run(args) -> None:
                         None if state.omega_body_flu is None else state.omega_body_flu.tolist()
                     ),
                     "goal_dist_m": out.goal_dist_m if np.isfinite(out.goal_dist_m) else None,
+                    "active_goal_enu": (
+                        None if awaiting_rviz_goal
+                        else node.waypoints[node.wp_index].tolist()
+                    ),
+                    "waypoint_index": int(node.wp_index),
+                    "goal_source": goal_source,
+                    "goal_revision": int(goal_revision),
                     "minimum_clearance_m": out.nearest_m if np.isfinite(out.nearest_m) else None,
+                    "obstacle_cloud": {
+                        "count": 0 if obstacles is None else int(len(obstacles)),
+                        "min_enu": None if obstacles is None else np.min(obstacles, axis=0).tolist(),
+                        "max_enu": None if obstacles is None else np.max(obstacles, axis=0).tolist(),
+                    },
                     "nominal_control": out.u.tolist(),
                     "sent_mavlink_control": sent_mavlink,
                     "control_kind": getattr(planner, "command_kind", "velocity-enu"),
@@ -801,6 +1152,9 @@ def run(args) -> None:
                         f"ESS={diagnostics.get('ess', float('nan')):.1f} "
                         f"cost(goal={costs.get('goal', 0.0):.1f}, "
                         f"obs={costs.get('obstacle', 0.0):.1f}, "
+                        f"collision={costs.get('collision', 0.0):.1f}, "
+                        f"path={costs.get('path', 0.0):.1f}, "
+                        f"vref={costs.get('reference_velocity', 0.0):.1f}, "
                         f"smooth={costs.get('smoothness', 0.0):.1f}, "
                         f"terminal={costs.get('terminal', 0.0):.1f})"
                     )
@@ -812,6 +1166,8 @@ def run(args) -> None:
     finally:
         if diag_file is not None:
             diag_file.close()
+        if traj_pub is not None:
+            traj_pub.close()
         if mav is not None:
             try:
                 mav.send_velocity_ned(0.0, 0.0, 0.0, yaw_rate=0.0)

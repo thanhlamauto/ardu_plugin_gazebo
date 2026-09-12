@@ -8,8 +8,16 @@ và processing thread.
 Runbook chạy, capture UDP và map dữ liệu về source code nằm tại
 [`docs/closed_loop_runtime_walkthrough_vi.md`](docs/closed_loop_runtime_walkthrough_vi.md).
 
+- [Báo cáo tuần: MPPI bám global path và điều khiển goal từ RViz](output/pdf/mppi_weekly_report_vi.pdf) — [video demo](https://drive.google.com/file/d/1I1VxN6-6Y3Gt8kxY8ieNvlvMMkvvLxLJ/view?usp=sharing), [quickstart 3 map](docs/RUN_3_MPPI_MAPS_QUICKSTART_VI.md)
 - [Video Gazebo + RViz khi điều khiển UAV ở GUIDED mode](https://drive.google.com/file/d/1D1ceJg4oJFvSS2aUksKp6LQNnHCnOOei/view?usp=sharing)
 - [Báo cáo luồng packet Gazebo--ROS 2--RViz](output/pdf/gazebo_ros2_rviz_dataflow_report_vi.pdf)
+- [Demo warehouse: click MAVProxy Map + tránh vật cản lidar 3D (Depot thực tế, takeoff 20 m)](docs/run_guided_sensor_demo_vi.md) — mặc định dùng `iris_warehouse_sensor.sdf`; bản runway cũ vẫn ở `worlds/iris_sensor_runway.sdf`
+- [Demo warehouse: MPPI/PA-MPPI trên companion](docs/run_mppi_demo_vi.md) — baseline velocity và nhánh rigid-body thrust/body-rate experimental cho Gazebo/SITL
+- [Đánh giá tiến độ MPPI và phạm vi còn lại cho edge computer](reports/mppi_week4_assessment_vi.md)
+- [Báo cáo học thuật LaTeX/PDF: PA-MPPI với ArduPilot và Gazebo](output/pdf/pa_mppi_ardupilot_technical_report_vi.pdf)
+- [Claim-to-source audit](docs/SOURCE_AUDIT.md) và [pre-Gazebo gate checklist](docs/GAZEBO_RUN_CHECKLIST.md)
+- [Report audit changelog](CHANGELOG_REPORT_AUDIT.md) — kết quả offline, phần pending và lệnh tái lập
+- [Slide Beamer: MPPI local planner trên companion](output/pdf/mppi_local_planner_report_vi.pdf)
 
 Mục tiêu cuối cùng là hiểu và chạy được pipeline:
 
