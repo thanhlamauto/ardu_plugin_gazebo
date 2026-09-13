@@ -130,8 +130,9 @@ attitude/motor stabilization \cite{mavlinkCommon2026,ardupilotGuidedDocs2026}.
 Profile chạy ba scenario dùng CPU, 10 Hz, 500 rollouts, 30 prediction steps,
 $\Delta t=0.1$ s và horizon 3 s. Profile audit dùng $\lambda=100$; giá trị này
 được tune cho state/control units hiện tại, không phải claim từ paper. Profile
-demo mượt giảm reference speed xuống 0.85 m/s và giới hạn gia tốc ngang xuống
-0.9 m/s$^2$. Global path được đổi thành chuỗi reference theo thời gian
+demo chậm candidate giảm reference speed xuống 0.60 m/s, giới hạn vận tốc xuống
+1.0 m/s và giới hạn gia tốc ngang xuống 0.6 m/s$^2$; profile này chưa được
+live-verify sau khi tune. Global path được đổi thành chuỗi reference theo thời gian
 $(p_k^{ref},v_k^{ref})$ để cùng rollout index $k$ so sánh cùng thời điểm.
 
 \subsection{Các hàm cost thực sự dùng}

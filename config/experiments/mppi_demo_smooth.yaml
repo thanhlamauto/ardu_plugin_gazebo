@@ -15,11 +15,11 @@ horizon: 30
 samples: 500
 lambda: 100.0
 
-# Smooth-demo envelope.  0.85 m/s keeps the reference reachable after the
-# low-pass/slew limiter; vmax remains a hard upper bound, not a target speed.
-vmax: 1.5
-vzmax: 0.8
-reference_speed_m_s: 0.85
+# Slow, smooth video-demo envelope.  The lower reference speed leaves more
+# tracking margin through turns; vmax remains a hard upper bound, not a target.
+vmax: 1.0
+vzmax: 0.6
+reference_speed_m_s: 0.60
 
 # Time-indexed global-reference and collision terms.
 w_path: 400.0
@@ -42,10 +42,11 @@ paper_r_delta_u: [0.05, 0.10, 0.10, 0.30]
 
 # Compared with the audit profile (alpha=0.45, accel=1.5), these limits trade
 # traversal time for visibly smoother commands and easier ArduPilot tracking.
-command_alpha: 0.35
-max_accel_xy: 0.9
-max_accel_z: 0.6
-max_yaw_accel: 0.9
+# Candidate values: Gazebo live validation is still required after this edit.
+command_alpha: 0.30
+max_accel_xy: 0.6
+max_accel_z: 0.4
+max_yaw_accel: 0.6
 
 # Begin tapering only at the final waypoint.  A 0.35 m terminal gate avoids a
 # noisy estimator hovering just outside the old 0.25 m strict inequality.
@@ -60,6 +61,6 @@ wp_radius: 1.25
 hard_brake_m: 1.0
 hard_brake_release_m: 1.8
 hard_brake_delay_s: 0.25
-recovery_speed_m_s: 0.35
+recovery_speed_m_s: 0.25
 stale_after_s: 1.0
 planner_timeout_ms: 90.0

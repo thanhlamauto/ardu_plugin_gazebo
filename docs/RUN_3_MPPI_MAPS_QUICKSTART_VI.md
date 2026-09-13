@@ -20,10 +20,12 @@ config/experiments/mppi_demo_smooth.yaml
 Đây vẫn là `cost_profile: paper`: effort `R`, input-change `R_delta`,
 position/velocity reference theo thời gian trên global path và collision
 indicator trên point-cloud đã inflate. So với profile audit
-`mppi_paper_cost_only.yaml`, profile demo giảm reference speed `1.0 -> 0.85
-m/s`, giảm giới hạn gia tốc ngang `1.5 -> 0.9 m/s²`, tăng làm mượt
-`command_alpha: 0.45 -> 0.35`, và dùng arrival gate `0.35 m`. Đây là
-engineering tune cho demo, không phải tham số của paper.
+`mppi_paper_cost_only.yaml`, profile demo giảm reference speed `1.0 -> 0.60
+m/s`, giới hạn vận tốc `1.5 -> 1.0 m/s`, giới hạn gia tốc ngang `1.5 -> 0.6
+m/s²`, tăng làm mượt `command_alpha: 0.45 -> 0.30`, và dùng arrival gate
+`0.35 m`. Đây là engineering tune cho demo, không phải tham số của paper.
+Cấu hình chậm này là candidate để quay video và **chưa được gán kết quả live
+Gazebo**; ba kết quả bên dưới vẫn thuộc profile audit cũ.
 
 Ba lệnh bên dưới truyền `--global-path` tương ứng với route
 clearance-checked của từng map. Profile này là adaptation velocity-level,
@@ -344,7 +346,7 @@ click xuyên vật cản. MAVProxy vẫn cần cho `arm throttle`, `takeoff 20`,
 ## Điều chỉnh global path trong paper profile
 
 Trong profile demo, `w_path=400`, `w_reference_velocity=40` và
-`reference_speed_m_s=0.85` đã bật. `--goal` là route/waypoint; `--global-path`
+`reference_speed_m_s=0.60` đã bật. `--goal` là route/waypoint; `--global-path`
 được time-parameterize thành chuỗi `(p_ref[j], v_ref[j])` cho horizon.
 Khi thay map hoặc route, phải cập nhật cả hai tham số:
 
