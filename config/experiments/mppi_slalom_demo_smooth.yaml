@@ -1,0 +1,59 @@
+# Slalom-specific Gazebo demo profile.
+#
+# Keep the same paper-cost formulation and command smoothing as
+# mppi_demo_smooth.yaml.  The only optimizer change is N=350 so the 10 Hz
+# deadline remains achievable during the longer slalom run.  The companion
+# route in docs/RUN_3_MPPI_MAPS_QUICKSTART_VI.md is also clearance-checked
+# against the four radius-1.2 m columns; tuning weights cannot make an unsafe
+# reference path geometrically safe.
+cost_profile: paper
+
+hz: 10.0
+dt: 0.1
+tau: 0.5
+horizon: 30
+samples: 350
+lambda: 100.0
+
+vmax: 1.0
+vzmax: 0.6
+reference_speed_m_s: 0.60
+reference_corner_radius_m: 0.8
+reference_corner_samples: 6
+
+w_path: 400.0
+path_scale_m: 1.0
+w_reference_velocity: 40.0
+w_terminal: 0.0
+w_collision: 1000000.0
+collision_radius_m: 1.5
+
+w_goal: 0.0
+w_obstacle: 0.0
+w_u: 0.0
+w_du: 0.0
+w_yaw: 0.0
+
+paper_r_u: [0.01, 0.05, 0.05, 0.10]
+paper_r_delta_u: [100.0, 100.0, 50.0, 20.0]
+
+command_alpha: 0.30
+max_accel_xy: 0.6
+max_accel_z: 0.4
+max_yaw_accel: 0.6
+
+goal_slowdown_radius: 4.0
+goal_approach_gain: 0.5
+goal_min_speed: 0.10
+goal_radius: 0.35
+wp_radius: 1.25
+
+# Entering the optimizer collision radius now also activates the live brake.
+# The documented route has about 2.03 m nominal geometric surface clearance,
+# so this gate should stay inactive in a healthy run.
+hard_brake_m: 1.5
+hard_brake_release_m: 2.0
+hard_brake_delay_s: 0.25
+recovery_speed_m_s: 0.25
+stale_after_s: 1.0
+planner_timeout_ms: 90.0

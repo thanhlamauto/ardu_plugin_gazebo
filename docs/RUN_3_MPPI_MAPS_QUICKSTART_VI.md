@@ -14,7 +14,8 @@ Mỗi lần đổi map phải dừng node MPPI, land, rồi reset Gazebo và SIT
 Profile dùng trong các lệnh demo dưới:
 
 ```text
-config/experiments/mppi_demo_smooth.yaml
+Slalom:                   config/experiments/mppi_slalom_demo_smooth.yaml
+Narrow gate/right-angle: config/experiments/mppi_demo_smooth.yaml
 ```
 
 Đây vẫn là `cost_profile: paper`: effort `R`, input-change `R_delta`,
@@ -24,8 +25,9 @@ indicator trên point-cloud đã inflate. So với profile audit
 m/s`, giới hạn vận tốc `1.5 -> 1.0 m/s`, giới hạn gia tốc ngang `1.5 -> 0.6
 m/s²`, tăng làm mượt `command_alpha: 0.45 -> 0.30`, và dùng arrival gate
 `0.35 m`. Đây là engineering tune cho demo, không phải tham số của paper.
-Cấu hình chậm này là candidate để quay video và **chưa được gán kết quả live
-Gazebo**; ba kết quả bên dưới vẫn thuộc profile audit cũ.
+Cấu hình chậm này là engineering candidate để quay video. Kết quả Gazebo
+headless mới nhất được ghi riêng bên dưới; chạy kèm Gazebo GUI và RViz vẫn
+phải kiểm tra lại vì tải đồ họa có thể ảnh hưởng deadline.
 
 Để giảm gãy ở waypoint, profile demo còn bo góc reference với bán kính `0.8
 m` (`reference_corner_samples: 6`). Cost đổi lệnh tính cả bước nối từ lệnh đã
@@ -48,6 +50,25 @@ giữ làm baseline project-cost khi cần.
 File YAML không hot-reload. Sau khi sửa config phải dừng và chạy lại Terminal 5.
 
 ## Kết quả kiểm chứng hiện có
+
+### Profile demo làm mượt — Gazebo headless
+
+Ngày 2026-09-13, `mppi_demo_smooth.yaml` được kiểm tra trên right-angle và
+narrow-gate; slalom dùng profile riêng `mppi_slalom_demo_smooth.yaml`. Cả ba
+dùng ArduPilot SITL commit `f808f78c`. Slalom đã chạy từ trạng thái reset với
+hai seed độc lập:
+
+| Map / seed | Terminal | Chu kỳ | Dài quỹ đạo | Min point-cloud clearance | Compute mean / p95 / worst | Deadline miss / timeout / collision-cost |
+|---|---:|---:|---:|---:|---:|---:|
+| Right-angle / 7 | đạt, 0.282 m | 178 | 22.87 m | 2.40 m | 15.7 / 17.6 / 53.1 ms | 0 / 0 / 0 |
+| Narrow-gate / 7 | đạt, 0.243 m | 311 | 35.00 m | 1.84 m | 15.2 / 16.9 / 77.1 ms | 0 / 0 / 0 |
+| Slalom tuned / 7 | đạt, 0.350 m | 311 | 34.63 m | 1.96 m | 10.7 / 11.5 / 51.5 ms | 0 / 0 / 0 |
+| Slalom tuned / 19 | đạt, 0.323 m | 313 | 34.75 m | 1.95 m | 10.4 / 11.3 / 45.7 ms | 0 / 0 / 0 |
+
+Hai run slalom tuned không kích hoạt hard brake. Đây là kết quả live headless,
+không phải bằng chứng cho hiệu năng khi đồng thời mở Gazebo GUI và RViz.
+
+### Profile audit cũ
 
 Ngày 2026-09-13, ba route bên dưới đã được chạy trực tiếp với
 `mppi_paper_cost_only.yaml`, seed 7, Gazebo Harmonic và ArduPilot SITL commit
@@ -197,6 +218,13 @@ Chờ UAV hover ổn định quanh 20 m rồi mới chạy MPPI.
 
 ### Map 1 — MPPI slalom
 
+Slalom dùng profile riêng để giữ deadline 10 Hz trong run dài. Các waypoint
+được đặt cùng hoành độ với tâm từng cột và lệch sang phía đối diện. Sau khi
+bo góc `0.8 m`, khoảng cách hình học nhỏ nhất từ reference tới bề mặt cột xấp
+xỉ `2.03 m` (chưa tính sai số bám thực tế), lớn hơn
+`collision_radius_m: 1.5`. Route cũ đặt waypoint sớm hơn cột `1.5 m` chỉ có
+khoảng hở hình học xấp xỉ `1.14 m` nên không còn dùng cho demo.
+
 ```bash
 cd ~/Projects/ardupilot_gazebo
 export GZ_PARTITION=ardupilot_mppi_challenge
@@ -205,10 +233,10 @@ export ROS_DOMAIN_ID=45
 MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
   scripts/mppi_velocity_avoidance.py \
   --planner mppi \
-  --config config/experiments/mppi_demo_smooth.yaml \
+  --config config/experiments/mppi_slalom_demo_smooth.yaml \
   --mav tcp:127.0.0.1:5762 \
-  --goal '5.5,-2.2,20;11.5,2.2,20;17.5,-2.2,20;23.5,2.2,20;30,0,20' \
-  --global-path '0,0,20;5.5,-2.2,20;11.5,2.2,20;17.5,-2.2,20;23.5,2.2,20;30,0,20' \
+  --goal '7,-2.2,20;13,2.2,20;19,-2.2,20;25,2.2,20;30,0,20' \
+  --global-path '0,0,20;7,-2.2,20;13,2.2,20;19,-2.2,20;25,2.2,20;30,0,20' \
   --seed 7 \
   --diag-every 1 \
   --diag-jsonl output/log/slalom_demo_smooth_seed7.jsonl \
@@ -371,8 +399,10 @@ Polyline phải cùng frame ENU, cùng đơn vị mét, và đã kiểm tra clea
 cost không thay thế collision cost. Có thể tune `reference_speed_m_s`,
 `w_path`, `w_reference_velocity`, `paper_r_u`, `paper_r_delta_u`, `lambda`,
 `reference_corner_radius_m` và `collision_radius_m` trong
-`config/experiments/mppi_demo_smooth.yaml`; sau mỗi lần sửa phải khởi động
-lại Terminal 5. Nếu cần lặp lại đúng kết quả audit ngày 2026-09-13 thì
+`config/experiments/mppi_demo_smooth.yaml`, hoặc
+`config/experiments/mppi_slalom_demo_smooth.yaml` khi chạy slalom; sau mỗi lần
+sửa phải khởi động lại Terminal 5. Nếu cần lặp lại đúng kết quả audit ngày
+2026-09-13 thì
 dùng `mppi_paper_cost_only.yaml`. Nếu muốn chạy baseline project-cost, đổi config về
 `mppi_my_test.yaml`; khi đó `w_path: 0` và có thể bật path cost bằng
 `--w-path`.
