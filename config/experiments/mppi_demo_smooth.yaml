@@ -20,6 +20,10 @@ lambda: 100.0
 vmax: 1.0
 vzmax: 0.6
 reference_speed_m_s: 0.60
+# Round interior global-path vertices before time-parameterization.  This does
+# not replace collision checking and is enabled only for the video-demo profile.
+reference_corner_radius_m: 0.8
+reference_corner_samples: 6
 
 # Time-indexed global-reference and collision terms.
 w_path: 400.0
@@ -38,7 +42,9 @@ w_yaw: 0.0
 
 # Velocity-level adaptation of Minařík et al.'s effort/input-change terms.
 paper_r_u: [0.01, 0.05, 0.05, 0.10]
-paper_r_delta_u: [0.05, 0.10, 0.10, 0.30]
+# Project-tuned velocity/yaw-rate weights.  Equal vx/vy entries avoid an ENU
+# axis bias.  The cost also includes u[0] - u_sent_previous.
+paper_r_delta_u: [100.0, 100.0, 50.0, 20.0]
 
 # Compared with the audit profile (alpha=0.45, accel=1.5), these limits trade
 # traversal time for visibly smoother commands and easier ArduPilot tracking.

@@ -406,6 +406,7 @@ def config_from_dict(d: dict) -> MPPIConfig:
         "yaw_rate_max", "noise_xy", "noise_z", "noise_yaw", "margin",
         "w_goal", "w_terminal", "w_obstacle", "w_u", "w_du", "w_yaw",
         "w_path", "path_scale_m", "w_reference_velocity", "reference_speed_m_s",
+        "reference_corner_radius_m", "reference_corner_samples",
         "cost_profile", "w_collision", "collision_radius_m", "paper_r_u",
         "paper_r_delta_u",
         "command_alpha", "max_accel_xy", "max_accel_z", "max_yaw_accel",
@@ -1155,7 +1156,7 @@ def run(args) -> None:
                         f"collision={costs.get('collision', 0.0):.1f}, "
                         f"path={costs.get('path', 0.0):.1f}, "
                         f"vref={costs.get('reference_velocity', 0.0):.1f}, "
-                        f"smooth={costs.get('smoothness', 0.0):.1f}, "
+                        f"smooth={costs.get('input_change', costs.get('smoothness', 0.0)):.1f}, "
                         f"terminal={costs.get('terminal', 0.0):.1f})"
                     )
             if out.event == "reached" and args.exit_on_goal:

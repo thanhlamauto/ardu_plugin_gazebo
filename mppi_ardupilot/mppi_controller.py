@@ -47,6 +47,11 @@ class MPPIConfig:
     path_scale_m: float = 1.0
     w_reference_velocity: float = 0.0
     reference_speed_m_s: float = 1.0
+    # Optional geometric rounding of interior global-path corners.  Zero keeps
+    # the original polyline.  This is a project reference generator, not an
+    # obstacle-aware global planner; collision cost remains authoritative.
+    reference_corner_radius_m: float = 0.0
+    reference_corner_samples: int = 5
     # ``project`` keeps the current proximity-softplus objective.  ``paper``
     # selects the subset mapped from Minařík et al.: input effort, input-change
     # effort, position reference and collision indicator.
@@ -115,6 +120,12 @@ class QuadMPPI:
             raise ValueError("w_reference_velocity phải hữu hạn và không âm")
         if self.cfg.reference_speed_m_s <= 0 or not np.isfinite(self.cfg.reference_speed_m_s):
             raise ValueError("reference_speed_m_s phải hữu hạn và lớn hơn 0")
+        if (self.cfg.reference_corner_radius_m < 0
+                or not np.isfinite(self.cfg.reference_corner_radius_m)):
+            raise ValueError("reference_corner_radius_m phải hữu hạn và không âm")
+        if (not isinstance(self.cfg.reference_corner_samples, int)
+                or self.cfg.reference_corner_samples < 2):
+            raise ValueError("reference_corner_samples phải là số nguyên >= 2")
         if self.cfg.cost_profile not in ("project", "paper"):
             raise ValueError("cost_profile phải là 'project' hoặc 'paper'")
         if self.cfg.w_collision < 0 or not np.isfinite(self.cfg.w_collision):
@@ -314,7 +325,26 @@ class QuadMPPI:
             # MPPI library passes the complete action sequence here, so this
             # term is evaluated once per rollout at the terminal callback.
             feasible_actions = states[..., 7:11] if states.shape[-1] >= self.NX else actions
-            deltas = feasible_actions[..., 1:, :] - feasible_actions[..., :-1, :]
+            # The first command is the only command executed this cycle, so
+            # include its jump from the command actually sent on the previous
+            # cycle.  Omitting this boundary term lets receding-horizon output
+            # jitter even when the remaining in-horizon sequence is smooth.
+            if hasattr(self, "_last_state_np"):
+                previous = self.torch.as_tensor(
+                    self._last_state_np[7:11], dtype=feasible_actions.dtype,
+                    device=feasible_actions.device,
+                )
+            else:
+                previous = self.torch.zeros(
+                    self.NU, dtype=feasible_actions.dtype,
+                    device=feasible_actions.device,
+                )
+            previous = previous.reshape(
+                *([1] * (feasible_actions.ndim - 2)), self.NU
+            )
+            first_delta = feasible_actions[..., 0, :] - previous
+            later_deltas = feasible_actions[..., 1:, :] - feasible_actions[..., :-1, :]
+            deltas = self.torch.cat((first_delta.unsqueeze(-2), later_deltas), dim=-2)
             cost = cost + (deltas.square() * self._paper_r_delta_u).sum(dim=(-2, -1))
         return cost
 
@@ -345,6 +375,7 @@ class QuadMPPI:
         """
         if path is None:
             self.reference_path = None
+            self.reference_path_raw = None
             self.reference_positions = None
             self.reference_velocities = None
             self._path_segment_lengths = None
@@ -356,6 +387,10 @@ class QuadMPPI:
             raise ValueError("reference path phải có dạng [M,3], M >= 1")
         if not np.isfinite(arr).all():
             raise ValueError("reference path chứa NaN/Inf")
+        self.reference_path_raw = self.torch.as_tensor(
+            arr, dtype=self.torch.double, device=self.goal.device
+        )
+        arr = self._round_reference_corners(arr)
         self.reference_path = self.torch.as_tensor(
             arr, dtype=self.torch.double, device=self.goal.device
         )
@@ -365,6 +400,51 @@ class QuadMPPI:
         self._path_segment_lengths = segment_lengths
         self._path_cumulative_lengths = np.r_[0.0, np.cumsum(segment_lengths)]
         self._path_progress_m = 0.0
+
+    def _round_reference_corners(self, path: np.ndarray) -> np.ndarray:
+        """Replace interior polyline vertices by small quadratic Bezier arcs.
+
+        Endpoints are preserved.  Each trim distance is capped at 45% of both
+        adjacent segments, so short segments cannot be consumed completely.
+        The result only smooths the supplied reference geometry; it does not
+        certify obstacle clearance.
+        """
+        radius = float(self.cfg.reference_corner_radius_m)
+        if radius <= 0.0 or len(path) < 3:
+            return path.copy()
+
+        rounded = [path[0].copy()]
+
+        def append_unique(point):
+            if np.linalg.norm(point - rounded[-1]) > 1e-9:
+                rounded.append(point.copy())
+
+        for index in range(1, len(path) - 1):
+            previous, corner, following = path[index - 1:index + 2]
+            incoming = corner - previous
+            outgoing = following - corner
+            len_in = float(np.linalg.norm(incoming))
+            len_out = float(np.linalg.norm(outgoing))
+            if len_in <= 1e-9 or len_out <= 1e-9:
+                append_unique(corner)
+                continue
+            direction_in = incoming / len_in
+            direction_out = outgoing / len_out
+            cosine = float(np.clip(np.dot(direction_in, direction_out), -1.0, 1.0))
+            if abs(cosine) > 0.9999:
+                append_unique(corner)
+                continue
+            trim = min(radius, 0.45 * len_in, 0.45 * len_out)
+            entry = corner - trim * direction_in
+            exit_ = corner + trim * direction_out
+            append_unique(entry)
+            for t in np.linspace(0.0, 1.0, self.cfg.reference_corner_samples + 1)[1:]:
+                point = ((1.0 - t) ** 2 * entry
+                         + 2.0 * (1.0 - t) * t * corner
+                         + t ** 2 * exit_)
+                append_unique(point)
+        append_unique(path[-1])
+        return np.asarray(rounded, dtype=np.float64)
 
     def _project_path_progress(self, position: np.ndarray) -> float:
         path = self.reference_path.detach().cpu().numpy()
@@ -581,7 +661,8 @@ class QuadMPPI:
         )
         if cfg.cost_profile == "paper" and len(feasible_actions) > 1:
             feasible_actions = np.asarray(feasible_actions)
-            delta_u = feasible_actions[1:] - feasible_actions[:-1]
+            previous_applied = np.asarray(self._last_state_np[7:11], dtype=np.float64)
+            delta_u = np.diff(np.vstack((previous_applied, feasible_actions)), axis=0)
             totals["input_change"] = float(
                 np.sum(delta_u * delta_u * paper_r_delta_u[None, :])
             )

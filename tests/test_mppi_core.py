@@ -466,6 +466,40 @@ class TestDiagnostics(unittest.TestCase):
         # Δu_0=[1,0,0,0] costs 1; Δu_1=[0,2,0,0] costs 8.
         self.assertAlmostEqual(float(planner._terminal_cost(states, actions).item()), 9.0)
 
+    def test_paper_input_change_penalizes_first_command_boundary(self):
+        import torch
+
+        cfg = MPPIConfig(
+            horizon=3, samples=8, device="cpu", cost_profile="paper",
+            w_goal=0.0, w_terminal=0.0, w_obstacle=0.0, w_du=0.0,
+            w_yaw=0.0, w_path=0.0, w_collision=0.0,
+            paper_r_u=(0.0, 0.0, 0.0, 0.0),
+            paper_r_delta_u=(1.0, 2.0, 3.0, 4.0),
+        )
+        planner = QuadMPPI(cfg)
+        planner._last_state_np = np.zeros(planner.NX)
+        states = torch.zeros((1, 1, 3, planner.NX), dtype=torch.double)
+        actions = torch.zeros((1, 1, 3, planner.NU), dtype=torch.double)
+        states[0, 0, :, 7:11] = torch.tensor([1.0, 1.0, 1.0, 1.0])
+        # Only previous -> u_0 changes; later controls are constant.
+        self.assertAlmostEqual(float(planner._terminal_cost(states, actions).item()), 10.0)
+
+    def test_reference_corner_rounding_preserves_endpoints_and_removes_vertex(self):
+        cfg = MPPIConfig(
+            horizon=3, samples=8, device="cpu",
+            reference_corner_radius_m=1.0, reference_corner_samples=4,
+        )
+        planner = QuadMPPI(cfg)
+        planner.update_reference_path([[0, 0, 2], [5, 0, 2], [5, 5, 2]])
+        rounded = planner.reference_path.detach().numpy()
+        np.testing.assert_allclose(rounded[0], [0, 0, 2])
+        np.testing.assert_allclose(rounded[-1], [5, 5, 2])
+        self.assertGreater(len(rounded), 3)
+        self.assertFalse(np.any(np.all(np.isclose(rounded, [5, 0, 2]), axis=1)))
+        # The arc remains inside the local corner bounding box.
+        self.assertTrue(np.all((rounded[:, 0] >= 0) & (rounded[:, 0] <= 5)))
+        self.assertTrue(np.all((rounded[:, 1] >= 0) & (rounded[:, 1] <= 5)))
+
     def test_paper_reference_is_time_indexed_and_progress_is_monotonic(self):
         import torch
 
@@ -655,10 +689,14 @@ class TestCliParsing(unittest.TestCase):
             "cost_profile": "paper",
             "paper_r_u": [0.1, 0.2, 0.3, 0.4],
             "paper_r_delta_u": [0.4, 0.3, 0.2, 0.1],
+            "reference_corner_radius_m": 0.7,
+            "reference_corner_samples": 6,
         })
         self.assertEqual(cfg.cost_profile, "paper")
         self.assertEqual(cfg.paper_r_u, [0.1, 0.2, 0.3, 0.4])
         self.assertEqual(cfg.paper_r_delta_u, [0.4, 0.3, 0.2, 0.1])
+        self.assertEqual(cfg.reference_corner_radius_m, 0.7)
+        self.assertEqual(cfg.reference_corner_samples, 6)
 
 
 if __name__ == "__main__":

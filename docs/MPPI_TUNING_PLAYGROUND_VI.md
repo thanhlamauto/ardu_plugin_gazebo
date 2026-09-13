@@ -226,12 +226,21 @@ global polyline được chiếu thành progress không lùi, sau đó sample
 `R_\Delta` của Eq. 16 được tính từ chuỗi action khả thi sau
 low-pass/slew limit trong
 terminal callback của `QuadMPPI`; phần breakdown tương ứng có khóa
-`input_change`. Đây là cách triển khai phù hợp với chuỗi
-`\Delta u_j=u_{j+1}-u_j` của paper, nhưng vị trí callback là chi tiết của thư
+`input_change`. Implementation hiện tính cả biên receding-horizon
+`u_0-u_sent_previous`, sau đó mới tính các hiệu
+`\Delta u_j=u_{j+1}-u_j`. Biên đầu quan trọng vì `u_0` là lệnh được gửi trong
+cycle hiện tại. Đây là cách triển khai phù hợp với chuỗi input-change của
+paper, nhưng việc neo vào lệnh cycle trước và vị trí callback là chi tiết của thư
 viện `pytorch-mppi`. Profile vẫn **không** phải reproduction đầy đủ vì state,
 dynamics rigid-body và collision module vẫn khác paper. Có thể tune
 `paper_r_delta_u=[0.05,0.10,0.10,0.30]` trong YAML nếu muốn phạt thay đổi
 velocity/yaw-rate mạnh hơn hoặc nhẹ hơn.
+
+Profile audit vẫn giữ weight paper-mapped ở trên. Profile quay video
+`mppi_demo_smooth.yaml` dùng project-tuned
+`paper_r_delta_u=[100,100,50,20]` và bo góc quadratic Bézier bán kính `0.8 m`.
+Không sao chép các weight demo sang profile khác nếu chưa kiểm tra lại cost
+scale, clearance và khả năng đạt terminal.
 
 Chạy offline trước:
 

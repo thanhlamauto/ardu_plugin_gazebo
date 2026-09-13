@@ -57,7 +57,7 @@ sang PA-MPPI và các insight khi tune. Những khác biệt với paper đượ
 project hiện là velocity-level adaptation, chưa phải rigid-body reproduction.
 \end{abstract}
 
-\noindent\textbf{Trạng thái:} 41/41 unit tests đạt offline; ba Gazebo/SITL
+\noindent\textbf{Trạng thái:} 43/43 unit tests đạt offline; ba Gazebo/SITL
 fixed-route run đạt với một seed; RViz-click, rigid-body PA-MPPI, edge computer
 và hardware còn cần validation tương ứng.
 
@@ -132,7 +132,8 @@ $\Delta t=0.1$ s và horizon 3 s. Profile audit dùng $\lambda=100$; giá trị 
 được tune cho state/control units hiện tại, không phải claim từ paper. Profile
 demo chậm candidate giảm reference speed xuống 0.60 m/s, giới hạn vận tốc xuống
 1.0 m/s và giới hạn gia tốc ngang xuống 0.6 m/s$^2$; profile này chưa được
-live-verify sau khi tune. Global path được đổi thành chuỗi reference theo thời gian
+live-verify sau khi tune. Các đỉnh trong global polyline được bo bằng cung
+quadratic Bézier bán kính 0.8 m trước khi đổi thành chuỗi reference theo thời gian
 $(p_k^{ref},v_k^{ref})$ để cùng rollout index $k$ so sánh cùng thời điểm.
 
 \subsection{Các hàm cost thực sự dùng}
@@ -149,13 +150,16 @@ J_{vel}&=40\sum_k\|v_k-v_k^{ref}\|^2,
 &&\text{bám tốc độ dọc reference},\\
 J_{input}&=\sum_k u_k^TRu_k,
 &&\text{phạt lệnh lớn},\\
-J_{smooth}&=\sum_k(u_k-u_{k-1})^TR_\Delta(u_k-u_{k-1}),
+J_{smooth}&=\sum_{k=0}^{N-1}(u_k-u_{k-1})^TR_\Delta(u_k-u_{k-1}),
 &&\text{phạt thay đổi lệnh},\\
 J_{collision}&=10^6\sum_k\mathbf{1}[d_k<r_{safe}],
 &&\text{loại rollout đi quá gần point cloud}.
 \end{align}
-Ở đây $R$ và $R_\Delta$ dùng các diagonal weight của paper nhưng ánh xạ sang
-$[v_x,v_y,v_z,\dot\psi]$; đây là project adaptation. $d_k$ là khoảng cách tới
+Với $k=0$, $u_{-1}$ là lệnh thực sự đã gửi ở cycle trước; nhờ đó cost tác động
+trực tiếp lên lệnh đầu sẽ được thực thi. $R$ dùng diagonal weight của paper ánh
+xạ sang $[v_x,v_y,v_z,\dot\psi]$. Riêng profile demo tăng
+$R_\Delta=\operatorname{diag}(100,100,50,20)$ và dùng cùng weight cho hai trục
+ngang; đây là project tune, còn profile audit giữ weight paper-mapped. $d_k$ là khoảng cách tới
 điểm LiDAR gần nhất và $r_{safe}=1.5$ m là point-cloud collision adapter. Project
 không dùng attitude/body-rate reference cost trong nhánh velocity-level vì state
 không có các biến đó. Các heuristic point-goal, soft obstacle, yaw và terminal
@@ -168,7 +172,7 @@ path, nhưng dùng cùng runtime flow:
 \begin{enumerate}
   \item Gazebo server cập nhật physics, sensor suite phát odometry và LiDAR;
   \item planner đọc state và point cloud, đổi FLU/FRD và ENU/NED đúng interface;
-  \item global polyline được time-parameterize thành reference trong horizon;
+  \item global polyline được bo góc rồi time-parameterize thành reference trong horizon;
   \item MPPI lấy mẫu 500 control sequences và forward-simulate 30 bước;
   \item mỗi rollout nhận năm cost ở trên, sau đó được đổi thành exponential weight;
   \item weighted noise cập nhật nominal sequence; conditioner áp low-pass, slew
@@ -182,6 +186,11 @@ path, nhưng dùng cùng runtime flow:
 Global path chọn phía đi quanh vật cản, còn MPPI quyết định chuyển động cục bộ
 trong horizon. Vì vậy narrow-gate demo đi qua cửa lớn rồi vòng phía bắc hai cột;
 route xuyên khe nhỏ là stress-test khác, không phải cùng kết quả.
+
+A/B offline với seed 7 cho profile demo mới giảm tổng biến thiên lệnh khoảng
+4.5\% ở right-angle, 1.7\% ở slalom và 5.4\% ở narrow-gate; cả ba vẫn đạt
+terminal trong reduced model. Đây là kết quả offline-only, chưa phải xác nhận
+Gazebo 3D.
 
 \subsection{Kết quả hiện có}
 

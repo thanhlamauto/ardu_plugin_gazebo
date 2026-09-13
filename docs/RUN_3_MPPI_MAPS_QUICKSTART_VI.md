@@ -27,6 +27,19 @@ m/s²`, tăng làm mượt `command_alpha: 0.45 -> 0.30`, và dùng arrival gate
 Cấu hình chậm này là candidate để quay video và **chưa được gán kết quả live
 Gazebo**; ba kết quả bên dưới vẫn thuộc profile audit cũ.
 
+Để giảm gãy ở waypoint, profile demo còn bo góc reference với bán kính `0.8
+m` (`reference_corner_samples: 6`). Cost đổi lệnh tính cả bước nối từ lệnh đã
+gửi ở cycle trước tới lệnh đầu của rollout và dùng
+`paper_r_delta_u: [100,100,50,20]`. Hai weight ngang bằng nhau để không thiên
+lệch theo trục ENU. Đây là project tune; profile audit vẫn giữ đúng weight đối
+chiếu paper.
+
+A/B offline, seed 7, cùng reduced dynamics cho thấy thay đổi mới vẫn đạt
+terminal ở cả ba case và giảm tổng biến thiên lệnh: right-angle `32.95 ->
+31.46`, slalom `51.25 -> 50.37`, narrow-gate `51.38 -> 48.62`. Đây chỉ là
+`VERIFIED OFFLINE`; phải tạo log Gazebo mới trước khi dùng các con số này để
+kết luận chất lượng bay 3D.
+
 Ba lệnh bên dưới truyền `--global-path` tương ứng với route
 clearance-checked của từng map. Profile này là adaptation velocity-level,
 không phải reproduction đầy đủ của paper. `mppi_my_test.yaml` vẫn được
@@ -356,13 +369,19 @@ Khi thay map hoặc route, phải cập nhật cả hai tham số:
 
 Polyline phải cùng frame ENU, cùng đơn vị mét, và đã kiểm tra clearance; path
 cost không thay thế collision cost. Có thể tune `reference_speed_m_s`,
-`w_path`, `w_reference_velocity`, `paper_r_u`, `paper_r_delta_u`, `lambda`
-và `collision_radius_m` trong
+`w_path`, `w_reference_velocity`, `paper_r_u`, `paper_r_delta_u`, `lambda`,
+`reference_corner_radius_m` và `collision_radius_m` trong
 `config/experiments/mppi_demo_smooth.yaml`; sau mỗi lần sửa phải khởi động
 lại Terminal 5. Nếu cần lặp lại đúng kết quả audit ngày 2026-09-13 thì
 dùng `mppi_paper_cost_only.yaml`. Nếu muốn chạy baseline project-cost, đổi config về
 `mppi_my_test.yaml`; khi đó `w_path: 0` và có thể bật path cost bằng
 `--w-path`.
+
+Trong dòng `[diag]`, trường `smooth=` của paper profile chính là cost
+`input_change`, đã gồm độ nhảy từ lệnh gửi ở cycle trước tới lệnh đầu của
+rollout. Nếu tăng weight mà `smooth` vẫn gần như không đổi và acceleration liên
+tục chạm hard limit, nguyên nhân còn lại thường là corner reference, weight
+collapse (ESS thấp) hoặc giới hạn slew, không phải thiếu weight đơn thuần.
 
 ## Dừng và reset trước khi đổi map
 
