@@ -1,544 +1,184 @@
-# ArduPilot Gazebo: hướng dẫn SITL và C++ sensor subscriber trên macOS
+# MPPI UAV Navigation with ArduPilot and Gazebo
 
-Repository này chứa ArduPilot Gazebo Plugin cùng hướng dẫn thực hành bằng tiếng
-Việt. Nội dung trình bày toàn bộ luồng từ build ArduCopter SITL, kết nối với
-Gazebo Harmonic, kiểm tra sensor topic, đến viết một C++ subscriber có callback
-và processing thread.
+Nghiên cứu điều khiển UAV tránh vật cản bằng **Model Predictive Path Integral
+(MPPI)** trên **ArduPilot SITL + Gazebo Harmonic**. Bài thử chính cho UAV lấy đà
+60 m, đạt tốc độ cruise yêu cầu 5 hoặc 10 m/s, tự giảm tốc để qua các góc cua
+trong bãi container rồi tăng tốc lại.
 
-Runbook chạy, capture UDP và map dữ liệu về source code nằm tại
-[`docs/closed_loop_runtime_walkthrough_vi.md`](docs/closed_loop_runtime_walkthrough_vi.md).
+Repository chứa controller, mô hình dự đoán đáp ứng, kiểm tra quỹ đạo, world
+Gazebo, harness chạy thí nghiệm, replay offline và tài liệu tái lập kết quả.
+Các thành phần này là phần mở rộng nghiên cứu trên nền
+[`ArduPilot/ardupilot_gazebo`](https://github.com/ArduPilot/ardupilot_gazebo).
 
-- [Báo cáo tuần: MPPI bám global path và điều khiển goal từ RViz](output/pdf/mppi_weekly_report_vi.pdf) — [video demo](https://drive.google.com/file/d/1I1VxN6-6Y3Gt8kxY8ieNvlvMMkvvLxLJ/view?usp=sharing), [quickstart 3 map](docs/RUN_3_MPPI_MAPS_QUICKSTART_VI.md)
-- [Video Gazebo + RViz khi điều khiển UAV ở GUIDED mode](https://drive.google.com/file/d/1D1ceJg4oJFvSS2aUksKp6LQNnHCnOOei/view?usp=sharing)
-- [Báo cáo luồng packet Gazebo--ROS 2--RViz](output/pdf/gazebo_ros2_rviz_dataflow_report_vi.pdf)
-- [Demo warehouse: click MAVProxy Map + tránh vật cản lidar 3D (Depot thực tế, takeoff 20 m)](docs/run_guided_sensor_demo_vi.md) — mặc định dùng `iris_warehouse_sensor.sdf`; bản runway cũ vẫn ở `worlds/iris_sensor_runway.sdf`
-- [Demo warehouse: MPPI/PA-MPPI trên companion](docs/run_mppi_demo_vi.md) — baseline velocity và nhánh rigid-body thrust/body-rate experimental cho Gazebo/SITL
-- [Đánh giá tiến độ MPPI và phạm vi còn lại cho edge computer](reports/mppi_week4_assessment_vi.md)
-- [Báo cáo học thuật LaTeX/PDF: PA-MPPI với ArduPilot và Gazebo](output/pdf/pa_mppi_ardupilot_technical_report_vi.pdf)
-- [Claim-to-source audit](docs/SOURCE_AUDIT.md) và [pre-Gazebo gate checklist](docs/GAZEBO_RUN_CHECKLIST.md)
-- [Report audit changelog](CHANGELOG_REPORT_AUDIT.md) — kết quả offline, phần pending và lệnh tái lập
-- [Slide Beamer: MPPI local planner trên companion](output/pdf/mppi_local_planner_report_vi.pdf)
+## Trạng thái hiện tại
 
-Mục tiêu cuối cùng là hiểu và chạy được pipeline:
+Profile tốt nhất hiện tại:
+[`mppi_yard_progress_feasible80.yaml`](config/experiments/mppi_yard_progress_feasible80.yaml).
 
-```text
-ArduPilot SITL ──motor commands──> ArduPilotPlugin ──> Gazebo physics
-       ^                                                   │
-       └──────────────── state / IMU ──────────────────────┘
+- Retiming tắt; global path chỉ cung cấp hình học.
+- MPPI dùng path-progress objective và tự chọn profile tốc độ.
+- `10 m/s` là cruise request và giới hạn trên, không phải tốc độ bắt buộc qua cua.
+- Rollout dùng mô hình có acceleration memory và command conditioner.
+- Cloud hiện tại và prior SDF cùng tham gia kiểm tra collision.
+- Sample không an toàn bị loại trước MPPI weighting; gate cuối dùng cùng safety
+  predicate.
+- Headless 10 m/s, seed 7 và 17: **2/2 tới đích và LAND/disarm**, peak
+  **8.98–9.19 m/s**, không optimizer timeout.
 
-Gazebo sensor ──> Gazebo Transport ──> C++ callback
-                                             │
-                                             v
-                                      thread-safe queue
-                                             │
-                                             v
-                                      processing thread
-                                             │
-                                             v
-                                       AI / CV / SLAM
+Hệ vẫn còn 11–21 chu kỳ `N_safe=0` trong hai lượt baseline và gửi zero hold.
+Experiment 7A replay 1.600 lần cho thấy tăng 80 lên 640 random samples không tạo
+được nghiệm ở 12 failure snapshots. Kết quả nghiêng về viability loss hoặc độ
+nhạy của stopping model/margin, chưa chứng minh controller đã an toàn cho bay
+thật.
+
+Đọc trước khi đánh giá kết quả:
+
+1. [Checkpoint mentor và kế hoạch phase tiếp theo](docs/MPPI_MENTOR_CHECKPOINT_AND_NEXT_PHASE_VI.md)
+2. [Quickstart bài 5/10 m/s](docs/RUN_YARD_5_10_MS_QUICKSTART_VI.md)
+3. [Feasibility mask và kết quả hai seed](docs/MPPI_FEASIBLE_SELECTION_VI.md)
+4. [Kiểm chứng mô hình phanh và safety gate](docs/MPPI_MENTOR_SAFETY_PHASE_VI.md)
+5. [Claim-to-source audit](docs/SOURCE_AUDIT.md)
+
+## Kiến trúc
+
+```mermaid
+flowchart LR
+    G[Global path<br/>known-map A* or fixed path] --> M[MPPI<br/>path progress + sampled controls]
+    L[Gazebo LiDAR / odometry] --> P[Cloud preprocessing<br/>state estimator interface]
+    P --> M
+    S[Known-world SDF] --> V[Shared trajectory safety predicate]
+    M --> D[Conditioner + acceleration response model]
+    D --> V
+    P --> V
+    V -->|feasible command| A[ArduPilot Guided velocity setpoint]
+    A --> Z[Gazebo dynamics]
+    Z --> L
+    V -->|N_safe = 0| H[Hold / recovery research branch]
 ```
 
-> [!NOTE]
-> Các lệnh và đường dẫn trong tài liệu giả định ArduPilot nằm tại
-> `~/Projects/ardupilot`, còn `ardupilot_gazebo` nằm tại
-> `~/Projects/ardupilot_gazebo`.
+MPPI chạy trên companion side và gửi velocity/yaw-rate setpoint qua MAVLink.
+ArduPilot giữ vai trò flight controller cấp thấp; Gazebo mô phỏng physics và
+sensor. Đây là reduced closed-loop velocity model, không phải full rigid-body
+reproduction của PA-MPPI.
 
-## 1. Các thành phần trong hệ thống
+## Chạy bài chuẩn
 
-- **ArduPilot SITL** là flight controller được compile để chạy trực tiếp trên
-  CPU của máy Mac thay vì trên Pixhawk.
-- **Gazebo server** chạy physics, world và sensor simulation.
-- **Gazebo GUI** render môi trường 3D và cho phép tương tác với mô phỏng.
-- **ArduPilotPlugin** là bridge: nhận motor output từ ArduPilot và gửi
-  state/sensor từ Gazebo về ArduPilot.
-- **Gazebo Transport** publish dữ liệu sensor qua topic để chương trình khác có
-  thể subscribe.
+Yêu cầu đã được kiểm tra trong project:
 
-Gazebo server và GUI là hai process riêng, giao tiếp với nhau qua Gazebo
-Transport.
+- macOS, Gazebo Harmonic;
+- ArduPilot tại `~/Projects/ardupilot`, đã build `build/sitl/bin/arducopter`;
+- repository này tại `~/Projects/ardupilot_gazebo`;
+- Python environment có `numpy`, `torch`, `PyYAML`, `pymavlink` và Gazebo Python
+  bindings. Các lệnh dưới dùng environment
+  `/opt/miniconda3/envs/ardupilot-rviz` của máy thí nghiệm.
 
-## 2. Build ArduPilot SITL
-
-Cài Command Line Tools và các dependency cần thiết:
-
-```bash
-xcode-select --install
-brew update
-brew install cmake gz-harmonic rapidjson opencv gstreamer
-```
-
-Clone ArduPilot cùng các submodule:
-
-```bash
-git clone --recurse-submodules \
-    https://github.com/ArduPilot/ardupilot.git \
-    ~/Projects/ardupilot
-```
-
-Nếu đã có ArduPilot tại `~/Projects/ardupilot`, bỏ qua bước clone. Sau đó build
-SITL từ thư mục gốc của repo:
-
-```bash
-cd ~/Projects/ardupilot
-./waf configure --board sitl
-./waf copter
-```
-
-Executable được tạo tại:
-
-```text
-build/sitl/bin/arducopter
-```
-
-## 3. Kiểm tra SITL độc lập
-
-Chạy ArduCopter bằng physics model có sẵn trong SITL, chưa dùng Gazebo:
-
-```bash
-cd ~/Projects/ardupilot
-./Tools/autotest/sim_vehicle.py -v ArduCopter -f quad
-```
-
-Trong MAVProxy, thử một chu trình bay đơn giản:
-
-```text
-mode guided
-arm throttle
-takeoff 5
-land
-```
-
-Bước này giúp tách lỗi. Nếu SITL độc lập hoạt động nhưng mô phỏng Gazebo không
-hoạt động, cần tập trung kiểm tra plugin, cấu hình hoặc kết nối giữa hai hệ
-thống thay vì flight controller.
-
-## 4. Cài và kiểm tra Gazebo Harmonic
-
-Cài Gazebo trên macOS bằng Homebrew:
-
-```bash
-brew install gz-harmonic
-```
-
-Chạy server:
-
-```bash
-gz sim -v4 shapes.sdf -s
-```
-
-Mở terminal khác và chạy GUI:
-
-```bash
-gz sim -v4 -g
-```
-
-Nếu GUI hiển thị các vật thể mẫu như cube, sphere và cylinder thì Gazebo
-server, GUI và Transport đang hoạt động.
-
-## 5. Build plugin `ardupilot_gazebo`
-
-Clone repository này vào thư mục được dùng xuyên suốt tutorial:
-
-```bash
-git clone \
-    https://github.com/thanhlamauto/ardu_plugin_gazebo.git \
-    ~/Projects/ardupilot_gazebo
-```
-
-Build plugin:
+Build plugin và world:
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build . -j4
-```
-
-Trên macOS, kết quả build gồm `libArduPilotPlugin.dylib`. Plugin thực hiện hai
-chiều giao tiếp:
-
-```text
-ArduPilot ──motor output──> plugin ──> Gazebo
-ArduPilot <──state/sensor── plugin <── Gazebo
-```
-
-## 6. Chạy Iris trong Gazebo và nối với ArduPilot
-
-Mỗi terminal trong phần này phải dùng cùng một `GZ_PARTITION`. Biến này tách
-network Transport của mô phỏng hiện tại khỏi các Gazebo process khác.
-
-Thiết lập environment:
-
-```bash
-export GZ_PARTITION=ardupilot_test
-export GZ_SIM_SYSTEM_PLUGIN_PATH="$HOME/Projects/ardupilot_gazebo/build"
-export GZ_SIM_RESOURCE_PATH="$HOME/Projects/ardupilot_gazebo/models:$HOME/Projects/ardupilot_gazebo/worlds"
-```
-
-### Terminal 1: Gazebo server
-
-```bash
-export GZ_PARTITION=ardupilot_test
-export GZ_SIM_SYSTEM_PLUGIN_PATH="$HOME/Projects/ardupilot_gazebo/build"
-export GZ_SIM_RESOURCE_PATH="$HOME/Projects/ardupilot_gazebo/models:$HOME/Projects/ardupilot_gazebo/worlds"
-
-gz sim -v4 -r \
-    "$HOME/Projects/ardupilot_gazebo/worlds/iris_runway.sdf" \
-    -s
-```
-
-### Terminal 2: Gazebo GUI
-
-```bash
-export GZ_PARTITION=ardupilot_test
-gz sim -v4 -g
-```
-
-### Terminal 3: ArduPilot SITL
-
-```bash
-cd ~/Projects/ardupilot
-
-./Tools/autotest/sim_vehicle.py \
-    -v ArduCopter \
-    -f JSON \
-    --add-param-file="$HOME/Projects/ardupilot_gazebo/config/gazebo-iris-gimbal.parm"
-```
-
-Chỉ thêm `-w` khi cần xóa và nạp lại toàn bộ parameter. Không cần dùng tùy chọn
-này trong mỗi lần chạy.
-
-Trong MAVProxy:
-
-```text
-mode guided
-arm throttle
-takeoff 5
-land
-```
-
-Khi Iris cất cánh trong GUI, closed loop sau đã hoạt động:
-
-```text
-ArduPilot ──> motor commands ──> Gazebo physics
-ArduPilot <── IMU and state <──── Gazebo sensors
-```
-
-## 7. Tìm và kiểm tra sensor topic
-
-Nhớ dùng cùng partition với Gazebo server:
-
-```bash
-export GZ_PARTITION=ardupilot_test
-gz topic -l
-```
-
-Lọc các topic thường dùng:
-
-```bash
-gz topic -l | grep -Ei 'camera|image|imu|lidar|scan|point'
-```
-
-Tên topic phụ thuộc vào world và model. Với world Iris trong ví dụ, IMU topic
-có thể là:
-
-```text
-/world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
-```
-
-Kiểm tra kiểu message:
-
-```bash
-gz topic -i -t \
-    /world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
-```
-
-Kết quả mong đợi có kiểu:
-
-```text
-gz.msgs.IMU
-```
-
-Echo dữ liệu thực tế:
-
-```bash
-gz topic -e -t \
-    /world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
-```
-
-Nếu không thấy dữ liệu, kiểm tra theo thứ tự:
-
-1. Gazebo server còn chạy và simulation không bị pause.
-2. Terminal hiện tại dùng đúng `GZ_PARTITION`.
-3. Topic được copy chính xác từ kết quả `gz topic -l`.
-4. Sensor tương ứng có trong model đang chạy.
-
-## 8. Hiểu subscriber và callback
-
-Cốt lõi của subscriber chỉ gồm một node và lời gọi `Subscribe`:
-
-```cpp
-gz::transport::Node node;
-node.Subscribe(topic, imu_callback);
-```
-
-Callback nhận message:
-
-```cpp
-void imu_callback(const gz::msgs::IMU &msg)
-{
-    const auto &accel = msg.linear_acceleration();
-    const auto &gyro = msg.angular_velocity();
-    // Xử lý dữ liệu ở đây.
-}
-```
-
-Chương trình không tự gọi `imu_callback`. Khi topic có message mới, Gazebo
-Transport gọi hàm đã đăng ký. Một hàm trở thành callback vì nó được đưa cho
-framework để framework quyết định thời điểm gọi; callback không phải một loại
-hàm đặc biệt trong C++.
-
-Callback có thể log, lưu hoặc chuyển tiếp dữ liệu. Tuy nhiên, callback nên làm
-ít việc và return nhanh. Chạy neural network hoặc thuật toán nặng trực tiếp
-trong callback có thể tạo latency, làm đầy queue nội bộ hoặc khiến frame bị
-drop.
-
-## 9. Subscriber với thread-safe queue
-
-Pattern producer-consumer tách việc nhận message khỏi xử lý nặng:
-
-```text
-Gazebo Transport thread             Processing thread
-          │                                 │
-          │ callback                        │
-          v                                 │
-     copy message                           │
-          │                                 │
-          v                                 │
-  bounded shared queue ───────────────────> pop
-                                            │
-                                            v
-                                      xử lý dữ liệu
-```
-
-Tạo một thư mục thử nghiệm bên ngoài source tree để không đưa build artifact
-vào repo:
-
-```bash
-mkdir -p /tmp/gz_imu_subscriber
-cd /tmp/gz_imu_subscriber
-```
-
-Tạo `main.cpp` với nội dung:
-
-```cpp
-#include <gz/msgs/imu.pb.h>
-#include <gz/transport/Node.hh>
-
-#include <atomic>
-#include <condition_variable>
-#include <cstddef>
-#include <deque>
-#include <iostream>
-#include <mutex>
-#include <string>
-#include <thread>
-#include <utility>
-
-namespace {
-
-constexpr std::size_t MAX_QUEUE_SIZE = 10;
-
-std::atomic<bool> running{true};
-std::condition_variable queue_cv;
-std::deque<gz::msgs::IMU> imu_queue;
-std::mutex queue_mutex;
-
-void imu_callback(const gz::msgs::IMU &msg)
-{
-    {
-        std::lock_guard<std::mutex> lock(queue_mutex);
-
-        // Giới hạn queue để latency và memory không tăng vô hạn nếu consumer
-        // xử lý chậm hơn tốc độ publish của sensor.
-        if (imu_queue.size() >= MAX_QUEUE_SIZE) {
-            imu_queue.pop_front();
-        }
-        imu_queue.push_back(msg);
-    }
-    queue_cv.notify_one();
-}
-
-void process_imu()
-{
-    while (true) {
-        gz::msgs::IMU msg;
-
-        {
-            std::unique_lock<std::mutex> lock(queue_mutex);
-            queue_cv.wait(lock, [] {
-                return !running.load() || !imu_queue.empty();
-            });
-
-            if (!running.load() && imu_queue.empty()) {
-                return;
-            }
-
-            msg = std::move(imu_queue.front());
-            imu_queue.pop_front();
-        }
-
-        const auto &accel = msg.linear_acceleration();
-        const auto &gyro = msg.angular_velocity();
-
-        std::cout << "accel [m/s^2]: "
-                  << accel.x() << ", "
-                  << accel.y() << ", "
-                  << accel.z() << " | gyro [rad/s]: "
-                  << gyro.x() << ", "
-                  << gyro.y() << ", "
-                  << gyro.z() << '\n';
-
-        // Đặt AI, CV hoặc SLAM processing tại đây.
-    }
-}
-
-}  // namespace
-
-int main(int argc, char **argv)
-{
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <imu-topic>\n";
-        return 1;
-    }
-
-    const std::string topic = argv[1];
-    gz::transport::Node node;
-
-    if (!node.Subscribe(topic, imu_callback)) {
-        std::cerr << "Failed to subscribe to " << topic << '\n';
-        return 1;
-    }
-
-    std::thread worker(process_imu);
-
-    std::cout << "Subscribed to " << topic << '\n'
-              << "Press Enter to stop.\n";
-    std::cin.get();
-
-    running.store(false);
-    queue_cv.notify_all();
-    worker.join();
-    return 0;
-}
-```
-
-Tạo `CMakeLists.txt`:
-
-```cmake
-cmake_minimum_required(VERSION 3.16)
-project(gz_imu_subscriber LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Gazebo Harmonic sử dụng gz-transport13 và gz-msgs10.
-find_package(gz-transport13 REQUIRED)
-find_package(gz-msgs10 REQUIRED)
-
-add_executable(gz_imu_subscriber main.cpp)
-target_link_libraries(
-    gz_imu_subscriber
-    PRIVATE
-        gz-transport13::core
-        gz-msgs10::core
-)
-```
-
-Build:
-
-```bash
-cmake -S . -B build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j4
+/opt/miniconda3/envs/ardupilot-rviz/bin/python scripts/build_yard_runup60.py
 ```
 
-Chạy subscriber trong terminal có cùng partition:
-
-```bash
-export GZ_PARTITION=ardupilot_test
-
-./build/gz_imu_subscriber \
-    /world/iris_runway/model/iris_with_gimbal/model/iris_with_standoffs/link/imu_link/sensor/imu_sensor/imu
-```
-
-Thay topic trong ví dụ bằng topic lấy từ `gz topic -l` nếu model của bạn dùng
-tên khác.
-
-### Vì sao queue cần giới hạn?
-
-Ví dụ camera publish 30 Hz, tức có frame mới khoảng mỗi 33 ms. Nếu processing
-mất 200 ms mỗi frame, producer tạo dữ liệu nhanh hơn consumer. Queue không giới
-hạn sẽ liên tục tăng, gây tăng memory và latency. Với dữ liệu real-time, thường
-hợp lý hơn khi bỏ frame cũ và ưu tiên dữ liệu mới.
-
-Chính sách drop tùy ứng dụng:
-
-- Queue FIFO nhỏ phù hợp khi vẫn cần xử lý một vài sample liên tiếp.
-- Chỉ giữ sample mới nhất phù hợp với hiển thị hoặc điều khiển real-time.
-- Không drop phù hợp khi mọi sample đều quan trọng, nhưng consumer phải đủ nhanh
-  hoặc cần backpressure/persistence phù hợp.
-
-## 10. Thread giao tiếp với nhau như thế nào?
-
-Các thread trong cùng một process dùng chung address space, nên có thể giao
-tiếp qua shared memory. Trong ví dụ trên, `imu_queue` là shared memory được cả
-callback thread và processing thread truy cập.
-
-Các primitive có vai trò khác nhau:
-
-- `std::mutex` đảm bảo chỉ một thread thay đổi queue tại một thời điểm, tránh
-  race condition.
-- `std::condition_variable` cho processing thread ngủ khi queue rỗng và được
-  đánh thức khi callback push message mới, thay vì polling liên tục.
-- `std::atomic<bool>` cho phép các thread đọc/ghi cờ dừng an toàn.
-- `std::thread::join()` chỉ chờ một thread kết thúc. Nó không phải cơ chế truyền
-  dữ liệu giữa các thread.
-
-Mutex là cần thiết vì một thao tác tưởng như đơn giản có thể gồm nhiều bước đọc,
-sửa và ghi. Nếu hai thread xen kẽ các bước này mà không đồng bộ, kết quả phụ
-thuộc timing và tạo ra race condition.
-
-## 11. Tổng kết
-
-Sau tutorial này, pipeline hoàn chỉnh là:
-
-1. ArduPilot SITL chạy flight-controller firmware trên macOS.
-2. ArduPilotPlugin nối motor command và simulated state giữa SITL với Gazebo.
-3. Gazebo mô phỏng physics và publish dữ liệu sensor qua Transport topic.
-4. C++ subscriber đăng ký callback với topic.
-5. Transport thread gọi callback khi message đến.
-6. Callback copy message vào bounded thread-safe queue rồi return nhanh.
-7. Processing thread lấy message để chạy AI, OpenCV, SLAM hoặc logic riêng.
-
-Điểm cốt lõi: queue vẫn là shared memory. `mutex`, `condition_variable` và
-`atomic` giúp các thread dùng vùng nhớ chung một cách an toàn và hiệu quả.
-
-## 12. Chạy sensor suite và RViz
-
-World `iris_sensor_arena.sdf` gắn đồng thời camera RGB, depth camera, LiDAR 3D,
-IMU, từ kế, khí áp và NavSat lên UAV. Hướng dẫn đầy đủ theo từng terminal nằm
-trong [runbook closed-loop](docs/closed_loop_runtime_walkthrough_vi.md#10-chạy-sensor-suite-và-rviz).
-
-Sau khi Gazebo và ArduPilot SITL đã chạy, mở bridge và RViz bằng một lệnh:
+Chạy headless, mỗi trial boot một Gazebo/SITL mới và tự takeoff, chạy planner,
+LAND, lưu log:
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
-./scripts/run_sensor_rviz.sh
+PY=/opt/miniconda3/envs/ardupilot-rviz/bin/python
+
+$PY scripts/run_yard_speed_ablation.py \
+  --scenario yard-runup60 \
+  --speeds 5 10 --seeds 7 \
+  --config config/experiments/mppi_yard_progress_feasible80.yaml \
+  --params config/experiments/mppi_yard_high_accel.parm \
+  --timeout 90 \
+  --output "output/benchmark/yard_$(date +%Y%m%d_%H%M%S)"
 ```
 
-## Nguồn dự án và giấy phép
+Thêm `--gui` và đổi sang
+[`mppi_yard_progress_feasible80_gui.yaml`](config/experiments/mppi_yard_progress_feasible80_gui.yaml)
+để xem Gazebo 3D. Không mở thêm RViz trong lượt đo tốc độ; camera/depth bridge và
+sampled-trajectory visualization làm thay đổi tải realtime. Quy trình năm
+terminal để quan sát và xử lý lỗi kết nối nằm trong
+[quickstart](docs/RUN_YARD_5_10_MS_QUICKSTART_VI.md).
 
-Repository này dựa trên
-[ArduPilot Gazebo Plugin](https://github.com/ArduPilot/ardupilot_gazebo). Xem
-[`LICENSE.md`](LICENSE.md) để biết thông tin giấy phép.
+## Tái lập Experiment 7A
+
+Thu exact planner snapshots ở hai seed:
+
+```bash
+PY=/opt/miniconda3/envs/ardupilot-rviz/bin/python
+
+$PY scripts/run_yard_speed_ablation.py \
+  --scenario yard-runup60 --speeds 10 --seeds 7 17 \
+  --config config/experiments/mppi_yard_progress_feasible80.yaml \
+  --params config/experiments/mppi_yard_high_accel.parm --timeout 60 \
+  --debug-snapshot-events --debug-control-stride 20 \
+  --output output/benchmark/yard_experiment7a_capture
+
+$PY scripts/select_experiment7a_snapshots.py \
+  output/benchmark/yard_experiment7a_capture \
+  --output output/benchmark/yard_experiment7a_selection
+
+$PY scripts/replay_experiment7a.py \
+  output/benchmark/yard_experiment7a_selection \
+  --samples 80 160 320 640 --realizations 20 \
+  --output output/benchmark/yard_experiment7a_replay
+```
+
+Kết quả đã commit để đọc nhanh:
+
+- [selection manifest](results/yard_experiment7a_20260916/manifest.json)
+- [replay summary](results/yard_experiment7a_20260916/summary.json)
+- [ESS/cost-gap analysis](results/yard_experiment7a_20260916/analysis.json)
+- [1.600 solve records](results/yard_experiment7a_20260916/solves.csv)
+
+## Kiểm thử
+
+```bash
+cd ~/Projects/ardupilot_gazebo
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+  /opt/miniconda3/envs/ardupilot-rviz/bin/python -m pytest -q tests
+```
+
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` tránh xung đột giữa pytest mới và ROS
+`launch_testing` cài trong cùng environment. Unit tests kiểm tra frame/MAVLink,
+A*, retiming, response model, stopping geometry, final trajectory gate,
+feasibility weighting và proposal recovery. Test pass không thay thế kiểm chứng
+closed-loop Gazebo.
+
+## Bản đồ repository
+
+| Đường dẫn | Nội dung |
+|---|---|
+| [`mppi_ardupilot/`](mppi_ardupilot/) | MPPI, response model, map geometry, safety predicate và MAVLink interface |
+| [`scripts/mppi_velocity_avoidance.py`](scripts/mppi_velocity_avoidance.py) | Entry point planner live |
+| [`scripts/run_yard_speed_ablation.py`](scripts/run_yard_speed_ablation.py) | Harness Gazebo/SITL cô lập, ghi log và cleanup |
+| [`scripts/replay_experiment7a.py`](scripts/replay_experiment7a.py) | Replay sample-count/RNG trên exact snapshots |
+| [`config/experiments/`](config/experiments/) | Profile controller; profile `feasible80` là baseline hiện tại |
+| [`worlds/iris_mppi_yard_runup60.sdf`](worlds/iris_mppi_yard_runup60.sdf) | World bãi container với đoạn lấy đà 60 m |
+| [`tests/`](tests/) | Regression tests cho controller, geometry và safety |
+| [`docs/`](docs/) | Protocol, kết quả, giới hạn và lệnh tái lập |
+| [`results/yard_experiment7a_20260916/`](results/yard_experiment7a_20260916/) | Kết quả gọn đã commit; raw Gazebo logs được giữ ngoài Git |
+
+## Phạm vi kết luận
+
+Kết quả hiện tại chỉ xác nhận hành vi trên Gazebo/ArduPilot SITL và các seed đã
+nêu. `collision_radius_m=1.5` là center clearance chưa hiệu chuẩn thành rotor/
+estimator envelope. Zero hold chưa phải verified emergency trajectory. Phase
+tiếp theo là sensitivity test cho response, delay, horizon và margin, sau đó mới
+chọn giữa hiệu chuẩn model và recursive-feasibility recovery.
+
+Các mô tả liên quan paper được giới hạn theo
+[`SOURCE_AUDIT.md`](docs/SOURCE_AUDIT.md). Tài liệu tham khảo nằm trong
+[`reports/pa_mppi_sources.bib`](reports/pa_mppi_sources.bib).
+
+## Nền tảng Gazebo plugin
+
+Phần C++ plugin, model gimbal/sensor và các world gốc vẫn giữ tương thích với
+upstream. Hướng dẫn kiểm tra SITL–Gazebo, transport topics và sensor threading
+nằm tại [closed-loop runtime walkthrough](docs/closed_loop_runtime_walkthrough_vi.md).
+
+Giấy phép: [BSD 3-Clause](LICENSE.md).

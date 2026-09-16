@@ -161,11 +161,13 @@ class ArduPilotInterface:
             return value
         raise SystemExit(f"[safety] không đọc được parameter {name} từ ArduPilot")
 
-    def spin_once(self, timeout: float = 0.0) -> None:
+    def spin_once(self, timeout: float = 0.0, max_messages: int = 256) -> None:
         """Hút message chờ sẵn vào cache mới nhất (không block quá timeout)."""
         m = self.mavutil.mavlink
         deadline = time.monotonic() + timeout
-        while True:
+        if max_messages <= 0:
+            raise ValueError('max_messages must be positive')
+        for _ in range(max_messages):
             msg = self.master.recv_match(blocking=False)
             if msg is None:
                 if time.monotonic() >= deadline:
@@ -177,7 +179,7 @@ class ArduPilotInterface:
                 self._lned, self._lned_t = msg, t
             elif msg.get_msgId() == m.MAVLINK_MSG_ID_ATTITUDE:
                 self._att, self._att_t = msg, t
-            if time.monotonic() >= deadline and msg is None:
+            if timeout > 0 and time.monotonic() >= deadline:
                 return
 
     def get_state(self, max_age_s: float = 1.0):

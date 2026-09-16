@@ -1,5 +1,52 @@
 # Report and implementation audit changelog
 
+## 2026-09-14 — A* known-map global planner
+
+- Added `mppi_ardupilot/global_planner.py`: 2.5D A* searches an 8-connected
+  XY lattice at the commanded flight altitude, inflates SDF box/cylinder
+  footprints, prevents diagonal corner cutting and simplifies the result with
+  collision-checked line of sight.
+- Added CLI options `--global-planner astar`, `--global-map-sdf`,
+  `--astar-resolution`, `--astar-clearance` and `--astar-padding`.
+- Initial planning starts only after fresh odometry is available. RViz goals
+  trigger replanning from the current state; failure sends zero velocity and
+  does not fall back to a straight reference.
+- Parser is fail-closed for unsupported Fuel/scenery includes, meshes and
+  rolled/pitched primitives. Current A* is a known-map 2.5D implementation,
+  not online mapping or full 3D kinodynamic planning.
+- Exact offline test command:
+
+  ```bash
+  /opt/miniconda3/envs/ardupilot-rviz/bin/python -m unittest discover -s tests
+  ```
+
+  Result: 48/48 passed. The three challenge SDFs also passed deterministic
+  closed-loop `--sim-test` with seed 7 and A* clearance 2.6 m.
+- Exact live controller command after Gazebo slalom + SITL takeoff:
+
+  ```bash
+  MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
+    scripts/mppi_velocity_avoidance.py \
+    --planner mppi \
+    --config config/experiments/mppi_slalom_demo_smooth.yaml \
+    --mav tcp:127.0.0.1:5762 \
+    --global-planner astar \
+    --global-map-sdf worlds/iris_mppi_slalom.sdf \
+    --goal '30,0,20' \
+    --astar-clearance 2.6 \
+    --seed 7 \
+    --diag-every 10 \
+    --diag-jsonl output/log/slalom_astar_live_seed7.jsonl \
+    --exit-on-goal
+  ```
+
+  Measured Gazebo/SITL headless result: reached in 307 cycles with 0.274 m
+  terminal error; minimum point-cloud clearance 2.402 m; compute
+  mean/p95/worst 10.53/11.54/41.11 ms; zero deadline miss, hard-brake and
+  collision-cost cycle. ArduPilot commit: `f808f78c`.
+- Not run: A* narrow-gate/right-angle live, RViz-click A* live, Fuel/mesh
+  warehouse A*, edge computer and hardware.
+
 Date: 2026-09-11
 
 ## Smooth fixed-route demo profile (2026-09-13)
@@ -301,3 +348,14 @@ Gazebo/SITL validation.
 - Edge compute distribution and deadline misses.
 
 These remain `SOURCE_TODO`/pending in `docs/SOURCE_AUDIT.md`; no result was inferred.
+
+## 2026-09-14 — Mentor industrial-yard/global-planner report update
+
+- Rewrote `reports/mppi_weekly_report_vi.tex`; rebuilt the four-page `output/pdf/mppi_weekly_report_vi.pdf`. Retained author Nguyễn Thanh Lâm and supplied video/GitHub links; video is not represented as evidence for all new runs.
+- Explained synthetic industrial geometry, known-SDF 2.5D A*, inflation/lattice/segment checking, reference smoothing, velocity MPPI costs and runtime flow. Distinguished finite collision penalty from hard rejection and graph search from grid-map representation.
+- Included recorded 10-run speed ablation (0.4/0.6/0.8/1.0/1.2 m/s, seeds 7/17). Kept two stale-odometry aborts at 0.4; identified partial metrics, unrandomized runtime load, center clearance and arrival-radius limitations. No additional measurements were generated.
+- Added primary sources for Fast-Planner/topological planning, EGO-Planner, OMPL, sampling-based optimal planning and polygon visibility roadmaps. Pinned external README/source commits in bibliography/audit. Clarified that EGO's ESDF-free design still uses occupancy/A* in inspected source.
+- Proposed visibility graph + Dijkstra for fixed-altitude geometry, separate smoothing/time allocation, then sparse 3D roadmap if needed. All are engineering proposals, not implemented or validated replacements.
+- Tests/simulation in this editing session: NOT RUN; prior 52-test result is explicitly historical. No Gazebo/SITL/RViz process or controller/configuration changed while user recorded video.
+- Document verification executed: BibTeX; repeated XeLaTeX passes with `-interaction=nonstopmode -halt-on-error -output-directory=../tmp/pdfs/mentor_industrial_20260914`; `pdftoppm -scale-to 1200 -png`; visual inspection of all four final pages. Final log has no undefined references or overfull boxes.
+- Unresolved: root cause of stale odometry, GUI-load repeatability, settling/jerk/footprint validation, randomized multi-map trials, edge/hardware performance and proposed-planner benchmarks.

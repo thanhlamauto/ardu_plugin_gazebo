@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "source": "results/yard_experiment7a_20260916/solves.csv",
+  "scope": "feasible control snapshots only",
+  "by_sample_count": [
+    {
+      "K": 80,
+      "solves": 160,
+      "ess_safe": {
+        "count": 160,
+        "min": 1.0,
+        "median": 1.0,
+        "p95": 1.0525229243398617,
+        "max": 3.0
+      },
+      "delta_j_safe_over_lambda": {
+        "count": 160,
+        "min": 0.0,
+        "median": 142.63768016864196,
+        "p95": 1840.7883450165973,
+        "max": 3129.671308361023
+      },
+      "best_stop_clearance_m": {
+        "count": 160,
+        "min": 1.5488782447734557,
+        "median": 2.6296317207890363,
+        "p95": 4.975069072667131,
+        "max": 4.975069072667131
+      },
+      "best_collision_clearance_m": {
+        "count": 160,
+        "min": 2.089211660015727,
+        "median": 3.5194046750456316,
+        "p95": 5.026971124343287,
+        "max": 5.026971124343287
+      }
+    },
+    {
+      "K": 160,
+      "solves": 160,
+      "ess_safe": {
+        "count": 160,
+        "min": 1.0,
+        "median": 1.0,
+        "p95": 1.417348745539404,
+        "max": 3.71754818086988
+      },
+      "delta_j_safe_over_lambda": {
+        "count": 160,
+        "min": 0.26913421664357884,
+        "median": 83.50445184214914,
+        "p95": 1213.4919759627373,
+        "max": 2034.374680491368
+      },
+      "best_stop_clearance_m": {
+        "count": 160,
+        "min": 1.539461925237498,
+        "median": 2.832362378619547,
+        "p95": 4.973274643758031,
+        "max": 4.975069072667131
+      },
+      "best_collision_clearance_m": {
+        "count": 160,
+        "min": 2.122843913330757,
+        "median": 3.3853655418988344,
+        "p95": 5.026971124343287,
+        "max": 5.026971124343287
+      }
+    },
+    {
+      "K": 320,
+      "solves": 160,
+      "ess_safe": {
+        "count": 160,
+        "min": 1.0,
+        "median": 1.0,
+        "p95": 1.0721667987729964,
+        "max": 1.5264349625952407
+      },
+      "delta_j_safe_over_lambda": {
+        "count": 160,
+        "min": 1.46195585764508,
+        "median": 72.18007699301234,
+        "p95": 897.6563306740281,
+        "max": 1807.1687588062487
+      },
+      "best_stop_clearance_m": {
+        "count": 160,
+        "min": 1.5359681433839316,
+        "median": 2.7779119606595346,
+        "p95": 4.961650120994043,
+        "max": 4.975069072667131
+      },
+      "best_collision_clearance_m": {
+        "count": 160,
+        "min": 2.190788827023717,
+        "median": 3.3850145135300083,
+        "p95": 5.026971124343287,
+        "max": 5.026973719483682
+      }
+    },
+    {
+      "K": 640,
+      "solves": 160,
+      "ess_safe": {
+        "count": 160,
+        "min": 1.0,
+        "median": 1.0,
+        "p95": 1.0562591770155028,
+        "max": 2.430137090996308
+      },
+      "delta_j_safe_over_lambda": {
+        "count": 160,
+        "min": 0.11106614609161625,
+        "median": 60.995570209574,
+        "p95": 674.2539994989056,
+        "max": 1431.4510752206697
+      },
+      "best_stop_clearance_m": {
+        "count": 160,
+        "min": 1.5353270306317057,
+        "median": 2.71382579189972,
+        "p95": 4.9538599021172125,
+        "max": 4.975069072667131
+      },
+      "best_collision_clearance_m": {
+        "count": 160,
+        "min": 2.0794664896878503,
+        "median": 3.3723232360242656,
+        "p95": 5.026971124343287,
+        "max": 5.026972643204846
+      }
+    }
+  ],
+  "interpretation": [
+    "ESS_safe is approximately one because feasible cost gaps are very large relative to lambda=1.",
+    "Changing lambda cannot create a feasible trajectory in failure snapshots where N_safe is zero.",
+    "Cost-component attribution is required before changing lambda."
+  ]
+}

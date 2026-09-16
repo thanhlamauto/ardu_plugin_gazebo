@@ -34,10 +34,14 @@ from .lidar_preprocess import (
 )
 from .mavlink_interface import ArduPilotInterface
 from .mppi_controller import MPPIConfig, QuadMPPI
+from .braking import stopping_segment_clearance, validate_stopping_states
+from .trajectory_validation import validate_trajectory
+from .trajectory_safety import single_safety_diagnostics
 
 DEFAULT_GOAL = "16,10,20;30,0,20"
 SAFE_HOLD_EVENTS = frozenset(
-    ("hold-stale", "hold-brake", "hold-timeout", "hold-await-goal", "reached")
+    ("hold-stale", "hold-brake", "hold-timeout", "hold-invalid-trajectory",
+     "hold-invalid-stopping-trajectory", "hold-await-goal", "reached")
 )
 
 
@@ -52,6 +56,7 @@ class PlannerState:
     omega_body_flu: Optional[np.ndarray] = None
     source_age_s: float = 0.0
     source_timestamp_s: Optional[float] = None
+    simulation_timestamp_s: Optional[float] = None
 
 
 @dataclass
@@ -136,6 +141,7 @@ class LocalPlannerNode:
         hard_brake_release_m: Optional[float] = None,
         hard_brake_delay_s: float = 0.25,
         brake_accel_m_s2: float = 1.5,
+        brake_swept_path: bool = False,
         recovery_speed_m_s: float = 0.4,
         planner_timeout_ms: Optional[float] = None,
         command_conditioner: Optional[VelocityCommandConditioner] = None,
@@ -157,6 +163,7 @@ class LocalPlannerNode:
         )
         self.hard_brake_delay_s = hard_brake_delay_s
         self.brake_accel_m_s2 = brake_accel_m_s2
+        self.brake_swept_path = brake_swept_path
         self.recovery_speed_m_s = recovery_speed_m_s
         if self.hard_brake_m < 0 or self.hard_brake_release_m < self.hard_brake_m:
             raise ValueError("hard-brake release must be >= trigger distance")
@@ -176,6 +183,15 @@ class LocalPlannerNode:
         self.reached = False
         self.recovery_active = False
         self._recovery_has_braked = False
+        if (hasattr(planner, 'configure_trajectory_safety')
+                and getattr(getattr(planner, 'cfg', None),
+                            'validate_stopping_trajectory', False)):
+            planner.configure_trajectory_safety(
+                collision_radius=planner.cfg.collision_radius_m,
+                acceleration=self.brake_accel_m_s2,
+                delay=self.hard_brake_delay_s,
+                stopping_clearance=self.hard_brake_m,
+                uncertainty=planner.cfg.stopping_guard_uncertainty_m)
         planner.update_goal(self.waypoints[0])
         if self.reference_path is not None and hasattr(planner, "update_reference_path"):
             planner.update_reference_path(self.reference_path)
@@ -223,6 +239,8 @@ class LocalPlannerNode:
             if self.command_conditioner is not None:
                 self.command_conditioner.reset()
             return PlannerStep(np.zeros(4), float("inf"), float("inf"), "hold-stale")
+        if hasattr(self.planner, 'observe_motion'):
+            self.planner.observe_motion(state.vel, state.simulation_timestamp_s)
         if hasattr(self.planner, "update_occupancy"):
             self.planner.update_occupancy(state.pos, obstacles)
         self.planner.update_obstacles(obstacles)
@@ -260,7 +278,21 @@ class LocalPlannerNode:
                 closing_speed * self.hard_brake_delay_s
                 + closing_speed**2 / (2.0 * self.brake_accel_m_s2)
             )
-        if self.recovery_active and nearest >= self.hard_brake_release_m:
+        release_distance = nearest
+        brake_required = nearest < safety_trigger_m
+        geometry_diag = {}
+        if self.brake_swept_path:
+            swept_distance, threat_point, stopping_distance = stopping_segment_clearance(
+                state.pos, state.vel, [] if obstacles is None else obstacles,
+                self.brake_accel_m_s2, self.hard_brake_delay_s)
+            release_distance = swept_distance
+            brake_required = swept_distance < self.hard_brake_m
+            if threat_point is not None:
+                nearest_point = threat_point
+            geometry_diag = {'brake_geometry': 'stopping-segment',
+                             'stopping_distance_m': stopping_distance,
+                             'swept_clearance_m': swept_distance}
+        if self.recovery_active and release_distance >= self.hard_brake_release_m:
             self.recovery_active = False
             self._recovery_has_braked = False
             if self.command_conditioner is not None:
@@ -268,7 +300,7 @@ class LocalPlannerNode:
             if hasattr(self.planner, "reset_applied_control"):
                 self.planner.reset_applied_control()
         if self.hard_brake_m > 0 and (
-            self.recovery_active or nearest < safety_trigger_m
+            self.recovery_active or brake_required
         ):
             newly_triggered = not self.recovery_active
             self.recovery_active = True
@@ -280,6 +312,7 @@ class LocalPlannerNode:
                 "closing_speed_m_s": closing_speed,
                 "safety_trigger_m": safety_trigger_m,
                 "hard_brake_release_m": self.hard_brake_release_m,
+                **geometry_diag,
             }
             horizontal_speed = float(np.linalg.norm(state.vel[0:2]))
             if newly_triggered or horizontal_speed > 0.25 or nearest_point is None:
@@ -326,19 +359,72 @@ class LocalPlannerNode:
                 u[0:3] = goal_error * (speed_cap / max(goal_dist, 1e-9))
             if self.command_conditioner is not None:
                 u = self.command_conditioner.apply(u, state.vel)
+            if getattr(getattr(self.planner, 'cfg', None), 'validate_final_trajectory', False):
+                check_stopping = getattr(self.planner.cfg, 'validate_stopping_trajectory', False)
+                states = self.planner.predict_states(first_applied=u) if check_stopping else None
+                checked = states[:, :3] if check_stopping else self.planner.predict_trajectory(first_applied=u)
+                geometry = getattr(self.planner, 'known_geometry', None)
+                if check_stopping:
+                    validation = single_safety_diagnostics(
+                        self.planner._evaluate_safety_states(states, detailed=True))
+                else:
+                    validation = validate_trajectory(
+                        checked, [] if obstacles is None else obstacles,
+                        self.planner.cfg.collision_radius_m)
+                    if geometry is not None:
+                        map_check = geometry.validate(checked, self.planner.cfg.collision_radius_m)
+                        validation['known_map'] = map_check
+                        validation['valid'] = validation['valid'] and map_check['valid']
+                        if not map_check['valid']:
+                            validation['reason'] = 'known_map_collision'
+                self._last_final_validation = validation
+                stopping_check = validation.get('stopping') if check_stopping else None
+                if (not validation['valid'] and check_stopping
+                        and getattr(self.planner.cfg, 'feasible_sample_weighting', False)):
+                    fallback = self.planner.select_best_feasible_sample()
+                    if fallback is not None:
+                        raw_u, u, _ = fallback
+                        if self.command_conditioner is not None:
+                            # The sampled first applied action already passed
+                            # the same conditioner inside the rollout.
+                            self.command_conditioner.previous = u.copy()
+                        states = self.planner.predict_states(first_applied=u)
+                        checked = states[:, :3]
+                        validation = single_safety_diagnostics(
+                            self.planner._evaluate_safety_states(states, detailed=True))
+                        stopping_check = validation['stopping']
+                        self._last_final_validation = validation
+                if not validation['valid']:
+                    diagnostics = self.planner.optimizer_diagnostics()
+                    diagnostics.update(raw_control=raw_u.tolist(), conditioned_control=np.asarray(u).tolist(),
+                        final_trajectory_validation=validation, rejected_trajectory_enu=checked.tolist())
+                    if self.command_conditioner is not None:
+                        # Match the zero actually sent, not measured velocity.
+                        self.command_conditioner.previous = np.zeros(4)
+                    self.planner.reject_nominal()
+                    hold_event = ('hold-invalid-stopping-trajectory'
+                                  if stopping_check is not None and not stopping_check['valid']
+                                  else 'hold-invalid-trajectory')
+                    return PlannerStep(np.zeros(4), nearest, goal_dist, hold_event, diagnostics)
             if hasattr(self.planner, "accept_applied_control"):
                 self.planner.accept_applied_control(u)
         diagnostics = self.planner.optimizer_diagnostics()
         if not getattr(self.planner, "requires_rigid_body_state", False):
             diagnostics["raw_control"] = raw_u.tolist()
             diagnostics["conditioned_control"] = np.asarray(u).tolist()
+            if getattr(getattr(self.planner, 'cfg', None), 'validate_final_trajectory', False):
+                diagnostics['final_trajectory_validation'] = self._last_final_validation
         if (
             self.planner_timeout_ms is not None
             and float(diagnostics.get("compute_ms", 0.0)) > self.planner_timeout_ms
         ):
             diagnostics["reason"] = "planner deadline exceeded"
             if self.command_conditioner is not None:
-                self.command_conditioner.reset()
+                self.command_conditioner.previous = np.zeros(4)
+            if hasattr(self.planner, 'reject_nominal'):
+                # The command computed above is not sent. Keep rollout memory
+                # aligned with the actual zero safety command.
+                self.planner.reject_nominal()
             return PlannerStep(np.zeros(4), nearest, goal_dist, "hold-timeout", diagnostics)
         return PlannerStep(u, nearest, goal_dist, event, diagnostics)
 
@@ -407,6 +493,9 @@ def config_from_dict(d: dict) -> MPPIConfig:
         "w_goal", "w_terminal", "w_obstacle", "w_u", "w_du", "w_yaw",
         "w_path", "path_scale_m", "w_reference_velocity", "reference_speed_m_s",
         "reference_corner_radius_m", "reference_corner_samples",
+        "reference_warm_start", "brake_swept_path",
+        "validate_final_trajectory", "validate_stopping_trajectory",
+        "feasible_sample_weighting", "stopping_guard_uncertainty_m",
         "cost_profile", "w_collision", "collision_radius_m", "paper_r_u",
         "paper_r_delta_u",
         "command_alpha", "max_accel_xy", "max_accel_z", "max_yaw_accel",
@@ -588,14 +677,32 @@ def run_sim_test(args) -> None:
     (box 12x2.5x6, yaw 1.57); copter ở 20 m phải vòng qua một đầu stack.
     """
     waypoints = args.goal
+    obstacle_points = None
+    if getattr(args, "global_planner", "manual") == "astar":
+        result = args.global_planner_instance.plan(
+            np.array([0.0, 0.0, 20.0]), waypoints[-1]
+        )
+        args.global_path = [point.copy() for point in result.path_enu]
+        obstacle_points = args.global_planner_instance.obstacle_points_enu(20.0)
+        print(
+            f"[astar] offline path: {result.raw_grid_points} grid points -> "
+            f"{len(result.path_enu)} reference points, length={result.path_length_m:.2f}m, "
+            f"expanded={result.expanded_nodes}, active_obstacles={result.active_obstacles}"
+        )
     route = " -> ".join(f"({w[0]:g},{w[1]:g},{w[2]:g})" for w in waypoints)
-    print(f"[sim-test] start (0,0,20) yaw=0, route {route}, stack x=12, y in [-6,6]")
-    planner = args.planner_factory(args.cfg)
-    wall = np.array(
-        [[12.0, y, z] for y in np.linspace(-6.0, 6.0, 13)
-         for z in np.linspace(0.0, 24.0, 13)]
+    environment = (
+        f"static map {args.global_map_sdf}"
+        if getattr(args, "global_planner", "manual") == "astar"
+        else "stack x=12, y in [-6,6]"
     )
-    planner.update_obstacles(wall)
+    print(f"[sim-test] start (0,0,20) yaw=0, route {route}, {environment}")
+    planner = args.planner_factory(args.cfg)
+    if obstacle_points is None:
+        obstacle_points = np.array(
+            [[12.0, y, z] for y in np.linspace(-6.0, 6.0, 13)
+             for z in np.linspace(0.0, 24.0, 13)]
+        )
+    planner.update_obstacles(obstacle_points)
     pos = np.array([0.0, 0.0, 20.0])
     vel = np.zeros(3)
     yaw = 0.0
@@ -616,12 +723,12 @@ def run_sim_test(args) -> None:
     )
     for step in range(600):
         st = PlannerState(pos=pos.copy(), vel=vel.copy(), yaw=yaw)
-        out = node.step(st, wall)
+        out = node.step(st, obstacle_points)
         u = out.u
         vel = vel + (u[0:3] - vel) * (args.cfg.dt / args.cfg.tau)
         pos = pos + vel * args.cfg.dt
         yaw = yaw + float(u[3]) * args.cfg.dt
-        clearance = float(np.linalg.norm(wall - pos, axis=1).min())
+        clearance = float(np.linalg.norm(obstacle_points - pos, axis=1).min())
         min_clearance = min(min_clearance, clearance)
         if out.event == "waypoint":
             print(f"[sim-test] t={step * args.cfg.dt:4.1f}s waypoint {node.wp_index}: "
@@ -753,6 +860,7 @@ def run(args) -> None:
         hard_brake_release_m=args.hard_brake_release_m,
         hard_brake_delay_s=args.hard_brake_delay_s,
         brake_accel_m_s2=cfg.max_accel_xy,
+        brake_swept_path=cfg.brake_swept_path,
         recovery_speed_m_s=args.recovery_speed_m_s,
         reference_path=args.global_path,
         planner_timeout_ms=args.planner_timeout_ms,
@@ -810,12 +918,16 @@ def run(args) -> None:
         print(f"[path] tracking {len(args.global_path)} reference points, "
               f"scale={cfg.path_scale_m:g}m")
     elif cfg.w_path > 0 and args.rviz_goal_topic:
-        print("[path] chưa có reference; mỗi RViz click sẽ tạo path current->goal")
+        if getattr(args, "global_planner", "manual") == "astar":
+            print("[path] chưa có reference; mỗi RViz click sẽ chạy A* từ current tới goal")
+        else:
+            print("[path] chưa có reference; mỗi RViz click sẽ tạo path current->goal")
 
     pos_prev: Optional[np.ndarray] = None
     pos_prev_stamp: Optional[float] = None
     vel_est = np.zeros(3)
     cycle = 0
+    previous_no_safe = False
     next_tick = time.monotonic()
     send_zero = np.zeros(4)
     timing = TimingWindow(deadline_ms=period * 1000.0, window=args.benchmark_window)
@@ -823,6 +935,10 @@ def run(args) -> None:
     awaiting_rviz_goal = bool(args.rviz_goal_topic)
     goal_source = "rviz" if awaiting_rviz_goal else "cli"
     goal_revision = 0
+    initial_astar_pending = bool(
+        getattr(args, "global_planner", "manual") == "astar"
+        and not args.rviz_goal_topic
+    )
     diag_file = None
     if args.diag_jsonl:
         diag_path = Path(args.diag_jsonl)
@@ -873,6 +989,17 @@ def run(args) -> None:
         vn, ve, vd = enu_to_ned_vel(u[0:3])
         mav.send_velocity_ned(vn, ve, vd, yaw_rate=yaw_enu_to_ned_rate(float(u[3])))
 
+    def apply_astar_route(start: np.ndarray, goal: np.ndarray, source: str) -> None:
+        """Plan and atomically install a known-map global reference."""
+        result = args.global_planner_instance.plan(start, goal)
+        path = [point.copy() for point in result.path_enu]
+        node.replace_route([goal], reference_path=path)
+        print(
+            f"[astar] {source}: {result.raw_grid_points} grid points -> "
+            f"{len(path)} reference points, length={result.path_length_m:.2f}m, "
+            f"expanded={result.expanded_nodes}, active_obstacles={result.active_obstacles}"
+        )
+
     try:
         while True:
             now = time.monotonic()
@@ -883,6 +1010,8 @@ def run(args) -> None:
             else:
                 next_tick = now
 
+            cycle_started = time.monotonic()
+
             if traj_pub is not None:
                 traj_pub.spin_once()
                 goal_error = traj_pub.take_goal_error()
@@ -892,6 +1021,10 @@ def run(args) -> None:
             # 1. state: odom (SITL ground truth) hoặc MAVLink telemetry
             state: Optional[PlannerState] = None
             pos_enu = rot = yaw_ned = pos_ned = None
+            # Drain inbound telemetry even when Gazebo supplies state. Leaving
+            # TCP unread can backpressure SITL; bound work per control cycle.
+            if mav is not None:
+                mav.spin_once(timeout=0.0)
             if use_odom:
                 odom_payload, odom_age = latest_odom.get()
                 if odom_payload is None or odom_age > args.stale_after_s:
@@ -906,7 +1039,9 @@ def run(args) -> None:
                 odom.ParseFromString(odom_payload)
                 pos_enu = np.array([odom.pose.position.x, odom.pose.position.y,
                                     odom.pose.position.z])
-                odom_sample_stamp = time.monotonic() - float(odom_age)
+                # Velocity is metres / simulation second, not metres / wall
+                # second. Keep receipt-age checks on monotonic wall time.
+                odom_sample_stamp = odom.header.stamp.sec + odom.header.stamp.nsec * 1e-9
                 q = odom.pose.orientation
                 rot = quat_to_rot(q.x, q.y, q.z, q.w)
                 yaw = yaw_enu_from_rot(rot)
@@ -932,9 +1067,9 @@ def run(args) -> None:
                     ),
                     source_age_s=float(odom_age),
                     source_timestamp_s=time.time() - float(odom_age),
+                    simulation_timestamp_s=float(odom_sample_stamp),
                 )
             else:
-                mav.spin_once(timeout=0.0)
                 got = mav.get_state(max_age_s=args.stale_after_s)
                 if got is None:
                     print("[mppi] chờ MAVLink LOCAL_POSITION_NED + ATTITUDE...")
@@ -949,6 +1084,14 @@ def run(args) -> None:
                                      source_age_s=mav.get_state_age_s(),
                                      source_timestamp_s=time.time() - mav.get_state_age_s())
 
+            if initial_astar_pending:
+                try:
+                    apply_astar_route(state.pos, args.goal[-1], "initial plan")
+                except (RuntimeError, ValueError) as exc:
+                    send_u(send_zero, safe_hold=True)
+                    raise SystemExit(f"[astar] lập global path thất bại; giữ zero velocity: {exc}") from exc
+                initial_astar_pending = False
+
             if traj_pub is not None and args.rviz_goal_topic:
                 pending_goal = traj_pub.take_goal()
                 if pending_goal is not None:
@@ -956,10 +1099,19 @@ def run(args) -> None:
                     goal = resolve_rviz_goal(
                         clicked_xyz, state.pos, args.rviz_goal_altitude
                     )
-                    reference = None
-                    if np.linalg.norm(goal - state.pos) > 1e-6:
-                        reference = [state.pos.copy(), goal.copy()]
-                    node.replace_route([goal], reference_path=reference)
+                    if getattr(args, "global_planner", "manual") == "astar":
+                        try:
+                            apply_astar_route(state.pos, goal, f"RViz goal#{goal_revision}")
+                        except (RuntimeError, ValueError) as exc:
+                            awaiting_rviz_goal = True
+                            send_u(send_zero, safe_hold=True)
+                            print(f"[astar] từ chối RViz goal#{goal_revision}: {exc}")
+                            continue
+                    else:
+                        reference = None
+                        if np.linalg.norm(goal - state.pos) > 1e-6:
+                            reference = [state.pos.copy(), goal.copy()]
+                        node.replace_route([goal], reference_path=reference)
                     awaiting_rviz_goal = False
                     goal_source = "rviz"
                     goal_announced = False
@@ -1008,6 +1160,11 @@ def run(args) -> None:
                 if cycle % args.diag_every == 0:
                     print(f"[rviz] chờ goal trên {args.rviz_goal_topic}; giữ velocity zero")
             else:
+                capture_events = bool(getattr(args, 'debug_snapshot_events', False))
+                if not rigid_mode and (capture_events or
+                        getattr(args, 'debug_snapshot_cycle', None) == cycle + 1):
+                    planner._capture_rng = True
+                    planner._rng_state_before_command = None
                 out = node.step(state, obstacles)
                 just_reached = out.event == "reached" and not goal_announced
                 if out.event == "waypoint":
@@ -1035,6 +1192,57 @@ def run(args) -> None:
                     planner.sampled_trajectories(args.rviz_top_k),
                 )
             cycle += 1
+            diagnostics_now = out.diagnostics or {}
+            no_safe_now = diagnostics_now.get('feasible_sample_count') == 0
+            stride = max(1, int(getattr(args, 'debug_control_stride', 25)))
+            event_snapshot = (bool(getattr(args, 'debug_snapshot_events', False))
+                              and (no_safe_now or previous_no_safe or cycle % stride == 0))
+            snapshot_cycle = (not rigid_mode and (event_snapshot or
+                              getattr(args, 'debug_snapshot_cycle', None) == cycle))
+            if (snapshot_cycle
+                    and getattr(planner, '_rng_state_before_command', None) is not None
+                    and hasattr(planner.ctrl, 'perturbed_action')):
+                snapshot_dir = (Path(args.diag_jsonl).parent if args.diag_jsonl
+                                else Path('output/log'))
+                snapshot_dir.mkdir(parents=True, exist_ok=True)
+                dest = snapshot_dir / f'mppi_sample_pool_cycle{cycle}.npz'
+                ctrl = planner.ctrl
+                np.savez_compressed(
+                    dest, raw_actions=ctrl.perturbed_action.detach().cpu().numpy(),
+                    predicted_states=ctrl.states.detach().cpu().numpy(),
+                    conditioned_sample_actions=ctrl.states[..., 7:11].detach().cpu().numpy(),
+                    total_sample_cost=ctrl.cost_total.detach().cpu().numpy(),
+                    normalized_weights=ctrl.omega.detach().cpu().numpy(),
+                    sample_feasible_mask=(np.ones(len(ctrl.cost_total), dtype=bool)
+                        if getattr(planner, '_last_sample_feasible_mask', None) is None
+                        else planner._last_sample_feasible_mask.detach().cpu().numpy()),
+                    rng_state_before=planner._rng_state_before_command.cpu().numpy(),
+                    nominal_actions_before=planner._nominal_before_command.detach().cpu().numpy(),
+                    initial_state=planner._last_state_np, obstacle_cloud=np.asarray(
+                        [] if obstacles is None else obstacles).reshape(-1, 3),
+                    reference_path_enu=(np.zeros((0, 3)) if planner.reference_path is None
+                                        else planner.reference_path.detach().cpu().numpy()),
+                    goal_enu=planner.goal.detach().cpu().numpy(),
+                    nominal_actions=ctrl.U.detach().cpu().numpy(),
+                    conditioned_nominal=(out.diagnostics or {}).get('conditioned_control', np.zeros(4)),
+                    sent_command=out.u, event=out.event or 'command',
+                    lambda_value=planner.cfg.lambda_,
+                    cycle=np.asarray(cycle), path_progress_m=np.asarray(
+                        getattr(planner, '_path_progress_m', 0.0)),
+                    config_json=np.asarray(json.dumps(planner.cfg.__dict__, sort_keys=True)),
+                    runtime_json=np.asarray(json.dumps({
+                        'hz': args.hz, 'hard_brake_m': args.hard_brake_m,
+                        'hard_brake_delay_s': args.hard_brake_delay_s,
+                        'planner_timeout_ms': args.planner_timeout_ms,
+                        'stale_after_s': args.stale_after_s,
+                    }, sort_keys=True)),
+                    known_map_sha256=np.asarray('' if planner.known_geometry is None
+                        else planner.known_geometry.sha256),
+                )
+                print(f'[mppi] saved sample pool: {dest}')
+            if snapshot_cycle and not getattr(args, 'debug_snapshot_events', False):
+                planner._capture_rng = False
+            previous_no_safe = bool(no_safe_now)
             u = out.u
             print_cycle = out.event != "reached" or cycle % args.diag_every == 0 or just_reached
             if rigid_mode and print_cycle:
@@ -1086,6 +1294,10 @@ def run(args) -> None:
                     "random_seed": int(cfg.seed),
                     "state_source": args.state_source,
                     "state_source_timestamp_s": state.source_timestamp_s,
+                    "state_simulation_timestamp_s": state.simulation_timestamp_s,
+                    "state_age_at_send_s": state.source_age_s + time.monotonic() - cycle_started,
+                    "cycle_to_send_ms": (time.monotonic() - cycle_started) * 1000.0,
+                    "cycle_deadline_miss": time.monotonic() - cycle_started > period,
                     "state_age_s": state.source_age_s,
                     "position_enu": state.pos.tolist(),
                     "velocity_enu": state.vel.tolist(),

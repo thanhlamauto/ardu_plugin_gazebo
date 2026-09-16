@@ -1,0 +1,51 @@
+# Model time constant sensitivity: tau 1.5s; not system-identified.
+# MPPI collision cost radius 2.5m; otherwise balanced candidate.
+# No retiming; emergency brake and actuation limits unchanged.
+# SITL: fixed 10 m/s path-progress reference, no external speed retiming.
+# MPPI optimizes tracking and obstacle avoidance; conditioning/brake stay active.
+# Reference lateral acceleration budget is inactive without retiming.
+# Not a forced 10 m/s MAVLink command or initial physical velocity.
+cost_profile: paper
+hz: 10.0
+dt: 0.1
+tau: 1.5
+horizon: 40
+samples: 500
+lambda: 100.0
+vmax: 10.0
+vzmax: 0.6
+reference_speed_m_s: 10.0
+reference_accel_m_s2: 0.0
+reference_lateral_accel_m_s2: 1.0
+reference_corner_radius_m: 1.5
+reference_corner_samples: 12
+w_path: 40.0
+path_scale_m: 1.0
+w_reference_velocity: 4.0
+w_terminal: 0.0
+w_collision: 1000000.0
+collision_radius_m: 2.5
+w_goal: 0.0
+w_obstacle: 0.0
+w_u: 0.0
+w_du: 0.0
+w_yaw: 0.0
+paper_r_u: [0.01, 0.05, 0.05, 0.10]
+paper_r_delta_u: [100.0, 100.0, 50.0, 20.0]
+command_alpha: 0.30
+max_accel_xy: 3.0
+max_accel_z: 0.4
+max_yaw_accel: 0.6
+goal_slowdown_radius: 0.0
+goal_radius: 0.35
+wp_radius: 1.25
+hard_brake_m: 1.5
+hard_brake_release_m: 2.0
+hard_brake_delay_s: 0.25
+recovery_speed_m_s: 0.25
+stale_after_s: 1.0
+planner_timeout_ms: 90.0
+
+reference_warm_start: false
+brake_swept_path: true
+noise_xy: 3.0

@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "source": "output/benchmark/yard_experiment7a_capture_20260916",
+  "snapshots": [
+    {
+      "file": "seed17_failure_first_occurrence_cycle77.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "cycle": 77,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        46.197002938792984,
+        0.21988622761724982,
+        4.922823410026702
+      ],
+      "speed_m_s": 8.514259600019262,
+      "distance_to_first_turn_m": 13.804748379625948,
+      "rejection_recovery": false
+    },
+    {
+      "file": "seed17_failure_after_first_zero_hold_cycle78.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "cycle": 78,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        47.0469628992956,
+        0.19566348263548294,
+        4.917358571959476
+      ],
+      "speed_m_s": 8.425228632519582,
+      "distance_to_first_turn_m": 12.954514824209424,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed17_failure_early_cluster_cycle81.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "early_cluster",
+      "cycle": 81,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        49.49852752321416,
+        0.1554379755954274,
+        4.916988297365909
+      ],
+      "speed_m_s": 7.988307510286273,
+      "distance_to_first_turn_m": 10.502622774571492,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed17_failure_middle_cycle85.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "middle",
+      "cycle": 85,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        52.1340177825284,
+        0.14707661043943057,
+        4.938011710988841
+      ],
+      "speed_m_s": 6.885823177809747,
+      "distance_to_first_turn_m": 7.867357102287764,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed17_failure_nearest_first_turn_cycle112.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "cycle": 112,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        60.028862218846925,
+        -1.197044976607114,
+        4.764349261381883
+      ],
+      "speed_m_s": 2.8046831066376945,
+      "distance_to_first_turn_m": 1.1973928777544545,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed17_failure_before_recovery_cycle117.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "before_recovery",
+      "cycle": 117,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        61.03903828822498,
+        -2.1475330915904416,
+        4.797301250480543
+      ],
+      "speed_m_s": 2.808447343441383,
+      "distance_to_first_turn_m": 2.385686262666048,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed17_control_control_1_cycle40.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_1",
+      "cycle": 40,
+      "event": "command",
+      "n_safe_original": 70,
+      "position_enu": [
+        13.635963422674752,
+        -0.1157405738069939,
+        5.0761109171374725
+      ],
+      "speed_m_s": 7.698498073086465,
+      "distance_to_first_turn_m": 46.3641810412303,
+      "rejection_recovery": false
+    },
+    {
+      "file": "seed17_control_control_2_cycle60.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_2",
+      "cycle": 60,
+      "event": "command",
+      "n_safe_original": 15,
+      "position_enu": [
+        31.04880806697973,
+        0.1873040937700945,
+        5.063999822589105
+      ],
+      "speed_m_s": 9.10505158837048,
+      "distance_to_first_turn_m": 28.951797822693514,
+      "rejection_recovery": false
+    },
+    {
+      "file": "seed17_control_control_3_cycle160.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_3",
+      "cycle": 160,
+      "event": "command",
+      "n_safe_original": 80,
+      "position_enu": [
+        65.79678153938423,
+        -4.098058996599272,
+        4.96757337818687
+      ],
+      "speed_m_s": 3.1777688385796696,
+      "distance_to_first_turn_m": 7.099067808871388,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed17_control_control_4_cycle180.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_4",
+      "cycle": 180,
+      "event": "command",
+      "n_safe_original": 80,
+      "position_enu": [
+        73.96657453107453,
+        -3.427460256093761,
+        5.045311317775149
+      ],
+      "speed_m_s": 3.5979030721598106,
+      "distance_to_first_turn_m": 14.380983552565588,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_failure_first_occurrence_cycle99.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "cycle": 99,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        58.4227403104425,
+        -0.45088242260313416,
+        5.135137595836497
+      ],
+      "speed_m_s": 3.6584994774461643,
+      "distance_to_first_turn_m": 1.6404399066456212,
+      "rejection_recovery": false
+    },
+    {
+      "file": "seed7_failure_after_first_zero_hold_cycle100.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "cycle": 100,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        58.74662346082724,
+        -0.5905799660103301,
+        5.1260081193327105
+      ],
+      "speed_m_s": 3.5541752122456987,
+      "distance_to_first_turn_m": 1.3855459015137155,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_failure_early_cluster_cycle101.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "early_cluster",
+      "cycle": 101,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        58.951862833833594,
+        -0.6899610316902323,
+        5.119930264528611
+      ],
+      "speed_m_s": 3.4500619409384066,
+      "distance_to_first_turn_m": 1.254845705395844,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_failure_middle_cycle104.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "middle",
+      "cycle": 104,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        59.762722548764486,
+        -1.1880937610548452,
+        5.104454055046352
+      ],
+      "speed_m_s": 3.0955539496072766,
+      "distance_to_first_turn_m": 1.2115557659151597,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_failure_nearest_first_turn_cycle105.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "cycle": 105,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        59.98963761713206,
+        -1.359527031593528,
+        5.103727792678268
+      ],
+      "speed_m_s": 2.938433406949652,
+      "distance_to_first_turn_m": 1.3595665223195998,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_failure_before_recovery_cycle108.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "before_recovery",
+      "cycle": 108,
+      "event": "hold-invalid-stopping-trajectory",
+      "n_safe_original": 0,
+      "position_enu": [
+        60.51994355543738,
+        -1.798318743205394,
+        5.109364049607829
+      ],
+      "speed_m_s": 2.2155497158971516,
+      "distance_to_first_turn_m": 1.871975321152683,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_control_control_1_cycle40.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_1",
+      "cycle": 40,
+      "event": "command",
+      "n_safe_original": 79,
+      "position_enu": [
+        13.918182135320777,
+        0.19583215647591898,
+        4.988972119110984
+      ],
+      "speed_m_s": 7.774041752823158,
+      "distance_to_first_turn_m": 46.0822339730506,
+      "rejection_recovery": false
+    },
+    {
+      "file": "seed7_control_control_2_cycle60.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_2",
+      "cycle": 60,
+      "event": "command",
+      "n_safe_original": 14,
+      "position_enu": [
+        31.406462018570075,
+        0.008824008524147223,
+        5.060694385119144
+      ],
+      "speed_m_s": 9.014385128293084,
+      "distance_to_first_turn_m": 28.593539342980996,
+      "rejection_recovery": false
+    },
+    {
+      "file": "seed7_control_control_3_cycle140.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_3",
+      "cycle": 140,
+      "event": "command",
+      "n_safe_original": 80,
+      "position_enu": [
+        63.81903731832018,
+        -4.23482681878619,
+        4.829511983581843
+      ],
+      "speed_m_s": 2.9759297444077477,
+      "distance_to_first_turn_m": 5.702526126536636,
+      "rejection_recovery": true
+    },
+    {
+      "file": "seed7_control_control_4_cycle160.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_4",
+      "cycle": 160,
+      "event": "command",
+      "n_safe_original": 80,
+      "position_enu": [
+        71.96506240244463,
+        -3.8558062716093415,
+        5.039785924296642
+      ],
+      "speed_m_s": 4.586455346381816,
+      "distance_to_first_turn_m": 12.570996790174437,
+      "rejection_recovery": true
+    }
+  ]
+}

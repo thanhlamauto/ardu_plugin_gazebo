@@ -110,6 +110,10 @@ terrain/
 scripts/__pycache__/
 output/video/
 output/log/
+/output/benchmark/
+/output/plots/
+*.mp4
+*.pcap
 output/pdf/*.log
 output/pdf/*.aux
 output/pdf/*.bbl

@@ -1,0 +1,55 @@
+# Industrial-yard speed ablation. Only reference_speed_m_s varies between runs.
+# Fixed vmax and all other optimizer/safety settings.
+cost_profile: paper
+
+hz: 10.0
+dt: 0.1
+tau: 0.5
+horizon: 30
+samples: 350
+lambda: 100.0
+
+vmax: 1.2
+vzmax: 0.6
+reference_speed_m_s: 0.60
+reference_corner_radius_m: 0.8
+reference_corner_samples: 6
+
+w_path: 400.0
+path_scale_m: 1.0
+w_reference_velocity: 40.0
+w_terminal: 0.0
+w_collision: 1000000.0
+collision_radius_m: 1.5
+
+w_goal: 0.0
+w_obstacle: 0.0
+w_u: 0.0
+w_du: 0.0
+w_yaw: 0.0
+
+paper_r_u: [0.01, 0.05, 0.05, 0.10]
+paper_r_delta_u: [100.0, 100.0, 50.0, 20.0]
+
+command_alpha: 0.30
+max_accel_xy: 0.6
+max_accel_z: 0.4
+max_yaw_accel: 0.6
+
+# Disable direct goal-attraction override: all translation remains MPPI-driven.
+goal_slowdown_radius: 0.0
+goal_approach_gain: 0.5
+goal_min_speed: 0.10
+goal_radius: 0.35
+wp_radius: 1.25
+
+# Entering the optimizer collision radius now also activates the live brake.
+# A* inflates structural footprints by 2.6m. A deterministic test checks the
+# rounded reference against the 1.5m local safety radius. Tracking still needs
+# live validation; a safe reference alone does not guarantee a safe flight.
+hard_brake_m: 1.5
+hard_brake_release_m: 2.0
+hard_brake_delay_s: 0.25
+recovery_speed_m_s: 0.25
+stale_after_s: 1.0
+planner_timeout_ms: 90.0

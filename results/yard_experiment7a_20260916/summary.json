@@ -1,0 +1,800 @@
+{
+  "schema_version": 1,
+  "selection": "output/benchmark/yard_experiment7a_selection_20260916",
+  "sample_counts": [
+    80,
+    160,
+    320,
+    640
+  ],
+  "realizations": 20,
+  "total_solves": 1600,
+  "grouped": [
+    {
+      "kind": "failure",
+      "K": 80,
+      "solves": 240,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0,
+      "median_solve_ms": 52.29775000771042
+    },
+    {
+      "kind": "failure",
+      "K": 160,
+      "solves": 240,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0,
+      "median_solve_ms": 100.01208299945574
+    },
+    {
+      "kind": "failure",
+      "K": 320,
+      "solves": 240,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0,
+      "median_solve_ms": 201.94768700457644
+    },
+    {
+      "kind": "failure",
+      "K": 640,
+      "solves": 240,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0,
+      "median_solve_ms": 411.4948960050242
+    },
+    {
+      "kind": "control",
+      "K": 80,
+      "solves": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 80.0,
+      "median_solve_ms": 59.99412500386825
+    },
+    {
+      "kind": "control",
+      "K": 160,
+      "solves": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 158.0,
+      "median_solve_ms": 108.11900000408059
+    },
+    {
+      "kind": "control",
+      "K": 320,
+      "solves": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 314.5,
+      "median_solve_ms": 211.9790419965284
+    },
+    {
+      "kind": "control",
+      "K": 640,
+      "solves": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 627.0,
+      "median_solve_ms": 423.60808300145436
+    }
+  ],
+  "per_snapshot": [
+    {
+      "file": "seed17_failure_first_occurrence_cycle77.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_first_occurrence_cycle77.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_first_occurrence_cycle77.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_first_occurrence_cycle77.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_after_first_zero_hold_cycle78.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_after_first_zero_hold_cycle78.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_after_first_zero_hold_cycle78.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_after_first_zero_hold_cycle78.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_early_cluster_cycle81.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_early_cluster_cycle81.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_early_cluster_cycle81.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_early_cluster_cycle81.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_middle_cycle85.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "middle",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_middle_cycle85.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "middle",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_middle_cycle85.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "middle",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_middle_cycle85.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "middle",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_nearest_first_turn_cycle112.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_nearest_first_turn_cycle112.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_nearest_first_turn_cycle112.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_nearest_first_turn_cycle112.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_before_recovery_cycle117.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_before_recovery_cycle117.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_before_recovery_cycle117.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_failure_before_recovery_cycle117.npz",
+      "seed": 17,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed17_control_control_1_cycle40.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_1",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 71.0
+    },
+    {
+      "file": "seed17_control_control_1_cycle40.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_1",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 139.0
+    },
+    {
+      "file": "seed17_control_control_1_cycle40.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_1",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 278.0
+    },
+    {
+      "file": "seed17_control_control_1_cycle40.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_1",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 556.5
+    },
+    {
+      "file": "seed17_control_control_2_cycle60.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_2",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 16.0
+    },
+    {
+      "file": "seed17_control_control_2_cycle60.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_2",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 19.0
+    },
+    {
+      "file": "seed17_control_control_2_cycle60.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_2",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 32.0
+    },
+    {
+      "file": "seed17_control_control_2_cycle60.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_2",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 49.0
+    },
+    {
+      "file": "seed17_control_control_3_cycle160.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_3",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 80.0
+    },
+    {
+      "file": "seed17_control_control_3_cycle160.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_3",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 160.0
+    },
+    {
+      "file": "seed17_control_control_3_cycle160.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_3",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 320.0
+    },
+    {
+      "file": "seed17_control_control_3_cycle160.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_3",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 640.0
+    },
+    {
+      "file": "seed17_control_control_4_cycle180.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_4",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 80.0
+    },
+    {
+      "file": "seed17_control_control_4_cycle180.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_4",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 160.0
+    },
+    {
+      "file": "seed17_control_control_4_cycle180.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_4",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 320.0
+    },
+    {
+      "file": "seed17_control_control_4_cycle180.npz",
+      "seed": 17,
+      "kind": "control",
+      "label": "control_4",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 640.0
+    },
+    {
+      "file": "seed7_failure_first_occurrence_cycle99.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_first_occurrence_cycle99.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_first_occurrence_cycle99.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_first_occurrence_cycle99.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "first_occurrence",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_after_first_zero_hold_cycle100.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_after_first_zero_hold_cycle100.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_after_first_zero_hold_cycle100.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_after_first_zero_hold_cycle100.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "after_first_zero_hold",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_early_cluster_cycle101.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_early_cluster_cycle101.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_early_cluster_cycle101.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_early_cluster_cycle101.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "early_cluster",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_middle_cycle104.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "middle",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_middle_cycle104.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "middle",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_middle_cycle104.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "middle",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_middle_cycle104.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "middle",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_nearest_first_turn_cycle105.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_nearest_first_turn_cycle105.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_nearest_first_turn_cycle105.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_nearest_first_turn_cycle105.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "nearest_first_turn",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_before_recovery_cycle108.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 80,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_before_recovery_cycle108.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 160,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_before_recovery_cycle108.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 320,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_failure_before_recovery_cycle108.npz",
+      "seed": 7,
+      "kind": "failure",
+      "label": "before_recovery",
+      "K": 640,
+      "p_hit": 0.0,
+      "median_n_safe": 0.0
+    },
+    {
+      "file": "seed7_control_control_1_cycle40.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_1",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 77.0
+    },
+    {
+      "file": "seed7_control_control_1_cycle40.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_1",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 151.5
+    },
+    {
+      "file": "seed7_control_control_1_cycle40.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_1",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 303.0
+    },
+    {
+      "file": "seed7_control_control_1_cycle40.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_1",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 602.0
+    },
+    {
+      "file": "seed7_control_control_2_cycle60.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_2",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 18.0
+    },
+    {
+      "file": "seed7_control_control_2_cycle60.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_2",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 25.0
+    },
+    {
+      "file": "seed7_control_control_2_cycle60.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_2",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 40.5
+    },
+    {
+      "file": "seed7_control_control_2_cycle60.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_2",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 72.0
+    },
+    {
+      "file": "seed7_control_control_3_cycle140.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_3",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 80.0
+    },
+    {
+      "file": "seed7_control_control_3_cycle140.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_3",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 160.0
+    },
+    {
+      "file": "seed7_control_control_3_cycle140.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_3",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 320.0
+    },
+    {
+      "file": "seed7_control_control_3_cycle140.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_3",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 640.0
+    },
+    {
+      "file": "seed7_control_control_4_cycle160.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_4",
+      "K": 80,
+      "p_hit": 1.0,
+      "median_n_safe": 80.0
+    },
+    {
+      "file": "seed7_control_control_4_cycle160.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_4",
+      "K": 160,
+      "p_hit": 1.0,
+      "median_n_safe": 160.0
+    },
+    {
+      "file": "seed7_control_control_4_cycle160.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_4",
+      "K": 320,
+      "p_hit": 1.0,
+      "median_n_safe": 320.0
+    },
+    {
+      "file": "seed7_control_control_4_cycle160.npz",
+      "seed": 7,
+      "kind": "control",
+      "label": "control_4",
+      "K": 640,
+      "p_hit": 1.0,
+      "median_n_safe": 640.0
+    }
+  ]
+}

@@ -1,0 +1,3537 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.9">
+  <world name="iris_mppi_industrial_yard">
+    <physics name="1ms" type="ignore">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster" />
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu" />
+    <plugin filename="gz-sim-magnetometer-system" name="gz::sim::systems::Magnetometer" />
+    <plugin filename="gz-sim-air-pressure-system" name="gz::sim::systems::AirPressure" />
+    <plugin filename="gz-sim-navsat-system" name="gz::sim::systems::NavSat" />
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>-35.363262</latitude_deg>
+      <longitude_deg>149.165237</longitude_deg>
+      <elevation>584</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <magnetic_field>2.1e-5 5.0e-6 -4.2e-5</magnetic_field>
+    <scene>
+      <ambient>0.45 0.45 0.45 1</ambient>
+      <background>0.08 0.1 0.14 1</background>
+      <grid>true</grid>
+    </scene>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 40 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <direction>-0.4 0.2 -1</direction>
+    </light>
+    <include>
+      <name>iris</name>
+      <pose>0 0 0.35 0 0 0</pose>
+      <uri>model://iris_with_sensor_suite</uri>
+    </include>
+    <model name="asphalt">
+      <static>true</static>
+      <pose>15 0 -0.15 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>65 50 0.3</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>65 50 0.3</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.19 .20 .22 1</ambient>
+            <diffuse>.19 .20 .22 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="north_warehouse">
+      <static>true</static>
+      <pose>15 15 4 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>36 8 8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>36 8 8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.64 .67 .70 1</ambient>
+            <diffuse>.64 .67 .70 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="south_warehouse">
+      <static>true</static>
+      <pose>15 -15 4 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>36 8 8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>36 8 8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.66 .62 .55 1</ambient>
+            <diffuse>.66 .62 .55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="north_loading_door_2">
+      <static>true</static>
+      <pose>2 10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="south_loading_door_2">
+      <static>true</static>
+      <pose>2 -10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="north_loading_door_10">
+      <static>true</static>
+      <pose>10 10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="south_loading_door_10">
+      <static>true</static>
+      <pose>10 -10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="north_loading_door_18">
+      <static>true</static>
+      <pose>18 10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="south_loading_door_18">
+      <static>true</static>
+      <pose>18 -10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="north_loading_door_26">
+      <static>true</static>
+      <pose>26 10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="south_loading_door_26">
+      <static>true</static>
+      <pose>26 -10.995 1.8 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3.5 0.01 3.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.25 .29 .32 1</ambient>
+            <diffuse>.25 .29 .32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="container_0_0">
+      <static>true</static>
+      <pose>9 -2 1.3 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.65 .18 .12 1</ambient>
+            <diffuse>.65 .18 .12 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_0_-1">
+      <static>true</static>
+      <pose>6.2 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_0_1">
+      <static>true</static>
+      <pose>6.2 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_1_-1">
+      <static>true</static>
+      <pose>6.63 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_1_1">
+      <static>true</static>
+      <pose>6.63 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_2_-1">
+      <static>true</static>
+      <pose>7.0600000000000005 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_2_1">
+      <static>true</static>
+      <pose>7.0600000000000005 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_3_-1">
+      <static>true</static>
+      <pose>7.49 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_3_1">
+      <static>true</static>
+      <pose>7.49 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_4_-1">
+      <static>true</static>
+      <pose>7.92 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_4_1">
+      <static>true</static>
+      <pose>7.92 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_5_-1">
+      <static>true</static>
+      <pose>8.35 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_5_1">
+      <static>true</static>
+      <pose>8.35 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_6_-1">
+      <static>true</static>
+      <pose>8.780000000000001 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_6_1">
+      <static>true</static>
+      <pose>8.780000000000001 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_7_-1">
+      <static>true</static>
+      <pose>9.21 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_7_1">
+      <static>true</static>
+      <pose>9.21 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_8_-1">
+      <static>true</static>
+      <pose>9.64 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_8_1">
+      <static>true</static>
+      <pose>9.64 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_9_-1">
+      <static>true</static>
+      <pose>10.07 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_9_1">
+      <static>true</static>
+      <pose>10.07 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_10_-1">
+      <static>true</static>
+      <pose>10.5 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_10_1">
+      <static>true</static>
+      <pose>10.5 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_11_-1">
+      <static>true</static>
+      <pose>10.93 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_11_1">
+      <static>true</static>
+      <pose>10.93 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_12_-1">
+      <static>true</static>
+      <pose>11.36 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_12_1">
+      <static>true</static>
+      <pose>11.36 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_13_-1">
+      <static>true</static>
+      <pose>11.79 -3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_0_13_1">
+      <static>true</static>
+      <pose>11.79 -0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="container_0_1">
+      <static>true</static>
+      <pose>9 -2 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.65 .18 .12 1</ambient>
+            <diffuse>.65 .18 .12 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_0_-1">
+      <static>true</static>
+      <pose>6.2 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_0_1">
+      <static>true</static>
+      <pose>6.2 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_1_-1">
+      <static>true</static>
+      <pose>6.63 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_1_1">
+      <static>true</static>
+      <pose>6.63 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_2_-1">
+      <static>true</static>
+      <pose>7.0600000000000005 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_2_1">
+      <static>true</static>
+      <pose>7.0600000000000005 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_3_-1">
+      <static>true</static>
+      <pose>7.49 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_3_1">
+      <static>true</static>
+      <pose>7.49 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_4_-1">
+      <static>true</static>
+      <pose>7.92 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_4_1">
+      <static>true</static>
+      <pose>7.92 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_5_-1">
+      <static>true</static>
+      <pose>8.35 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_5_1">
+      <static>true</static>
+      <pose>8.35 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_6_-1">
+      <static>true</static>
+      <pose>8.780000000000001 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_6_1">
+      <static>true</static>
+      <pose>8.780000000000001 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_7_-1">
+      <static>true</static>
+      <pose>9.21 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_7_1">
+      <static>true</static>
+      <pose>9.21 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_8_-1">
+      <static>true</static>
+      <pose>9.64 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_8_1">
+      <static>true</static>
+      <pose>9.64 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_9_-1">
+      <static>true</static>
+      <pose>10.07 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_9_1">
+      <static>true</static>
+      <pose>10.07 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_10_-1">
+      <static>true</static>
+      <pose>10.5 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_10_1">
+      <static>true</static>
+      <pose>10.5 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_11_-1">
+      <static>true</static>
+      <pose>10.93 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_11_1">
+      <static>true</static>
+      <pose>10.93 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_12_-1">
+      <static>true</static>
+      <pose>11.36 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_12_1">
+      <static>true</static>
+      <pose>11.36 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_13_-1">
+      <static>true</static>
+      <pose>11.79 -3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_1_13_1">
+      <static>true</static>
+      <pose>11.79 -0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="container_0_2">
+      <static>true</static>
+      <pose>9 -2 6.5 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.65 .18 .12 1</ambient>
+            <diffuse>.65 .18 .12 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_0_-1">
+      <static>true</static>
+      <pose>6.2 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_0_1">
+      <static>true</static>
+      <pose>6.2 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_1_-1">
+      <static>true</static>
+      <pose>6.63 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_1_1">
+      <static>true</static>
+      <pose>6.63 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_2_-1">
+      <static>true</static>
+      <pose>7.0600000000000005 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_2_1">
+      <static>true</static>
+      <pose>7.0600000000000005 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_3_-1">
+      <static>true</static>
+      <pose>7.49 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_3_1">
+      <static>true</static>
+      <pose>7.49 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_4_-1">
+      <static>true</static>
+      <pose>7.92 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_4_1">
+      <static>true</static>
+      <pose>7.92 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_5_-1">
+      <static>true</static>
+      <pose>8.35 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_5_1">
+      <static>true</static>
+      <pose>8.35 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_6_-1">
+      <static>true</static>
+      <pose>8.780000000000001 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_6_1">
+      <static>true</static>
+      <pose>8.780000000000001 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_7_-1">
+      <static>true</static>
+      <pose>9.21 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_7_1">
+      <static>true</static>
+      <pose>9.21 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_8_-1">
+      <static>true</static>
+      <pose>9.64 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_8_1">
+      <static>true</static>
+      <pose>9.64 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_9_-1">
+      <static>true</static>
+      <pose>10.07 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_9_1">
+      <static>true</static>
+      <pose>10.07 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_10_-1">
+      <static>true</static>
+      <pose>10.5 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_10_1">
+      <static>true</static>
+      <pose>10.5 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_11_-1">
+      <static>true</static>
+      <pose>10.93 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_11_1">
+      <static>true</static>
+      <pose>10.93 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_12_-1">
+      <static>true</static>
+      <pose>11.36 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_12_1">
+      <static>true</static>
+      <pose>11.36 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_13_-1">
+      <static>true</static>
+      <pose>11.79 -3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_0_2_13_1">
+      <static>true</static>
+      <pose>11.79 -0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="container_1_0">
+      <static>true</static>
+      <pose>21 2 1.3 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.10 .32 .58 1</ambient>
+            <diffuse>.10 .32 .58 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_0_-1">
+      <static>true</static>
+      <pose>18.2 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_0_1">
+      <static>true</static>
+      <pose>18.2 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_1_-1">
+      <static>true</static>
+      <pose>18.63 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_1_1">
+      <static>true</static>
+      <pose>18.63 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_2_-1">
+      <static>true</static>
+      <pose>19.06 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_2_1">
+      <static>true</static>
+      <pose>19.06 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_3_-1">
+      <static>true</static>
+      <pose>19.49 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_3_1">
+      <static>true</static>
+      <pose>19.49 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_4_-1">
+      <static>true</static>
+      <pose>19.919999999999998 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_4_1">
+      <static>true</static>
+      <pose>19.919999999999998 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_5_-1">
+      <static>true</static>
+      <pose>20.349999999999998 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_5_1">
+      <static>true</static>
+      <pose>20.349999999999998 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_6_-1">
+      <static>true</static>
+      <pose>20.78 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_6_1">
+      <static>true</static>
+      <pose>20.78 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_7_-1">
+      <static>true</static>
+      <pose>21.21 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_7_1">
+      <static>true</static>
+      <pose>21.21 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_8_-1">
+      <static>true</static>
+      <pose>21.64 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_8_1">
+      <static>true</static>
+      <pose>21.64 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_9_-1">
+      <static>true</static>
+      <pose>22.07 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_9_1">
+      <static>true</static>
+      <pose>22.07 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_10_-1">
+      <static>true</static>
+      <pose>22.5 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_10_1">
+      <static>true</static>
+      <pose>22.5 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_11_-1">
+      <static>true</static>
+      <pose>22.93 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_11_1">
+      <static>true</static>
+      <pose>22.93 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_12_-1">
+      <static>true</static>
+      <pose>23.36 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_12_1">
+      <static>true</static>
+      <pose>23.36 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_13_-1">
+      <static>true</static>
+      <pose>23.79 0.782 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_0_13_1">
+      <static>true</static>
+      <pose>23.79 3.218 1.3 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="container_1_1">
+      <static>true</static>
+      <pose>21 2 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.10 .32 .58 1</ambient>
+            <diffuse>.10 .32 .58 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_0_-1">
+      <static>true</static>
+      <pose>18.2 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_0_1">
+      <static>true</static>
+      <pose>18.2 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_1_-1">
+      <static>true</static>
+      <pose>18.63 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_1_1">
+      <static>true</static>
+      <pose>18.63 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_2_-1">
+      <static>true</static>
+      <pose>19.06 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_2_1">
+      <static>true</static>
+      <pose>19.06 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_3_-1">
+      <static>true</static>
+      <pose>19.49 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_3_1">
+      <static>true</static>
+      <pose>19.49 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_4_-1">
+      <static>true</static>
+      <pose>19.919999999999998 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_4_1">
+      <static>true</static>
+      <pose>19.919999999999998 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_5_-1">
+      <static>true</static>
+      <pose>20.349999999999998 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_5_1">
+      <static>true</static>
+      <pose>20.349999999999998 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_6_-1">
+      <static>true</static>
+      <pose>20.78 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_6_1">
+      <static>true</static>
+      <pose>20.78 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_7_-1">
+      <static>true</static>
+      <pose>21.21 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_7_1">
+      <static>true</static>
+      <pose>21.21 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_8_-1">
+      <static>true</static>
+      <pose>21.64 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_8_1">
+      <static>true</static>
+      <pose>21.64 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_9_-1">
+      <static>true</static>
+      <pose>22.07 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_9_1">
+      <static>true</static>
+      <pose>22.07 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_10_-1">
+      <static>true</static>
+      <pose>22.5 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_10_1">
+      <static>true</static>
+      <pose>22.5 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_11_-1">
+      <static>true</static>
+      <pose>22.93 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_11_1">
+      <static>true</static>
+      <pose>22.93 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_12_-1">
+      <static>true</static>
+      <pose>23.36 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_12_1">
+      <static>true</static>
+      <pose>23.36 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_13_-1">
+      <static>true</static>
+      <pose>23.79 0.782 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_1_13_1">
+      <static>true</static>
+      <pose>23.79 3.218 3.9000000000000004 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="container_1_2">
+      <static>true</static>
+      <pose>21 2 6.5 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 2.44 2.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.10 .32 .58 1</ambient>
+            <diffuse>.10 .32 .58 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_0_-1">
+      <static>true</static>
+      <pose>18.2 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_0_1">
+      <static>true</static>
+      <pose>18.2 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_1_-1">
+      <static>true</static>
+      <pose>18.63 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_1_1">
+      <static>true</static>
+      <pose>18.63 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_2_-1">
+      <static>true</static>
+      <pose>19.06 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_2_1">
+      <static>true</static>
+      <pose>19.06 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_3_-1">
+      <static>true</static>
+      <pose>19.49 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_3_1">
+      <static>true</static>
+      <pose>19.49 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_4_-1">
+      <static>true</static>
+      <pose>19.919999999999998 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_4_1">
+      <static>true</static>
+      <pose>19.919999999999998 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_5_-1">
+      <static>true</static>
+      <pose>20.349999999999998 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_5_1">
+      <static>true</static>
+      <pose>20.349999999999998 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_6_-1">
+      <static>true</static>
+      <pose>20.78 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_6_1">
+      <static>true</static>
+      <pose>20.78 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_7_-1">
+      <static>true</static>
+      <pose>21.21 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_7_1">
+      <static>true</static>
+      <pose>21.21 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_8_-1">
+      <static>true</static>
+      <pose>21.64 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_8_1">
+      <static>true</static>
+      <pose>21.64 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_9_-1">
+      <static>true</static>
+      <pose>22.07 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_9_1">
+      <static>true</static>
+      <pose>22.07 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_10_-1">
+      <static>true</static>
+      <pose>22.5 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_10_1">
+      <static>true</static>
+      <pose>22.5 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_11_-1">
+      <static>true</static>
+      <pose>22.93 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_11_1">
+      <static>true</static>
+      <pose>22.93 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_12_-1">
+      <static>true</static>
+      <pose>23.36 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_12_1">
+      <static>true</static>
+      <pose>23.36 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_13_-1">
+      <static>true</static>
+      <pose>23.79 0.782 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rib_1_2_13_1">
+      <static>true</static>
+      <pose>23.79 3.218 6.5 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.06 0.008 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.75 .75 .72 1</ambient>
+            <diffuse>.75 .75 .72 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_-4">
+      <static>true</static>
+      <pose>-4 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_-1">
+      <static>true</static>
+      <pose>-1 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_2">
+      <static>true</static>
+      <pose>2 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_5">
+      <static>true</static>
+      <pose>5 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_8">
+      <static>true</static>
+      <pose>8 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_11">
+      <static>true</static>
+      <pose>11 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_14">
+      <static>true</static>
+      <pose>14 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_17">
+      <static>true</static>
+      <pose>17 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_20">
+      <static>true</static>
+      <pose>20 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_23">
+      <static>true</static>
+      <pose>23 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_26">
+      <static>true</static>
+      <pose>26 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_29">
+      <static>true</static>
+      <pose>29 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_32">
+      <static>true</static>
+      <pose>32 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="road_dash_35">
+      <static>true</static>
+      <pose>35 0 0.006 0 0 0</pose>
+      <link name="body">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.4 0.12 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.9 .8 .25 1</ambient>
+            <diffuse>.9 .8 .25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="loading_pallets">
+      <static>true</static>
+      <pose>4 -8 0.6 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>3 2 1.2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>3 2 1.2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.48 .32 .15 1</ambient>
+            <diffuse>.48 .32 .15 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="parked_trailer">
+      <static>true</static>
+      <pose>28 8 1.9 0 0 0</pose>
+      <link name="body">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>7 2.5 3.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>7 2.5 3.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>.8 .8 .77 1</ambient>
+            <diffuse>.8 .8 .77 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

@@ -304,6 +304,31 @@ def _read_gz_points(msg, max_raw_points: int) -> List[Point]:
         return []
 
     endian = ">" if msg.is_bigendian else "<"
+    # Protobuf bytes access can materialize the entire scan. Fetch once, not
+    # three times per point (tens of thousands of full-cloud copies per cycle).
+    data = msg.data
+    # Fast path for complete, valid packed layouts; retain the scalar decoder
+    # for malformed/truncated messages and installations without NumPy.
+    try:
+        import numpy as np
+        valid_layout = all(
+            0 <= int(field_map[name].offset)
+            and int(field_map[name].offset) + formats[int(field_map[name].datatype)][1] <= point_step
+            for name in required
+        )
+        if valid_layout and row_step >= width * point_step and len(data) >= height * row_step:
+            count = max(0, min(width * height, max_raw_points))
+            columns = []
+            for name in required:
+                field = field_map[name]
+                _, size = formats[int(field.datatype)]
+                array = np.ndarray((height, width), dtype=np.dtype(endian + f'f{size}'),
+                                   buffer=data, offset=int(field.offset), strides=(row_step, point_step))
+                columns.append(array.reshape(-1)[:count])
+            xyz = np.column_stack(columns)
+            return [tuple(row) for row in xyz[np.isfinite(xyz).all(axis=1)].tolist()]
+    except ImportError:
+        pass
     points = []
     for index in range(min(width * height, max_raw_points)):
         row, column = divmod(index, width)
@@ -315,7 +340,7 @@ def _read_gz_points(msg, max_raw_points: int) -> List[Point]:
             fmt, _ = formats[int(field.datatype)]
             try:
                 value = struct.unpack_from(
-                    endian + fmt, msg.data, base + int(field.offset)
+                    endian + fmt, data, base + int(field.offset)
                 )[0]
             except struct.error:
                 valid = False

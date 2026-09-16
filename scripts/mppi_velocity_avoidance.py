@@ -7,6 +7,7 @@ setpoint ``u = [vx, vy, vz, yaw_rate]`` qua SET_POSITION_TARGET_LOCAL_NED).
 
 Pipeline (companion-side, ArduPilot OA tắt hoàn toàn)::
 
+    goal + known static SDF --global-planner astar -> collision-free reference
     Gazebo gpu_lidar /sensor_suite/lidar/points (FLU)
       -> downsample week 3 -> BODY_FRD -> world ENU (odom pose)
     Gazebo /iris/odometry  HOẶC  MAVLink telemetry (--state-source mav)
@@ -50,6 +51,7 @@ from mppi_ardupilot.rigid_body_pa_mppi import (  # noqa: E402
     RigidBodyPAMPPI,
     RigidBodyPAMPPIConfig,
 )
+from mppi_ardupilot.global_planner import AStarConfig, AStarGlobalPlanner  # noqa: E402
 
 _DEFAULTS = MPPIConfig()
 DEFAULT_MAV = "tcp:127.0.0.1:5762"
@@ -71,6 +73,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--global-path", default=None,
                    help="polyline global path 'x,y,z;x,y,z;...' (m, ENU), ít nhất 2 điểm; "
                         "chỉ dùng khi w_path > 0")
+    p.add_argument("--global-planner", choices=("manual", "astar"), default=None,
+                   help="manual: dùng --global-path/--goal; astar: tự lập path từ SDF")
+    p.add_argument("--global-map-sdf", default=None,
+                   help="SDF world chứa collision box/cylinder tĩnh cho A* 2.5D")
+    p.add_argument("--astar-resolution", type=float, default=None,
+                   help="độ phân giải lattice A* [m]")
+    p.add_argument("--astar-clearance", type=float, default=None,
+                   help="inflate footprint vật cản cho A* [m]")
+    p.add_argument("--astar-padding", type=float, default=None,
+                   help="padding search bounds quanh start/goal/obstacles [m]")
     p.add_argument("--mav", default=DEFAULT_MAV, help=f"MAVLink target (mặc định: {DEFAULT_MAV})")
     p.add_argument("--state-source", choices=("odom", "mav"), default=None,
                    help="odom: Gazebo ground truth (mặc định SITL); "
@@ -122,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-yaw-accel", type=float, default=None,
                    help="giới hạn đổi yaw-rate [rad/s^2]")
     p.add_argument("--goal-slowdown-radius", type=float, default=None,
-                   help="bắt giới hạn tốc độ tiếp cận trong bán kính này [m]")
+                   help="bán kính hút thẳng về goal [m]; 0=tắt nhánh arrival, dùng MPPI tới đích")
     p.add_argument("--goal-approach-gain", type=float, default=None,
                    help="gain đổi sai số goal thành speed cap [1/s]")
     p.add_argument("--max-points", type=int, default=None, help="obstacle tối đa mỗi scan")
@@ -156,6 +168,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="in timing/cost diagnostics mỗi N chu kỳ")
     p.add_argument("--diag-jsonl", default=None,
                    help="lưu diagnostics từng chu kỳ vào JSONL")
+    p.add_argument("--debug-snapshot-cycle", type=int, default=None,
+                   help="lưu sample pool MPPI của đúng chu kỳ này vào NPZ (chi phí I/O lớn)")
+    p.add_argument("--debug-snapshot-events", action="store_true",
+                   help="lưu exact pool khi N_safe=0, ngay sau hold, và control định kỳ")
+    p.add_argument("--debug-control-stride", type=int, default=25,
+                   help="stride cycle cho control snapshots khi --debug-snapshot-events")
     p.add_argument("--benchmark-window", type=int, default=200,
                    help="cửa sổ rolling mean/p95/worst timing")
     p.add_argument("--no-mav", action="store_true", help="chạy MPPI + log, không gửi MAVLink (debug)")
@@ -189,6 +207,11 @@ _CLI_TO_CFG = {
 _RUNTIME_DEFAULTS = {
     "goal": ("goal", DEFAULT_GOAL),
     "global_path": ("global_path", None),
+    "global_planner": ("global_planner", "manual"),
+    "global_map_sdf": ("global_map_sdf", None),
+    "astar_resolution": ("astar_resolution", 0.5),
+    "astar_clearance": ("astar_clearance", None),
+    "astar_padding": ("astar_padding", 4.0),
     "state_source": ("state_source", "odom"),
     "topic": ("lidar_topic", DEFAULT_LIDAR_TOPIC),
     "odom_topic": ("odom_topic", DEFAULT_ODOM_TOPIC),
@@ -291,15 +314,17 @@ def main() -> None:
     if args.cfg.cost_profile == "paper" and args.planner != "mppi":
         print("[warn] cost_profile=paper chỉ áp dụng objective vanilla QuadMPPI; "
               "PA/rigid planner vẫn cộng thêm cost riêng của nhánh đó.")
-    if (args.cfg.goal_slowdown_radius <= 0 or args.cfg.goal_approach_gain <= 0
+    if (args.cfg.goal_slowdown_radius < 0 or args.cfg.goal_approach_gain <= 0
             or args.cfg.goal_min_speed <= 0):
-        raise SystemExit("[error] goal slowdown radius/gain phải lớn hơn 0")
+        raise SystemExit("[error] goal slowdown radius phải >= 0; gain phải > 0")
     if args.diag_every <= 0 or args.benchmark_window <= 0 or args.rviz_top_k < 0:
         raise SystemExit("[error] diag/window phải > 0 và rviz-top-k phải >= 0")
     if args.planner_timeout_ms is not None and args.planner_timeout_ms <= 0:
         raise SystemExit("[error] planner-timeout-ms phải > 0")
     if args.rviz_goal_altitude is not None and not math.isfinite(args.rviz_goal_altitude):
         raise SystemExit("[error] rviz-goal-altitude phải hữu hạn")
+    if args.astar_resolution <= 0 or args.astar_padding <= 0:
+        raise SystemExit("[error] A* resolution/padding phải > 0")
     if args.rviz_goal_topic and args.exit_on_goal:
         raise SystemExit(
             "[error] interactive RViz không dùng --exit-on-goal; node phải còn chạy để nhận goal mới"
@@ -322,7 +347,42 @@ def main() -> None:
         if args.hz < 20:
             raise SystemExit("[safety] rigid-pa-mppi cần --hz >= 20; khuyến nghị 50 Hz")
     args.goal = parse_goal(args.goal)
-    if args.global_path is not None:
+    args.global_planner_instance = None
+    if args.global_planner == "astar":
+        if args.global_path is not None:
+            raise SystemExit("[error] --global-planner astar không dùng cùng --global-path")
+        if not args.global_map_sdf:
+            raise SystemExit("[error] --global-planner astar cần --global-map-sdf")
+        if args.cfg.w_path <= 0:
+            raise SystemExit("[error] A* cần w_path > 0 để MPPI bám reference")
+        if args.astar_clearance is None:
+            args.astar_clearance = max(
+                args.cfg.collision_radius_m,
+                args.hard_brake_m,
+            ) + args.cfg.reference_corner_radius_m + 0.3
+        if args.astar_clearance < 0:
+            raise SystemExit("[error] --astar-clearance phải >= 0")
+        if len(args.goal) > 1:
+            print("[astar] chỉ dùng waypoint cuối làm goal; waypoint trung gian do A* tự sinh")
+            args.goal = [args.goal[-1]]
+        try:
+            args.global_planner_instance = AStarGlobalPlanner.from_sdf(
+                args.global_map_sdf,
+                AStarConfig(
+                    resolution_m=args.astar_resolution,
+                    clearance_m=args.astar_clearance,
+                    bounds_padding_m=args.astar_padding,
+                ),
+            )
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"[astar] không load được static map: {exc}") from exc
+        args.global_path = None
+        print(
+            f"[astar] loaded {len(args.global_planner_instance.obstacles)} primitive "
+            f"collisions từ {args.global_map_sdf}; resolution={args.astar_resolution:g}m "
+            f"clearance={args.astar_clearance:g}m"
+        )
+    elif args.global_path is not None:
         args.global_path = parse_reference_path(args.global_path)
     elif args.cfg.w_path > 0 and args.rviz_goal_topic:
         args.global_path = None

@@ -1,5 +1,6 @@
 import math
 import os
+from pathlib import Path
 import unittest
 from types import SimpleNamespace
 
@@ -15,6 +16,12 @@ from mppi_ardupilot.lidar_preprocess import (
     quat_to_rot,
     yaw_enu_to_ned_rate,
     yaw_ned_to_enu,
+)
+from mppi_ardupilot.global_planner import (
+    AStarConfig,
+    AStarGlobalPlanner,
+    StaticObstacle2D,
+    load_sdf_obstacles,
 )
 from mppi_ardupilot.mavlink_interface import (
     ArduPilotInterface,
@@ -72,6 +79,64 @@ class FakePlanner:
 
     def optimizer_diagnostics(self):
         return {"compute_ms": 1.0, "ess": 5.0, "cost": {}}
+
+
+class TestAStarGlobalPlanner(unittest.TestCase):
+    def test_loads_static_sdf_primitives_and_ignores_ground_at_flight_altitude(self):
+        world = Path(__file__).resolve().parents[1] / "worlds/iris_mppi_slalom.sdf"
+        obstacles = load_sdf_obstacles(world)
+        self.assertEqual(len(obstacles), 5)  # ground + four columns
+        active = [obstacle for obstacle in obstacles if obstacle.active_at(20.0, 0.3)]
+        self.assertEqual(len(active), 4)
+
+    def test_rejects_unresolved_scenery_include_instead_of_treating_it_as_free(self):
+        world = Path(__file__).resolve().parents[1] / "worlds/iris_warehouse_sensor.sdf"
+        with self.assertRaisesRegex(ValueError, "chưa resolve collision"):
+            load_sdf_obstacles(world)
+
+    def test_astar_routes_around_inflated_obstacle_and_simplifies(self):
+        obstacle = StaticObstacle2D(
+            name="wall", kind="box", center_xy=(5.0, 0.0),
+            z_min=0.0, z_max=5.0, half_size_xy=(0.5, 2.0),
+        )
+        planner = AStarGlobalPlanner(
+            [obstacle], AStarConfig(resolution_m=0.25, clearance_m=0.5)
+        )
+        result = planner.plan([0, 0, 2], [10, 0, 2])
+        self.assertGreater(result.path_length_m, 10.0)
+        self.assertGreater(result.raw_grid_points, len(result.path_enu))
+        np.testing.assert_allclose(result.path_enu[0], [0, 0, 2])
+        np.testing.assert_allclose(result.path_enu[-1], [10, 0, 2])
+        for a, b in zip(result.path_enu[:-1], result.path_enu[1:]):
+            self.assertTrue(planner._line_free(a[:2], b[:2], [obstacle]))
+
+    def test_astar_rejects_occupied_goal_and_altitude_change(self):
+        obstacle = StaticObstacle2D(
+            name="column", kind="cylinder", center_xy=(5.0, 0.0),
+            z_min=0.0, z_max=10.0, radius=1.0,
+        )
+        planner = AStarGlobalPlanner([obstacle], AStarConfig(clearance_m=0.5))
+        with self.assertRaisesRegex(ValueError, "goal nằm trong obstacle"):
+            planner.plan([0, 0, 2], [5, 0, 2])
+        with self.assertRaisesRegex(ValueError, "cùng cao độ"):
+            planner.plan([0, 0, 2], [10, 0, 3])
+
+    def test_astar_finds_paths_in_all_three_challenge_worlds(self):
+        root = Path(__file__).resolve().parents[1]
+        cases = (
+            ("iris_mppi_slalom.sdf", [30, 0, 20]),
+            ("iris_mppi_narrow_gate.sdf", [24, 0, 20]),
+            ("iris_mppi_right_angle.sdf", [10, 13, 20]),
+        )
+        for filename, goal in cases:
+            with self.subTest(world=filename):
+                planner = AStarGlobalPlanner.from_sdf(
+                    root / "worlds" / filename,
+                    AStarConfig(resolution_m=0.5, clearance_m=1.8),
+                )
+                result = planner.plan([0, 0, 20], goal)
+                self.assertGreaterEqual(len(result.path_enu), 2)
+                self.assertGreater(result.path_length_m, 0.0)
 
 
 class TestMavlinkAndFrames(unittest.TestCase):
@@ -205,6 +270,16 @@ class TestPlannerSafety(unittest.TestCase):
         out = self.node.step(self.state, np.array([[0.5, 0.0, 2.0]]))
         self.assertEqual(out.event, "hold-brake")
         np.testing.assert_allclose(out.u, 0)
+
+    def test_swept_brake_keeps_ground_clear_but_blocks_forward_obstacle(self):
+        node = LocalPlannerNode(self.fake, [np.array([300., 0, 5])],
+            hard_brake_m=1.5, brake_accel_m_s2=.6, brake_swept_path=True)
+        state = PlannerState(np.array([0., 0, 5]), np.array([10., 0, 0]), 0.)
+        clear = node.step(state, np.array([[15., 0, 0]]))
+        self.assertNotEqual(clear.event, 'hold-brake')
+        blocked = node.step(state, np.array([[0., 3, 5], [20., 0, 5]]))
+        self.assertEqual(blocked.event, 'hold-brake')
+        np.testing.assert_allclose(blocked.u, 0)
 
     def test_goal_reached_holds(self):
         state = PlannerState(np.array([4.5, 0.0, 2.0]), np.zeros(3), 0.0)
@@ -361,7 +436,7 @@ class TestDiagnostics(unittest.TestCase):
         applied = np.array([0.1, -0.2, 0.05, -0.03])
         planner.accept_applied_control(applied)
         np.testing.assert_allclose(
-            planner.ctrl.get_action_sequence()[0].detach().cpu().numpy(), applied
+            planner.ctrl.get_action_sequence()[0].detach().cpu().numpy(), action
         )
         self.assertEqual(planner.predict_trajectory().shape, (6, 3))
         self.assertEqual(planner.sampled_trajectories(3).shape, (3, 6, 3))

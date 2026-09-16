@@ -42,14 +42,30 @@ terminal ở cả ba case và giảm tổng biến thiên lệnh: right-angle `3
 `VERIFIED OFFLINE`; phải tạo log Gazebo mới trước khi dùng các con số này để
 kết luận chất lượng bay 3D.
 
-Ba lệnh bên dưới truyền `--global-path` tương ứng với route
-clearance-checked của từng map. Profile này là adaptation velocity-level,
-không phải reproduction đầy đủ của paper. `mppi_my_test.yaml` vẫn được
-giữ làm baseline project-cost khi cần.
+Ba lệnh bên dưới dùng **A* 2.5D** đọc trực tiếp collision box/cylinder tĩnh từ
+world SDF. A* lập path ở cao độ 20 m, inflate vật cản 2.6 m, sau đó MPPI bám
+reference do A* sinh. Không còn truyền waypoint né vật cản bằng tay. Profile
+này là adaptation velocity-level, không phải reproduction đầy đủ của paper.
+`mppi_my_test.yaml` vẫn được giữ làm baseline project-cost khi cần.
 
 File YAML không hot-reload. Sau khi sửa config phải dừng và chạy lại Terminal 5.
 
 ## Kết quả kiểm chứng hiện có
+
+### A* global path + MPPI — Gazebo headless
+
+Ngày 2026-09-14, slalom được chạy trực tiếp bằng A* đọc collision từ
+`iris_mppi_slalom.sdf`, resolution 0.5 m, clearance 2.6 m, seed 7 và ArduPilot
+SITL commit `f808f78c`. A* tạo 63 grid points, rút gọn còn 4 reference points,
+đường dài 34.24 m và MPPI đạt goal sau 307 chu kỳ:
+
+| Terminal | Min point-cloud clearance | Compute mean / p95 / worst | Deadline miss | Hard-brake / collision-cost |
+|---:|---:|---:|---:|---:|
+| đạt, 0.274 m | 2.402 m | 10.53 / 11.54 / 41.11 ms | 0 | 0 / 0 |
+
+Log: `output/log/slalom_astar_live_seed7.jsonl`. Đây là một run live headless;
+narrow-gate và right-angle A* mới chỉ VERIFIED OFFLINE, chưa được gán kết quả
+Gazebo live.
 
 ### Profile demo làm mượt — Gazebo headless
 
@@ -218,12 +234,10 @@ Chờ UAV hover ổn định quanh 20 m rồi mới chạy MPPI.
 
 ### Map 1 — MPPI slalom
 
-Slalom dùng profile riêng để giữ deadline 10 Hz trong run dài. Các waypoint
-được đặt cùng hoành độ với tâm từng cột và lệch sang phía đối diện. Sau khi
-bo góc `0.8 m`, khoảng cách hình học nhỏ nhất từ reference tới bề mặt cột xấp
-xỉ `2.03 m` (chưa tính sai số bám thực tế), lớn hơn
-`collision_radius_m: 1.5`. Route cũ đặt waypoint sớm hơn cột `1.5 m` chỉ có
-khoảng hở hình học xấp xỉ `1.14 m` nên không còn dùng cho demo.
+Slalom dùng profile riêng để giữ deadline 10 Hz trong run dài. A* được tự do
+chọn homotopy ngắn nhất đủ clearance; nó có thể vòng ngoài cụm cột thay vì
+luồn lần lượt như route vẽ tay cũ. Đây là hành vi đúng của global planner tối
+ưu chiều dài, không phải failure của MPPI.
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
@@ -235,11 +249,13 @@ MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
   --planner mppi \
   --config config/experiments/mppi_slalom_demo_smooth.yaml \
   --mav tcp:127.0.0.1:5762 \
-  --goal '7,-2.2,20;13,2.2,20;19,-2.2,20;25,2.2,20;30,0,20' \
-  --global-path '0,0,20;7,-2.2,20;13,2.2,20;19,-2.2,20;25,2.2,20;30,0,20' \
+  --goal '30,0,20' \
+  --global-planner astar \
+  --global-map-sdf worlds/iris_mppi_slalom.sdf \
+  --astar-clearance 2.6 \
   --seed 7 \
   --diag-every 1 \
-  --diag-jsonl output/log/slalom_demo_smooth_seed7.jsonl \
+  --diag-jsonl output/log/slalom_astar_seed7.jsonl \
   --rviz-traj-topic /mppi/predicted_path \
   --rviz-samples-topic /mppi/sampled_trajectories \
   --rviz-top-k 5 \
@@ -248,9 +264,8 @@ MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
 
 ### Map 2 — MPPI narrow gate
 
-Route chính bên dưới đi qua cửa tường lớn rồi vòng phía bắc cụm hai cột.
-Đây là route demo; nó **không đi xuyên khe nhỏ giữa hai cột**. Không
-dùng route stress-test phía dưới khi quay demo.
+A* tự tìm đường qua cửa tường lớn rồi chọn phía ngắn hơn quanh hai cột. Với
+clearance 2.6 m, khe nhỏ giữa hai cột không khả thi nên A* không chọn nó.
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
@@ -262,24 +277,18 @@ MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
   --planner mppi \
   --config config/experiments/mppi_demo_smooth.yaml \
   --mav tcp:127.0.0.1:5762 \
-  --goal '13,0,20;12.5,5.8,20;23,5.8,20;24,0,20' \
-  --global-path '0,0,20;13,0,20;12.5,5.8,20;23,5.8,20;24,0,20' \
+  --goal '24,0,20' \
+  --global-planner astar \
+  --global-map-sdf worlds/iris_mppi_narrow_gate.sdf \
+  --astar-clearance 2.6 \
   --seed 7 \
   --diag-every 1 \
-  --diag-jsonl output/log/narrow_gate_demo_smooth_seed7.jsonl \
+  --diag-jsonl output/log/narrow_gate_astar_seed7.jsonl \
   --rviz-traj-topic /mppi/predicted_path \
   --rviz-samples-topic /mppi/sampled_trajectories \
   --rviz-top-k 5 \
   --exit-on-goal
 ```
-
-Route stress test cũ, chỉ dùng để tái lập failure/trade-off trong SITL:
-
-```text
-13,0,20;18,-0.2,20;24,0,20
-```
-
-Không dùng route stress-test này để chứng minh safety.
 
 ### Map 3 — MPPI right-angle corridor
 
@@ -293,11 +302,13 @@ MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
   --planner mppi \
   --config config/experiments/mppi_demo_smooth.yaml \
   --mav tcp:127.0.0.1:5762 \
-  --goal '5.5,0,20;10,0,20;10,5,20;10,13,20' \
-  --global-path '0,0,20;5.5,0,20;10,0,20;10,5,20;10,13,20' \
+  --goal '10,13,20' \
+  --global-planner astar \
+  --global-map-sdf worlds/iris_mppi_right_angle.sdf \
+  --astar-clearance 2.6 \
   --seed 7 \
   --diag-every 1 \
-  --diag-jsonl output/log/right_angle_demo_smooth_seed7.jsonl \
+  --diag-jsonl output/log/right_angle_astar_seed7.jsonl \
   --rviz-traj-topic /mppi/predicted_path \
   --rviz-samples-topic /mppi/sampled_trajectories \
   --rviz-top-k 5 \
@@ -341,8 +352,8 @@ ros2 topic list | grep mppi
 ## Click goal trực tiếp trong RViz
 
 File `config/sensor_suite.rviz` đã có tool `2D Goal Pose`, publish
-`geometry_msgs/PoseStamped` lên `/goal_pose`. Để điều khiển tương tác, dùng
-lệnh Terminal 5 sau cho bất kỳ world nào:
+`geometry_msgs/PoseStamped` lên `/goal_pose`. Block sau minh họa map slalom;
+khi đổi map phải đổi `--global-map-sdf` sang đúng world đang chạy:
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
@@ -354,6 +365,9 @@ MAVLINK20=1 /opt/miniconda3/envs/ardupilot-rviz/bin/python \
   --planner mppi \
   --config config/experiments/mppi_demo_smooth.yaml \
   --mav tcp:127.0.0.1:5762 \
+  --global-planner astar \
+  --global-map-sdf worlds/iris_mppi_slalom.sdf \
+  --astar-clearance 2.6 \
   --rviz-goal-topic /goal_pose \
   --rviz-goal-frame odom \
   --rviz-goal-altitude 20 \
@@ -378,25 +392,37 @@ RViz `2D Goal Pose` thường gửi `z=0`; node cố ý không dùng giá trị 
 độ cao UAV tại đúng thời điểm click. Orientation của mũi tên hiện chưa dùng để
 đặt yaw goal.
 
-Mỗi click tạo reference thẳng `current position -> clicked goal`; đây là
-interactive waypoint interface, **không phải global planner**. Trên slalom,
-U-wall hoặc góc khuất, hãy click lần lượt các waypoint có clearance thay vì
-click xuyên vật cản. MAVProxy vẫn cần cho `arm throttle`, `takeoff 20`,
+Mỗi click gọi lại A* từ odometry hiện tại tới goal, rồi thay atomically global
+reference của MPPI. Nếu goal nằm trong obstacle đã inflate hoặc A* không tìm
+được đường, node gửi zero velocity và từ chối goal; nó không fallback sang
+đường thẳng xuyên vật cản. MAVProxy vẫn cần cho `arm throttle`, `takeoff 20`,
 `mode brake` khẩn cấp và `mode land`; không còn cần `Fly To` để điều hướng.
 
-## Điều chỉnh global path trong paper profile
+## Điều chỉnh A* và global path trong paper profile
 
 Trong profile demo, `w_path=400`, `w_reference_velocity=40` và
-`reference_speed_m_s=0.60` đã bật. `--goal` là route/waypoint; `--global-path`
-được time-parameterize thành chuỗi `(p_ref[j], v_ref[j])` cho horizon.
-Khi thay map hoặc route, phải cập nhật cả hai tham số:
+`reference_speed_m_s=0.60` đã bật. `--goal` chỉ là đích cuối; A* đọc collision
+tĩnh từ `--global-map-sdf` và sinh polyline. Polyline này được
+time-parameterize thành chuỗi `(p_ref[j], v_ref[j])` cho horizon MPPI.
+
+Các tham số global planner:
 
 ```bash
---global-path 'x0,y0,z0;x1,y1,z1;x2,y2,z2;...'
+--global-planner astar
+--global-map-sdf worlds/<world-dang-chay>.sdf
+--astar-resolution 0.5
+--astar-clearance 2.6
+--astar-padding 4.0
 ```
 
-Polyline phải cùng frame ENU, cùng đơn vị mét, và đã kiểm tra clearance; path
-cost không thay thế collision cost. Có thể tune `reference_speed_m_s`,
+`--astar-clearance` là khoảng inflate hình học cho global path, không thay thế
+`collision_radius_m` trong local MPPI hay hard-brake gate. Parser hiện chỉ coi
+collision primitive `box` và `cylinder` được khai báo trực tiếp trong SDF là
+vật cản. World có mesh/Fuel scenery `<include>` sẽ bị từ chối theo nguyên tắc
+fail-closed; phải bổ sung adapter collision trước khi dùng A* cho warehouse
+realistic.
+
+Có thể tune `reference_speed_m_s`,
 `w_path`, `w_reference_velocity`, `paper_r_u`, `paper_r_delta_u`, `lambda`,
 `reference_corner_radius_m` và `collision_radius_m` trong
 `config/experiments/mppi_demo_smooth.yaml`, hoặc
