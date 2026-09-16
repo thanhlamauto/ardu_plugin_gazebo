@@ -1,184 +1,207 @@
 # MPPI UAV Navigation with ArduPilot and Gazebo
 
-Nghiên cứu điều khiển UAV tránh vật cản bằng **Model Predictive Path Integral
-(MPPI)** trên **ArduPilot SITL + Gazebo Harmonic**. Bài thử chính cho UAV lấy đà
-60 m, đạt tốc độ cruise yêu cầu 5 hoặc 10 m/s, tự giảm tốc để qua các góc cua
-trong bãi container rồi tăng tốc lại.
+Project nghiên cứu điều khiển UAV tránh vật cản bằng **Model Predictive Path
+Integral (MPPI)** trên **ArduPilot SITL + Gazebo Harmonic**. Bài thử chính cho
+UAV lấy đà 60 m, đạt cruise request 5 hoặc 10 m/s, tự giảm tốc để qua các góc
+cua trong bãi container rồi tăng tốc lại.
 
-Repository chứa controller, mô hình dự đoán đáp ứng, kiểm tra quỹ đạo, world
-Gazebo, harness chạy thí nghiệm, replay offline và tài liệu tái lập kết quả.
-Các thành phần này là phần mở rộng nghiên cứu trên nền
+Đây là phần mở rộng nghiên cứu trên nền
 [`ArduPilot/ardupilot_gazebo`](https://github.com/ArduPilot/ardupilot_gazebo).
+MPPI chạy trên companion side, gửi velocity/yaw-rate setpoint cho ArduPilot;
+ArduPilot điều khiển UAV trong Gazebo.
 
-## Trạng thái hiện tại
+## Trạng thái controller
 
-Profile tốt nhất hiện tại:
-[`mppi_yard_progress_feasible80.yaml`](config/experiments/mppi_yard_progress_feasible80.yaml).
+Profile hiện dùng:
+[`mppi_yard_progress_feasible80.yaml`](config/experiments/mppi_yard_progress_feasible80.yaml)
+cho headless và
+[`mppi_yard_progress_feasible80_gui.yaml`](config/experiments/mppi_yard_progress_feasible80_gui.yaml)
+cho Gazebo GUI.
 
 - Retiming tắt; global path chỉ cung cấp hình học.
-- MPPI dùng path-progress objective và tự chọn profile tốc độ.
-- `10 m/s` là cruise request và giới hạn trên, không phải tốc độ bắt buộc qua cua.
-- Rollout dùng mô hình có acceleration memory và command conditioner.
+- Objective gồm path tracking và path progress. `vmax` là giới hạn trên; MPPI
+  được quyền tự giảm tốc trước cua.
+- Rollout chứa command conditioner và mô hình đáp ứng có acceleration memory.
 - Cloud hiện tại và prior SDF cùng tham gia kiểm tra collision.
-- Sample không an toàn bị loại trước MPPI weighting; gate cuối dùng cùng safety
-  predicate.
-- Headless 10 m/s, seed 7 và 17: **2/2 tới đích và LAND/disarm**, peak
-  **8.98–9.19 m/s**, không optimizer timeout.
-
-Hệ vẫn còn 11–21 chu kỳ `N_safe=0` trong hai lượt baseline và gửi zero hold.
-Experiment 7A replay 1.600 lần cho thấy tăng 80 lên 640 random samples không tạo
-được nghiệm ở 12 failure snapshots. Kết quả nghiêng về viability loss hoặc độ
-nhạy của stopping model/margin, chưa chứng minh controller đã an toàn cho bay
-thật.
-
-Đọc trước khi đánh giá kết quả:
-
-1. [Checkpoint mentor và kế hoạch phase tiếp theo](docs/MPPI_MENTOR_CHECKPOINT_AND_NEXT_PHASE_VI.md)
-2. [Quickstart bài 5/10 m/s](docs/RUN_YARD_5_10_MS_QUICKSTART_VI.md)
-3. [Feasibility mask và kết quả hai seed](docs/MPPI_FEASIBLE_SELECTION_VI.md)
-4. [Kiểm chứng mô hình phanh và safety gate](docs/MPPI_MENTOR_SAFETY_PHASE_VI.md)
-5. [Claim-to-source audit](docs/SOURCE_AUDIT.md)
-
-## Kiến trúc
+- Sample không an toàn bị loại trước khi chuẩn hóa MPPI weight; output cuối dùng
+  lại cùng safety predicate.
 
 ```mermaid
 flowchart LR
-    G[Global path<br/>known-map A* or fixed path] --> M[MPPI<br/>path progress + sampled controls]
-    L[Gazebo LiDAR / odometry] --> P[Cloud preprocessing<br/>state estimator interface]
-    P --> M
-    S[Known-world SDF] --> V[Shared trajectory safety predicate]
-    M --> D[Conditioner + acceleration response model]
+    G[Global path] --> M[MPPI path-progress]
+    O[Odometry + LiDAR] --> M
+    S[Prior SDF] --> V[Shared safety predicate]
+    M --> D[Conditioner + response model]
     D --> V
-    P --> V
-    V -->|feasible command| A[ArduPilot Guided velocity setpoint]
-    A --> Z[Gazebo dynamics]
-    Z --> L
-    V -->|N_safe = 0| H[Hold / recovery research branch]
+    O --> V
+    V --> A[ArduPilot Guided velocity]
+    A --> Z[Gazebo]
+    Z --> O
 ```
 
-MPPI chạy trên companion side và gửi velocity/yaw-rate setpoint qua MAVLink.
-ArduPilot giữ vai trò flight controller cấp thấp; Gazebo mô phỏng physics và
-sensor. Đây là reduced closed-loop velocity model, không phải full rigid-body
-reproduction của PA-MPPI.
+## Kết quả thí nghiệm hiện tại
 
-## Chạy bài chuẩn
+| Thí nghiệm | Thiết lập | Kết quả | Kết luận |
+|---|---|---|---|
+| Cruise đường thẳng | Đường thoáng 300 m, path-progress, retiming tắt, hai seed | Giữ gần 10 m/s khoảng 22 s ở cả hai seed | Hệ có khả năng đạt cruise cao khi chưa gặp cua/vật cản |
+| Phanh độc lập | 40 pha cruise→zero; 10 lần tại mỗi mức 4/6/8/10 m/s | Quãng dừng median lần lượt 4.00/7.81/13.48/20.10 m | Công thức `v×0.25 + v²/(2×3)` dự đoán thiếu ở 40/40 pha; thiếu lớn nhất 1.302 m tại 10 m/s |
+| Feasible-selection headless 10 m/s | Yard run-up 60 m, 80 samples, seed 7/17 | 2/2 tới đích và LAND/disarm; peak 9.19/8.98 m/s; 21/11 cycle `N_safe=0`; 0 optimizer timeout | Đã sửa lỗi có safe sample nhưng output cuối không an toàn; chuyển động vẫn còn zero hold |
+| Gazebo GUI | Seed 7, chạy riêng 5 và 10 m/s, không bật RViz | Cả hai tới đích; peak 4.98 và 8.68 m/s | Đủ để demo GUI, chưa chứng minh giữ ổn định 10 m/s trong yard |
+| Experiment 7A | 12 failure + 8 control snapshots; K=80/160/320/640; 20 RNG/K; tổng 1.600 solve | Failure: `P_hit=0` ở mọi K. Control: `P_hit=1` ở mọi K | Tăng random samples không giải quyết `N_safe=0`; nguyên nhân hiện nghiêng về viability loss hoặc độ nhạy model/margin |
 
-Yêu cầu đã được kiểm tra trong project:
+Các giới hạn cần giữ khi báo cáo:
 
-- macOS, Gazebo Harmonic;
-- ArduPilot tại `~/Projects/ardupilot`, đã build `build/sitl/bin/arducopter`;
-- repository này tại `~/Projects/ardupilot_gazebo`;
-- Python environment có `numpy`, `torch`, `PyYAML`, `pymavlink` và Gazebo Python
-  bindings. Các lệnh dưới dùng environment
-  `/opt/miniconda3/envs/ardupilot-rviz` của máy thí nghiệm.
+- Hai seed thành công là checkpoint, chưa phải thống kê độ tin cậy.
+- `collision_radius_m=1.5` là center clearance, chưa hiệu chuẩn thành rotor và
+  estimator envelope.
+- Zero setpoint khi `N_safe=0` chưa phải verified emergency trajectory.
+- Kết quả chỉ áp dụng cho Gazebo/ArduPilot SITL, chưa phải chứng nhận bay thật.
 
-Build plugin và world:
+Chi tiết số liệu và lập luận:
+
+- [Checkpoint dành cho mentor](docs/MPPI_MENTOR_CHECKPOINT_AND_NEXT_PHASE_VI.md)
+- [Feasibility-selection](docs/MPPI_FEASIBLE_SELECTION_VI.md)
+- [Mô hình phanh và safety gate](docs/MPPI_MENTOR_SAFETY_PHASE_VI.md)
+- [Kết quả Experiment 7A](results/yard_experiment7a_20260916/)
+- [Claim-to-source audit](docs/SOURCE_AUDIT.md)
+
+## Chạy Gazebo 3D bằng 5 terminal
+
+Các lệnh gốc đã chạy trên macOS. Trên Ubuntu, đường dẫn Python/Gazebo có thể
+khác; dùng Python environment đã cài `numpy`, `torch`, `PyYAML`, `pymavlink` và
+Gazebo Python bindings. ArduPilot được giả định ở `~/Projects/ardupilot`, repo
+này ở `~/Projects/ardupilot_gazebo`.
+
+Chuẩn bị một lần:
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build -j4
-/opt/miniconda3/envs/ardupilot-rviz/bin/python scripts/build_yard_runup60.py
+cmake --build build -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+python3 scripts/build_yard_runup60.py
 ```
 
-Chạy headless, mỗi trial boot một Gazebo/SITL mới và tự takeoff, chạy planner,
-LAND, lưu log:
+### Terminal 1 — Gazebo server
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
-PY=/opt/miniconda3/envs/ardupilot-rviz/bin/python
-
-$PY scripts/run_yard_speed_ablation.py \
-  --scenario yard-runup60 \
-  --speeds 5 10 --seeds 7 \
-  --config config/experiments/mppi_yard_progress_feasible80.yaml \
-  --params config/experiments/mppi_yard_high_accel.parm \
-  --timeout 90 \
-  --output "output/benchmark/yard_$(date +%Y%m%d_%H%M%S)"
+export GZ_PARTITION=ardupilot_yard_5_10
+export GZ_SIM_SYSTEM_PLUGIN_PATH="$PWD/build"
+export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/worlds"
+gz sim -v2 -r "$PWD/worlds/iris_mppi_yard_runup60.sdf" -s
 ```
 
-Thêm `--gui` và đổi sang
-[`mppi_yard_progress_feasible80_gui.yaml`](config/experiments/mppi_yard_progress_feasible80_gui.yaml)
-để xem Gazebo 3D. Không mở thêm RViz trong lượt đo tốc độ; camera/depth bridge và
-sampled-trajectory visualization làm thay đổi tải realtime. Quy trình năm
-terminal để quan sát và xử lý lỗi kết nối nằm trong
-[quickstart](docs/RUN_YARD_5_10_MS_QUICKSTART_VI.md).
-
-## Tái lập Experiment 7A
-
-Thu exact planner snapshots ở hai seed:
-
-```bash
-PY=/opt/miniconda3/envs/ardupilot-rviz/bin/python
-
-$PY scripts/run_yard_speed_ablation.py \
-  --scenario yard-runup60 --speeds 10 --seeds 7 17 \
-  --config config/experiments/mppi_yard_progress_feasible80.yaml \
-  --params config/experiments/mppi_yard_high_accel.parm --timeout 60 \
-  --debug-snapshot-events --debug-control-stride 20 \
-  --output output/benchmark/yard_experiment7a_capture
-
-$PY scripts/select_experiment7a_snapshots.py \
-  output/benchmark/yard_experiment7a_capture \
-  --output output/benchmark/yard_experiment7a_selection
-
-$PY scripts/replay_experiment7a.py \
-  output/benchmark/yard_experiment7a_selection \
-  --samples 80 160 320 640 --realizations 20 \
-  --output output/benchmark/yard_experiment7a_replay
-```
-
-Kết quả đã commit để đọc nhanh:
-
-- [selection manifest](results/yard_experiment7a_20260916/manifest.json)
-- [replay summary](results/yard_experiment7a_20260916/summary.json)
-- [ESS/cost-gap analysis](results/yard_experiment7a_20260916/analysis.json)
-- [1.600 solve records](results/yard_experiment7a_20260916/solves.csv)
-
-## Kiểm thử
+### Terminal 2 — Gazebo GUI
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
-  /opt/miniconda3/envs/ardupilot-rviz/bin/python -m pytest -q tests
+export GZ_PARTITION=ardupilot_yard_5_10
+export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/worlds"
+gz sim -v1 -g --gui-config "$PWD/config/gazebo_runway_camera.config"
 ```
 
-`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` tránh xung đột giữa pytest mới và ROS
-`launch_testing` cài trong cùng environment. Unit tests kiểm tra frame/MAVLink,
-A*, retiming, response model, stopping geometry, final trajectory gate,
-feasibility weighting và proposal recovery. Test pass không thay thế kiểm chứng
-closed-loop Gazebo.
+### Terminal 3 — ArduPilot SITL và MAVProxy
+
+```bash
+cd ~/Projects/ardupilot
+python3 Tools/autotest/sim_vehicle.py \
+  -v ArduCopter -f JSON -N -w \
+  -A "--serial1=tcp:2" \
+  --custom-location=-35.363262,149.165237,584,0 \
+  --add-param-file="$HOME/Projects/ardupilot_gazebo/config/experiments/mppi_yard_high_accel.parm"
+```
+
+Đợi EKF sẵn sàng, sau đó nhập trong MAVProxy:
+
+```text
+mode guided
+arm throttle
+takeoff 5
+```
+
+Chờ UAV hover ổn định gần `(0,0,5)` trước khi chạy Terminal 5.
+
+### Terminal 4 — ROS 2 bridge và RViz
+
+```bash
+cd ~/Projects/ardupilot_gazebo
+export GZ_PARTITION=ardupilot_yard_5_10
+export ROS_DOMAIN_ID=45
+./scripts/run_sensor_rviz.sh
+```
+
+Terminal này dùng để quan sát camera, depth và trajectory. RViz làm tăng tải
+realtime; nếu UAV bay chậm hoặc planner timeout, đóng Terminal 4 rồi chạy lại
+để đánh giá controller. Kết quả benchmark trong bảng không bật RViz.
+
+### Terminal 5 — MPPI planner
+
+Chọn `YARD_SPEED=5` hoặc `YARD_SPEED=10`, và sửa `PYTHON` nếu environment nằm
+ở đường dẫn khác:
+
+```bash
+cd ~/Projects/ardupilot_gazebo
+export GZ_PARTITION=ardupilot_yard_5_10
+export ROS_DOMAIN_ID=45
+
+PYTHON=/opt/miniconda3/envs/ardupilot-rviz/bin/python
+YARD_SPEED=10
+YARD_SEED=7
+RUN_TAG=$(date +%Y%m%d_%H%M%S)
+mkdir -p output/log
+
+MAVLINK20=1 "$PYTHON" scripts/mppi_velocity_avoidance.py \
+  --planner mppi \
+  --config config/experiments/mppi_yard_progress_feasible80_gui.yaml \
+  --mav tcp:127.0.0.1:5762 \
+  --goal '77.1,-1.9,5' \
+  --global-path '0,0,5;60,0,5;60.5,-4,5;73,-4,5;77.1,-1.9,5' \
+  --reference-speed-m-s "$YARD_SPEED" \
+  --vmax "$YARD_SPEED" \
+  --seed "$YARD_SEED" \
+  --diag-every 20 \
+  --diag-jsonl "output/log/yard_gui_v${YARD_SPEED}_seed${YARD_SEED}_${RUN_TAG}.jsonl" \
+  --exit-on-goal
+```
+
+Planner thoát khi tới đích nhưng không tự LAND. Trong MAVProxy Terminal 3:
+
+```text
+mode land
+```
+
+Muốn đổi tốc độ, dừng cả phiên, khởi động lại năm terminal và cất cánh từ đầu.
+Không chạy lượt 10 m/s ngay từ vị trí kết thúc của lượt 5 m/s.
+
+Nếu UAV không cất cánh dù MAVProxy đã nhận lệnh, kiểm tra chỉ có một Gazebo
+server và server đó đang giữ UDP 9002:
+
+```bash
+ps -axo pid,command | grep '[g]z sim -v2'
+lsof -nP -iUDP:9002
+```
 
 ## Bản đồ repository
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [`mppi_ardupilot/`](mppi_ardupilot/) | MPPI, response model, map geometry, safety predicate và MAVLink interface |
+| [`mppi_ardupilot/mppi_controller.py`](mppi_ardupilot/mppi_controller.py) | MPPI rollout, objective, proposal và weighting |
+| [`mppi_ardupilot/mppi_local_planner_node.py`](mppi_ardupilot/mppi_local_planner_node.py) | Closed-loop planner, conditioner, gate và diagnostics |
+| [`mppi_ardupilot/trajectory_safety.py`](mppi_ardupilot/trajectory_safety.py) | Safety predicate dùng chung cho sample và output cuối |
+| [`mppi_ardupilot/braking.py`](mppi_ardupilot/braking.py) | Hình học stopping segment |
+| [`mppi_ardupilot/known_geometry.py`](mppi_ardupilot/known_geometry.py) | Prior SDF từ world |
+| [`mppi_ardupilot/global_planner.py`](mppi_ardupilot/global_planner.py) | Known-map 2.5D A* |
 | [`scripts/mppi_velocity_avoidance.py`](scripts/mppi_velocity_avoidance.py) | Entry point planner live |
-| [`scripts/run_yard_speed_ablation.py`](scripts/run_yard_speed_ablation.py) | Harness Gazebo/SITL cô lập, ghi log và cleanup |
-| [`scripts/replay_experiment7a.py`](scripts/replay_experiment7a.py) | Replay sample-count/RNG trên exact snapshots |
-| [`config/experiments/`](config/experiments/) | Profile controller; profile `feasible80` là baseline hiện tại |
-| [`worlds/iris_mppi_yard_runup60.sdf`](worlds/iris_mppi_yard_runup60.sdf) | World bãi container với đoạn lấy đà 60 m |
-| [`tests/`](tests/) | Regression tests cho controller, geometry và safety |
-| [`docs/`](docs/) | Protocol, kết quả, giới hạn và lệnh tái lập |
-| [`results/yard_experiment7a_20260916/`](results/yard_experiment7a_20260916/) | Kết quả gọn đã commit; raw Gazebo logs được giữ ngoài Git |
+| [`scripts/run_yard_speed_ablation.py`](scripts/run_yard_speed_ablation.py) | Harness Gazebo/SITL tự động |
+| [`scripts/replay_experiment7a.py`](scripts/replay_experiment7a.py) | Replay sample-count/RNG offline |
+| [`config/experiments/`](config/experiments/) | Controller profiles và SITL parameters |
+| [`worlds/iris_mppi_yard_runup60.sdf`](worlds/iris_mppi_yard_runup60.sdf) | World bãi container, đoạn lấy đà 60 m |
+| [`tests/`](tests/) | Regression tests cho dynamics, geometry, selection và safety |
+| [`docs/RUN_YARD_5_10_MS_QUICKSTART_VI.md`](docs/RUN_YARD_5_10_MS_QUICKSTART_VI.md) | Hướng dẫn chạy đầy đủ và troubleshooting |
+| [`results/yard_experiment7a_20260916/`](results/yard_experiment7a_20260916/) | Manifest, summary, ESS analysis và 1.600 solve records |
 
-## Phạm vi kết luận
-
-Kết quả hiện tại chỉ xác nhận hành vi trên Gazebo/ArduPilot SITL và các seed đã
-nêu. `collision_radius_m=1.5` là center clearance chưa hiệu chuẩn thành rotor/
-estimator envelope. Zero hold chưa phải verified emergency trajectory. Phase
-tiếp theo là sensitivity test cho response, delay, horizon và margin, sau đó mới
-chọn giữa hiệu chuẩn model và recursive-feasibility recovery.
-
-Các mô tả liên quan paper được giới hạn theo
-[`SOURCE_AUDIT.md`](docs/SOURCE_AUDIT.md). Tài liệu tham khảo nằm trong
-[`reports/pa_mppi_sources.bib`](reports/pa_mppi_sources.bib).
-
-## Nền tảng Gazebo plugin
-
-Phần C++ plugin, model gimbal/sensor và các world gốc vẫn giữ tương thích với
-upstream. Hướng dẫn kiểm tra SITL–Gazebo, transport topics và sensor threading
-nằm tại [closed-loop runtime walkthrough](docs/closed_loop_runtime_walkthrough_vi.md).
+Phần Gazebo plugin C++, model và world gốc vẫn giữ từ upstream. Luồng SITL,
+Gazebo Transport và sensor được mô tả tại
+[closed-loop runtime walkthrough](docs/closed_loop_runtime_walkthrough_vi.md).
 
 Giấy phép: [BSD 3-Clause](LICENSE.md).
