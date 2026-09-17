@@ -2,6 +2,7 @@ import csv
 import importlib.util
 import json
 import math
+import signal
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +50,25 @@ def test_m7_baseline_is_performance_mode_and_100ms_deadline():
     assert local["visualization.max_mppi_samples"] == 0
     assert local["mppi.samples"] == 80
     assert local["mppi.path_progress_objective"] is True
+
+
+def test_m7_cleanup_stops_children_after_launch_leader_exits(monkeypatch):
+    runner = load_script("run_m7_scenario")
+    sent = []
+    probes = iter([None, PermissionError()])
+
+    def fake_killpg(process_group, group_signal):
+        sent.append((process_group, group_signal))
+        if group_signal == 0:
+            outcome = next(probes)
+            if outcome is not None:
+                raise outcome
+
+    monkeypatch.setattr(runner.os, "killpg", fake_killpg)
+    monkeypatch.setattr(runner.time, "sleep", lambda _: None)
+    runner.stop_process_group(1234, grace_s=0.01)
+    assert sent[0] == (1234, signal.SIGINT)
+    assert any(group_signal == 0 for _, group_signal in sent)
 
 
 def test_s02_geometry_really_creates_an_approximately_45_degree_turn():

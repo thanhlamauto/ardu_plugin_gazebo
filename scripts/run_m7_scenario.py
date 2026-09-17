@@ -76,6 +76,30 @@ def process_ids(pattern: str) -> list[int]:
     return [int(value) for value in result.stdout.split() if int(value) != os.getpid()]
 
 
+def process_group_exists(process_group: int) -> bool:
+    try:
+        os.killpg(process_group, 0)
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+
+
+def stop_process_group(process_group: int, grace_s: float = 10.0) -> None:
+    """Stop every launch child even when the ros2 launch leader exited first."""
+    for group_signal, wait_s in ((signal.SIGINT, grace_s),
+                                 (signal.SIGTERM, 3.0),
+                                 (signal.SIGKILL, 1.0)):
+        try:
+            os.killpg(process_group, group_signal)
+        except (ProcessLookupError, PermissionError):
+            return
+        deadline = time.monotonic() + wait_s
+        while time.monotonic() < deadline:
+            if not process_group_exists(process_group):
+                return
+            time.sleep(0.1)
+
+
 class M7Recorder:
     def __init__(self, node: Any, scenario: dict[str, Any], stream: Any,
                  start_immediately: bool, allow_process_faults: bool,
@@ -439,12 +463,12 @@ def main() -> int:
         print(f"{'PASS' if success else 'FAIL'} {scenario['id']}: {recorder.reason}")
         return 0 if success else 2
     finally:
-        if launch is not None and launch.poll() is None:
-            os.killpg(launch.pid, signal.SIGINT)
+        if launch is not None:
+            stop_process_group(launch.pid)
             try:
-                launch.wait(timeout=10)
+                launch.wait(timeout=1)
             except subprocess.TimeoutExpired:
-                os.killpg(launch.pid, signal.SIGTERM)
+                pass
 
 
 if __name__ == "__main__":
