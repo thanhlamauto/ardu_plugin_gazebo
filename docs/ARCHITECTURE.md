@@ -4,8 +4,8 @@
 conditioner, MPPI dynamics/rollout/objective/optimizer sang C++ thuần và kiểm
 parity bằng golden fixtures. M5 đã nối các module vào `local_navigation_node`,
 ROS 2 launch, Gazebo/ArduPilot SITL closed loop, diagnostics và RViz cost view.
-MAVLink vẫn dùng bridge Python mỏng đã kiểm chứng; C++ autopilot adapter thuộc
-M6.
+M6 đã thay bridge Python bằng C++ `autopilot_adapter_node`; MAVROS chịu trách
+nhiệm transport và ENU→NED. Python không còn nằm trong runtime control path.
 
 ## 1. Mục tiêu
 
@@ -22,10 +22,10 @@ Phạm vi kiến trúc đã chốt:
 - định nghĩa visualization và test matrix;
 - đóng gói để người sau có thể thay adapter mà dùng lại cùng core.
 
-Chưa triển khai sau Milestone 5:
+Chưa triển khai sau Milestone 6:
 
 - PA-MPPI;
-- C++ MAVLink/autopilot adapter và hardware qualification;
+- hardware qualification;
 - full simulation stress matrix và edge-device benchmark;
 - tuning thuật toán ngoài cấu hình MPPI hiện đã kiểm chứng.
 
@@ -34,7 +34,6 @@ Chưa triển khai sau Milestone 5:
 Pipeline Python vẫn là oracle/regression baseline. Luồng C++/ROS 2 hiện đã chạy
 closed loop trong Gazebo/ArduPilot SITL, nhưng còn các khoảng trống:
 
-- bridge MAVLink M5 còn là Python và chỉ dành cho SITL;
 - SITL vẫn cần operator arm/takeoff/land, không thuộc navigation launch;
 - chưa chạy đủ stress matrix và chưa đo p95/p99 trên edge device mục tiêu;
 - hardware sensor/localization/map adapters chưa được chốt.
@@ -63,6 +62,10 @@ Obstacle representation ►│ Local Planner (MPPI)  │
                                     │ safe control
                          ┌──────────▼───────────┐
                          │ Autopilot Adapter     │
+                         └──────────┬───────────┘
+                                    │ safe TwistStamped
+                         ┌──────────▼───────────┐
+                         │ MAVROS                │
                          └──────────┬───────────┘
                                     │ MAVLink
                                     ▼
@@ -144,8 +147,8 @@ Chỉ chứa launch, ROS parameter YAML và RViz config.
 - `navigation.rviz`: goal, cost grid, paths và MPPI sample cost.
 
 `sim.launch.xml` chạy Gazebo server/GUI, bridge odometry/TF/LiDAR, C++ global
-planner, C++ local navigation và RViz. Bridge MAVLink Python tạm thời được tắt
-mặc định vì operator phải arm/takeoff SITL trước khi planner gửi setpoint.
+planner, C++ local navigation và RViz. C++ adapter + MAVROS được tắt mặc định
+để operator arm/takeoff SITL trước khi planner gửi setpoint.
 
 ## 5. Core C++ contracts
 
@@ -214,7 +217,8 @@ Source of truth mục tiêu:
 | `global_planner` | algorithm, resolution, bounds, clearance, altitude policy |
 | `local_navigation` | rate, horizon, samples, temperature, limits, costs, response model |
 | `local_navigation` | stopping/collision predicate và conditioner vì cùng process |
-| `autopilot_adapter` | transport URL, frame conversion, heartbeat, command timeout |
+| `autopilot_adapter` | readiness mode, command limits, heartbeat và command timeout |
+| MAVROS launch/config | FCU transport URL, system/component ID và ENU→NED conversion |
 | `local_navigation` | publish rate, sample count, color/range |
 | ArduPilot `.parm` | flight-controller parameters; không copy vào planner YAML |
 
@@ -232,7 +236,7 @@ ArduPilot SITL
 ros_gz_bridge / robot_state_publisher
 global_planner_node
 local_navigation_node
-safe_twist_to_mavlink.py (M5, thay bằng C++ ở M6)
+autopilot_adapter_node + MAVROS
 optional RViz
 ```
 
@@ -243,7 +247,7 @@ LiDAR driver + localization/VIO/LIO
 sensor/state adapters
 global_planner_node
 local_navigation_node
-C++ autopilot adapter (M6)
+C++ autopilot adapter + MAVROS
 optional RViz
 ```
 
@@ -334,7 +338,7 @@ control-loop critical path.
 4. MPPI C++ CPU và component-level parity — hoàn thành.
 5. ROS local navigation, cost visualization và Gazebo/SITL closed loop — hoàn
    thành ở mức integration checkpoint.
-6. C++ autopilot adapter — M6.
+6. C++ autopilot adapter + MAVROS — hoàn thành.
 7. Full launch regression, stress matrix và deadline statistics — M7.
 8. ARM64/x86-64 artifact, HIL và hardware qualification — M8.
 9. PA-MPPI — chỉ bắt đầu sau khi kiến trúc deployment ổn định.
@@ -348,7 +352,7 @@ port; không xóa trước khi C++ đạt parity.
 2. Edge device cụ thể, CPU/GPU/RAM và có CUDA hay không?
 3. Global map trên phần cứng là prior map, online occupancy hay cả hai?
 4. Localization source và frame tree chính thức?
-5. MAVLink trực tiếp hay qua MAVROS/ROS bridge?
+5. MAVROS là backend M6; direct MAVLink chỉ được cân nhắc lại nếu profiling edge yêu cầu.
 6. Safety/recovery nằm trong process local navigation hay một supervisor riêng?
 7. Có cho phép runtime parameter update đối với nhóm nào?
 8. Acceptance rate, latency và hardware test gates cần đạt?

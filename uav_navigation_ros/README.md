@@ -33,10 +33,16 @@ are `WAITING_FOR_STATE`, `WAITING_FOR_PATH`, `WAITING_FOR_OBSTACLES`, `ACTIVE`,
 published. The full timed trajectory remains in-process; `nav_msgs/Path` is
 only a visualization.
 
-`safe_twist_to_mavlink.py` is the temporary M5 SITL bridge. It converts the
-verified ENU velocity/yaw-rate command to MAVLink local NED. It does not arm,
-take off, change mode or invent a command when the C++ node stops publishing.
-The C++ autopilot adapter is the scope of M6.
+`autopilot_adapter_node` is the C++ boundary between navigation and MAVROS. It
+validates the safe ENU command, monitors `/mavros/state`, and republishes only
+while the FCU is connected, armed, in `GUIDED`, and the command is fresh.
+MAVROS owns ENU-to-NED conversion and MAVLink transport. The adapter never arms
+or changes mode. Its states are `DISCONNECTED`, `CONNECTED_NOT_READY`, `READY`,
+`STREAMING`, `STALE_COMMAND` and `FAULT`.
+
+`CommandTranslator`, `ConnectionMonitor` and `IAutopilotBackend` keep command
+validation, readiness policy and transport boundary independently testable.
+The previous Python MAVLink bridge is no longer installed or used by launch.
 
 All runtime parameters are owned by
 `uav_navigation_bringup/config/navigation.yaml`.

@@ -83,10 +83,16 @@ local_navigation:
 
 autopilot_adapter:
   ros__parameters:
-    transport: mavlink
-    connection_url: tcp:127.0.0.1:5762
     input_frame: odom
-    command_timeout_s: 0.5
+    required_mode: GUIDED
+    command_timeout_s: 0.25
     heartbeat_timeout_s: 2.0
+    setpoint_rate_hz: 10.0
+    max_speed_xy_m_s: 10.0
+    max_speed_z_m_s: 0.6
+    max_yaw_rate_rad_s: 0.6
     arm_on_start: false
     input_topic: /control/safe_velocity_command
+    mavros_setpoint_topic: /mavros/setpoint_velocity/cmd_vel
+    mavros_state_topic: /mavros/state
+    diagnostics_topic: /diagnostics

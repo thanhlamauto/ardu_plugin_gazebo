@@ -12,12 +12,12 @@ ArduPilot điều khiển UAV trong Gazebo.
 
 ## Kiến trúc hệ thống
 
-**Trạng thái: M5 integration checkpoint.** A*, trajectory safety, command
+**Trạng thái: M6 integration checkpoint.** A*, trajectory safety, command
 conditioning và MPPI đã nằm trong core C++ thuần. ROS 2 nodes đã chạy global
 planning, local MPPI, safety, diagnostics và RViz visualization trong một
-launch; closed loop Gazebo/ArduPilot SITL đã đi từ takeoff tới goal. Python còn
-được giữ làm regression oracle và bridge MAVLink SITL tạm thời. M6 sẽ thay
-bridge này bằng C++ trước khi chuyển sang hardware qualification.
+launch. C++ autopilot adapter dùng MAVROS cho frame conversion và MAVLink; đường
+runtime điều khiển không còn Python. Closed loop Gazebo/ArduPilot SITL đã đi từ
+takeoff tới goal. Python chỉ còn là regression oracle cho thuật toán cũ.
 
 Tài liệu thiết kế chính là
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), bao gồm trách nhiệm module,
@@ -152,7 +152,7 @@ Workflow hướng tới dùng ROS 2 launch để phối hợp các thành phần
 - [`hardware.launch.xml`](uav_navigation_bringup/launch/hardware.launch.xml)
   dành cho sensor thật và edge device trong tương lai.
 
-`sim.launch.xml` hiện là entry point M5 cho Gazebo, bridges, C++ planners và
+`sim.launch.xml` hiện là entry point M6 cho Gazebo, bridges, C++ planners và
 RViz. `hardware.launch.xml` mới chỉ là boundary dự kiến và chưa sẵn sàng flight.
 
 Thiết kế visualization gồm global costmap, global path, local predicted
@@ -362,6 +362,7 @@ flowchart LR
 | Feasible-selection headless 10 m/s | Yard run-up 60 m, 80 samples, seed 7/17 | 2/2 tới đích và LAND/disarm; peak 9.19/8.98 m/s; 21/11 cycle `N_safe=0`; 0 optimizer timeout | Đã sửa lỗi có safe sample nhưng output cuối không an toàn; chuyển động vẫn còn zero hold |
 | Gazebo GUI | Seed 7, chạy riêng 5 và 10 m/s, không bật RViz | Cả hai tới đích; peak 4.98 và 8.68 m/s | Đủ để demo GUI, chưa chứng minh giữ ổn định 10 m/s trong yard |
 | Experiment 7A | 12 failure + 8 control snapshots; K=80/160/320/640; 20 RNG/K; tổng 1.600 solve | Failure: `P_hit=0` ở mọi K. Control: `P_hit=1` ở mọi K | Tăng random samples không giải quyết `N_safe=0`; nguyên nhân hiện nghiêng về viability loss hoặc độ nhạy model/margin |
+| M6 C++ adapter | MAVROS, axis bench và closed loop từ `(2.55,2.47,6.07)` tới `(30,2.5,5)` | Dấu X/Y/Z/yaw đúng; tới goal sau 24.4 s; peak XY 6.06 m/s; command/FCU loss chuyển `STALE_COMMAND`/`DISCONNECTED` | Runtime control path không còn Python; chưa phải benchmark controller tốc độ cao |
 
 Các giới hạn cần giữ khi báo cáo:
 
@@ -385,6 +386,8 @@ Trên Ubuntu ROS 2 Jazzy, build cả package Gazebo gốc và ba package navigat
 (ba package navigation nằm lồng trong repo nên cần liệt kê `--base-paths`):
 
 ```bash
+sudo apt install ros-jazzy-mavros ros-jazzy-mavros-msgs
+sudo /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh
 source /opt/ros/jazzy/setup.bash
 colcon build \
   --base-paths . uav_navigation_core uav_navigation_ros uav_navigation_bringup \
@@ -404,7 +407,7 @@ python3 Tools/autotest/sim_vehicle.py \
   --add-param-file="$HOME/Projects/ardupilot_gazebo/config/experiments/mppi_yard_high_accel.parm"
 ```
 
-Terminal 2 chạy toàn bộ Gazebo/ROS 2 navigation stack M5:
+Terminal 2 chạy toàn bộ Gazebo/ROS 2 navigation stack M6:
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
@@ -415,12 +418,13 @@ ros2 launch uav_navigation_bringup sim.launch.xml \
 
 Trong MAVProxy, chạy `mode guided`, `arm throttle`, `takeoff 5`; chờ hover ổn
 định rồi mới đặt **2D Goal Pose** trong RViz. Không đặt goal trước takeoff vì
-bridge M5 sẽ forward setpoint local planner ngay khi path tồn tại. Khi tới đích,
+adapter sẽ forward setpoint local planner ngay khi path tồn tại. Khi tới đích,
 operator vẫn phải `mode land`.
 
-Launch này thay workflow năm terminal cho kiến trúc C++ M5. Bridge MAVLink vẫn
-là Python mỏng và sẽ được thay bằng C++ ở M6. Dùng baseline bên dưới khi cần tái
-lập chính xác số liệu thí nghiệm cũ.
+Launch này thay workflow năm terminal cho kiến trúc C++ M6. Adapter C++ chỉ
+forward command khi FCU connected, armed, ở `GUIDED` và command chưa quá 250
+ms; MAVROS xử lý ENU→NED và MAVLink. Dùng baseline bên dưới khi cần tái lập
+chính xác số liệu thí nghiệm cũ.
 
 ## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
 

@@ -8,6 +8,7 @@
   <arg name="enable_global_planner" default="false"/>
   <arg name="enable_local_navigation" default="false"/>
   <arg name="enable_autopilot_adapter" default="false"/>
+  <arg name="fcu_url" default="/dev/ttyACM0:57600"/>
   <arg name="enable_rviz" default="false"/>
 
   <!-- A hardware map adapter must provide CostGrid before enabling this node. -->
@@ -20,9 +21,14 @@
     <param from="$(var params_file)"/>
   </node>
   <node if="$(var enable_autopilot_adapter)" pkg="uav_navigation_ros"
-        exec="safe_twist_to_mavlink.py" name="autopilot_adapter" output="screen">
+        exec="autopilot_adapter_node" name="autopilot_adapter" output="screen">
     <param from="$(var params_file)"/>
   </node>
+  <include if="$(var enable_autopilot_adapter)"
+           file="$(find-pkg-share mavros)/launch/apm.launch">
+    <arg name="fcu_url" value="$(var fcu_url)"/>
+    <arg name="namespace" value="mavros"/>
+  </include>
   <node if="$(var enable_rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
         args="-d $(var rviz_config)" output="screen"/>
 </launch>
