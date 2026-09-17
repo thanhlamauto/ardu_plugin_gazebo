@@ -5,18 +5,179 @@ Integral (MPPI)** trên **ArduPilot SITL + Gazebo Harmonic**. Bài thử chính 
 UAV lấy đà 60 m, đạt cruise request 5 hoặc 10 m/s, tự giảm tốc để qua các góc
 cua trong bãi container rồi tăng tốc lại.
 
-Kiến trúc C++/ROS 2 cho edge deployment đã được mentor duyệt và đang được hiện
-thực theo từng vertical slice tại [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-Milestone 1 đã chạy end-to-end phần global planning: A* C++ thuần → ROS 2 node
-→ costmap/path trên RViz → Gazebo. Milestone 2 đã port trajectory safety và
-velocity command conditioner sang C++ thuần, có golden test đối chiếu baseline
-Python. MPPI thí nghiệm vẫn giữ bản Python làm regression baseline cho đến
-milestone port local planner.
-
 Đây là phần mở rộng nghiên cứu trên nền
 [`ArduPilot/ardupilot_gazebo`](https://github.com/ArduPilot/ardupilot_gazebo).
 MPPI chạy trên companion side, gửi velocity/yaw-rate setpoint cho ArduPilot;
 ArduPilot điều khiển UAV trong Gazebo.
+
+## Kiến trúc hệ thống
+
+**Trạng thái: Architecture reviewed — approved for implementation.** Project
+ban đầu phát triển như một workflow thí nghiệm Python/Gazebo: Gazebo, SITL,
+sensor bridge, RViz và planner được mở thủ công ở nhiều terminal; tham số nằm
+rải rác trong CLI và script; thuật toán, simulator I/O và runtime policy chưa có
+ranh giới đủ rõ để chuyển lên edge device. Kiến trúc đã được review và project
+đang được tổ chức lại thành navigation stack C++/ROS 2 có thể tái sử dụng. Bản
+Python hiện tại tiếp tục là baseline đã kiểm chứng để tái lập và so sánh
+regression; toàn bộ stack mới chưa được xem là đã hoàn thiện.
+
+Tài liệu thiết kế chính là
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), bao gồm trách nhiệm module,
+core interfaces, ROS topic contracts, quy ước frame, QoS, quyền sở hữu tham số,
+ranh giới simulation/hardware, xử lý lỗi, thiết kế RViz và chiến lược test.
+Các boundary và quyền sở hữu này cho phép developer khác tiếp quản từng module
+mà không phải phụ thuộc vào workflow thí nghiệm cũ.
+
+Dependency chỉ đi theo một chiều:
+
+```text
+uav_navigation_bringup
+        |
+        v
+uav_navigation_ros
+        |
+        v
+uav_navigation_core
+```
+
+### `uav_navigation_core`
+
+[`uav_navigation_core/`](uav_navigation_core/) sở hữu planning algorithms,
+trajectory/safety logic và reusable data structures. Public API/header của core
+được thiết kế không chứa ROS messages, Gazebo APIs hoặc MAVLink APIs để cùng
+thuật toán có thể dùng trong simulation và sau này trên edge device. Build
+skeleton vẫn có thể dùng `ament_cmake`; điều này không có nghĩa repository hiện
+đã là một shared library hoàn toàn độc lập và sẵn sàng deployment.
+
+Ranh giới này là quyết định riêng của project, dựa trên nhu cầu portability và
+maintainability. Nó phù hợp với động lực chung của ROS 2 về phần mềm robot
+modular, scalable và reusable được trình bày bởi Macenski và cộng sự trong
+[“Robot Operating System 2: Design, architecture, and uses in the wild”](https://doi.org/10.1126/scirobotics.abm6074),
+nhưng paper không quy định cấu trúc ba package cụ thể này.
+
+### `uav_navigation_ros`
+
+[`uav_navigation_ros/`](uav_navigation_ros/) sở hữu ROS 2 nodes,
+topic/service/action communication, chuyển đổi ROS message ↔ core type và các
+adapter riêng cho simulation hoặc hardware. Thuật toán vì vậy không trực tiếp
+sở hữu kết nối simulator.
+
+Nav2 là tham chiếu kiến trúc cho cách tách planning, control, environmental
+representation và integration thành các server/plugin có interface rõ ràng;
+project này không implement hoặc kế thừa Nav2. Xem
+[Nav2 Navigation Servers](https://docs.nav2.org/jazzy/getting_started/navigation_concepts/navigation_servers/),
+[Nav2 Navigation Plugins](https://docs.nav2.org/jazzy/configuration_and_development/navigation_plugins/)
+và paper gốc
+[“The Marathon 2: A Navigation System”](https://doi.org/10.1109/IROS45743.2020.9341207).
+
+### `uav_navigation_bringup`
+
+[`uav_navigation_bringup/`](uav_navigation_bringup/) sở hữu launch files, ROS
+2 parameter YAML, RViz configuration, simulation bringup và hardware bringup
+tương lai. System orchestration thuộc lớp này thay vì được mã hóa thành một
+chuỗi terminal thủ công. ROS 2 launch được thiết kế để mô tả, cấu hình và khởi
+động hệ thống gồm nhiều executable/node; cách tổ chức package theo tài liệu
+[ROS 2 Jazzy: Integrating launch files into ROS 2 packages](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Launch-system.html).
+
+Luồng hệ thống được thiết kế như sau:
+
+```text
+Sensors / State Estimation
+          |
+          v
+     Map / Costmap
+          |
+          v
+    Global Planner
+          |
+          v
+      Global Path
+          |
+          v
+     Local Planner
+          |
+          v
+    Safety Checking
+          |
+          v
+ Command Conditioning
+          |
+          v
+   Autopilot Adapter
+          |
+          v
+       ArduPilot
+```
+
+Các boundary tách environmental representation, global planning, local
+control, safety và autopilot integration. Cách phân rã planner/controller/map
+được tham khảo từ Nav2 Navigation Servers và *The Marathon 2*, nhưng data model
+và flight-control semantics ở đây được thiết kế cho UAV.
+
+Simulation và hardware dùng chung navigation core; chỉ adapter thay đổi:
+
+```text
+Gazebo / simulated sensors ----\
+                                > Navigation Core
+Real sensors / localization ---/
+```
+
+Autopilot adapter cô lập transport và flight-controller interface khỏi planner.
+Đây cũng là điểm thay thế giữa SITL và flight controller thật. Thiết kế này dựa
+trên interface boundary mà tài liệu chính thức
+[ArduPilot ROS 2 Interfaces](https://ardupilot.org/dev/docs/ros2-interfaces.html)
+mô tả cho state, odometry và vehicle services; README không coi hardware
+deployment là đã hoàn tất.
+
+### Environmental representation và costmap
+
+Map/cost representation là input riêng cho planner thay vì nằm trong thuật
+toán hoặc simulator adapter. Grid costmap biểu diễn free space, occupied space,
+vùng inflated/high-cost và obstacle information từ sensor; planner có thể dùng
+representation này để kiểm collision hoặc tránh vùng có cost cao. Cách phân
+tách này được tham khảo từ
+[Nav2 Costmap 2D](https://docs.nav2.org/jazzy/configuration_and_development/configuration_guide/core_servers/costmap_2d/),
+nơi static, obstacle và inflation layers cung cấp environmental representation
+cho planner/controller. Project chỉ dùng đây như tham chiếu; UAV có thể cần
+adapter 2.5D/3D thay vì sao chép trực tiếp costmap 2D của Nav2.
+
+### Config, launch và RViz
+
+Algorithm và runtime parameters được tập trung trong
+[`uav_navigation_bringup/config/navigation.yaml`](uav_navigation_bringup/config/navigation.yaml),
+với mỗi nhóm tham số có module sở hữu rõ ràng, thay vì nằm rải rác trong lệnh
+terminal hoặc hard-code trong script.
+
+Workflow hướng tới dùng ROS 2 launch để phối hợp các thành phần:
+
+- [`sim.launch.xml`](uav_navigation_bringup/launch/sim.launch.xml) dành cho tích
+  hợp phía Gazebo/simulation;
+- [`hardware.launch.xml`](uav_navigation_bringup/launch/hardware.launch.xml)
+  dành cho sensor thật và edge device trong tương lai.
+
+Hai launch file thể hiện ranh giới và entry point dự kiến; chúng không hàm ý
+mọi component đã hoàn thiện hoặc sẵn sàng production.
+
+Thiết kế visualization gồm global costmap, global path, local predicted
+trajectory, MPPI candidate/sample trajectory hoặc cost, obstacle và chọn goal
+tương tác từ RViz. Mục tiêu là quan sát được dữ liệu cost mà global planner sử
+dụng và debug quyết định của planner. Cấu hình nằm tại
+[`uav_navigation_bringup/rviz/navigation.rviz`](uav_navigation_bringup/rviz/navigation.rviz).
+
+### Nguồn tham khảo kiến trúc
+
+- S. Macenski et al.,
+  [“Robot Operating System 2: Design, architecture, and uses in the wild,”](https://doi.org/10.1126/scirobotics.abm6074)
+  *Science Robotics*, 2022.
+- S. Macenski et al.,
+  [“The Marathon 2: A Navigation System,”](https://doi.org/10.1109/IROS45743.2020.9341207)
+  IEEE/RSJ IROS, 2020.
+- [ROS 2 Jazzy launch documentation](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Launch-system.html).
+- [Nav2 Navigation Servers](https://docs.nav2.org/jazzy/getting_started/navigation_concepts/navigation_servers/),
+  [Navigation Plugins](https://docs.nav2.org/jazzy/configuration_and_development/navigation_plugins/)
+  và [Costmap 2D](https://docs.nav2.org/jazzy/configuration_and_development/configuration_guide/core_servers/costmap_2d/).
+- [ArduPilot ROS 2 Interfaces](https://ardupilot.org/dev/docs/ros2-interfaces.html)
+  và upstream [ArduPilot ROS integration](https://github.com/ArduPilot/ardupilot_ros).
 
 ## Trạng thái controller
 
@@ -73,7 +234,7 @@ Chi tiết số liệu và lập luận:
 - [Kết quả Experiment 7A](results/yard_experiment7a_20260916/)
 - [Claim-to-source audit](docs/SOURCE_AUDIT.md)
 
-## C++ Milestone 1–2
+## ROS 2 architecture workflow
 
 Trên Ubuntu ROS 2 Jazzy, build cả package Gazebo gốc và ba package navigation
 (ba package navigation nằm lồng trong repo nên cần liệt kê `--base-paths`):
@@ -87,28 +248,22 @@ colcon build \
 source install/setup.bash
 ```
 
-Sau đó chạy:
+Entry point dành cho simulation được thiết kế là:
 
 ```bash
 ros2 launch uav_navigation_bringup sim.launch.xml
 ```
 
-Lệnh này mở Gazebo server/GUI, bridge `/iris/odometry`, C++ global planner và
-RViz. Chọn **2D Goal Pose** trong RViz để cập nhật `/planning/global_path`;
-`/planning/global_costmap` hiển thị footprint SDF đã inflate. Toàn bộ tham số A*
-nằm trong
-[`uav_navigation_bringup/config/navigation.yaml`](uav_navigation_bringup/config/navigation.yaml).
-
-Safety checker và conditioner của Milestone 2 hiện là thư viện core đã test,
-chưa được nối vào ROS node hay thay controller Python đang bay trong Gazebo.
-Milestone kế tiếp port MPPI dynamics/rollout rồi mới compose ba phần trong
-`local_navigation_node`.
+Launch này là workflow mục tiêu thay cho việc mở nhiều terminal thủ công. Một
+số component vẫn đang được hoàn thiện; dùng baseline Python bên dưới khi cần
+tái lập chính xác các thí nghiệm hiện tại.
 
 ## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
 
 > Đây là workflow hiện tại dùng để tái lập các kết quả đã báo cáo. Nó được giữ
-> làm regression oracle trong quá trình port. Kiến trúc mục tiêu sẽ thay năm
-> terminal bằng ROS 2 launch theo từng milestone.
+> để tái lập thí nghiệm trước đây, so sánh regression và xác nhận hành vi trong
+> quá trình chuyển đổi kiến trúc. Đây không phải kiến trúc deployment cuối;
+> workflow mục tiêu dùng ROS 2 launch và các module C++/ROS 2 ở trên.
 
 Các lệnh gốc đã chạy trên macOS. Trên Ubuntu, đường dẫn Python/Gazebo có thể
 khác; dùng Python environment đã cài `numpy`, `torch`, `PyYAML`, `pymavlink` và
@@ -228,10 +383,10 @@ lsof -nP -iUDP:9002
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Kiến trúc C++/ROS 2 đã duyệt, contracts, topics, failure policy và test plan |
-| [`uav_navigation_core/`](uav_navigation_core/) | C++ types/interfaces, A*, trajectory safety và command conditioner thuần; không phụ thuộc ROS/Gazebo/SDF |
-| [`uav_navigation_ros/`](uav_navigation_ros/) | SDF simulation adapter và C++ `global_planner_node` |
-| [`uav_navigation_bringup/`](uav_navigation_bringup/) | Launch/config/RViz; Milestone 1 chạy global planner end-to-end |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System-design baseline: module, interfaces, topics, frame/QoS, failure policy và test strategy |
+| [`uav_navigation_core/`](uav_navigation_core/) | Navigation algorithms, safety contracts và reusable C++ core API |
+| [`uav_navigation_ros/`](uav_navigation_ros/) | ROS 2 nodes, message conversion và simulation/hardware adapters |
+| [`uav_navigation_bringup/`](uav_navigation_bringup/) | Launch, parameter YAML và RViz configuration |
 | [`mppi_ardupilot/mppi_controller.py`](mppi_ardupilot/mppi_controller.py) | MPPI rollout, objective, proposal và weighting |
 | [`mppi_ardupilot/mppi_local_planner_node.py`](mppi_ardupilot/mppi_local_planner_node.py) | Closed-loop planner, conditioner, gate và diagnostics |
 | [`mppi_ardupilot/trajectory_safety.py`](mppi_ardupilot/trajectory_safety.py) | Safety predicate dùng chung cho sample và output cuối |
