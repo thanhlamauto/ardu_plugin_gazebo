@@ -9,7 +9,10 @@ add_library(${PROJECT_NAME} SHARED
   src/astar_planner.cpp
   src/command_conditioner.cpp
   src/cost_grid.cpp
+  src/mppi/cost_evaluator.cpp
   src/mppi/dynamics.cpp
+  src/mppi/optimizer.cpp
+  src/mppi/path_reference.cpp
   src/mppi/rollout.cpp
   src/trajectory_safety_checker.cpp)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
@@ -49,6 +52,18 @@ if(BUILD_TESTING)
   target_compile_definitions(test_mppi_rollout PRIVATE
     UAV_NAVIGATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures")
   add_test(NAME mppi_rollout_tests COMMAND test_mppi_rollout)
+
+  add_executable(test_mppi_cost test/test_mppi_cost.cpp)
+  target_link_libraries(test_mppi_cost PRIVATE ${PROJECT_NAME})
+  target_compile_definitions(test_mppi_cost PRIVATE
+    UAV_NAVIGATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures")
+  add_test(NAME mppi_cost_tests COMMAND test_mppi_cost)
+
+  add_executable(test_mppi_optimizer test/test_mppi_optimizer.cpp)
+  target_link_libraries(test_mppi_optimizer PRIVATE ${PROJECT_NAME})
+  target_compile_definitions(test_mppi_optimizer PRIVATE
+    UAV_NAVIGATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures")
+  add_test(NAME mppi_optimizer_tests COMMAND test_mppi_optimizer)
 endif()
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

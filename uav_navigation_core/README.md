@@ -13,12 +13,16 @@ Implemented core components:
 - deterministic MPPI multirotor dynamics and single/batch rollout APIs, including
   command conditioning, velocity response, optional XY acceleration/jerk memory
   and timestamp propagation.
+- deterministic MPPI cost evaluation for the Python `project` and `paper`
+  profiles, with a component-level `CostBreakdown`;
+- injected-noise MPPI updates, bounded effective-noise accounting, native C++
+  Gaussian sampling, M2 feasible-sample weighting and recovery proposals.
 
 `ICollisionEnvironment` is the only static-geometry contract. Simulation can
 adapt an SDF and hardware can adapt an ESDF or voxel map without either
-dependency entering this library. Safety, conditioner and MPPI dynamics golden
-fixtures are generated from the validated Python baseline and consumed by CTest
-without starting Python.
+dependency entering this library. Safety, conditioner, MPPI dynamics, objective
+and optimizer-update golden fixtures are generated from the validated Python
+baseline and consumed by CTest without starting Python.
 
 Standalone build and tests:
 
@@ -35,4 +39,5 @@ validated Python behavior:
 ```bash
 PYTHONPATH=. python3 scripts/generate_m2_golden_fixtures.py
 PYTHONPATH=. python3 scripts/generate_m3_mppi_golden_fixtures.py
+PYTHONPATH=. python3 scripts/generate_m4_mppi_golden_fixtures.py
 ```
