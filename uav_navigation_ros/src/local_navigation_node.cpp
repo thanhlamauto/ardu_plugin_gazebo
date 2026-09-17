@@ -148,6 +148,10 @@ public:
     obstacle_timeout_s_ = declare_parameter<double>("obstacle_timeout_s", 1.0);
     max_compute_time_ms_ =
         declare_parameter<double>("max_compute_time_ms", 80.0);
+    const double validation_deadline_override = declare_parameter<double>(
+        "validation.max_compute_time_ms_override", -1.0);
+    if (validation_deadline_override > 0.0)
+      max_compute_time_ms_ = validation_deadline_override;
     goal_tolerance_m_ = declare_parameter<double>("goal_tolerance_m", 0.5);
     goal_speed_tolerance_m_s_ =
         declare_parameter<double>("goal_speed_tolerance_m_s", 0.5);
@@ -155,6 +159,8 @@ public:
         declare_parameter<int64_t>("obstacle_max_points", 800);
     visualization_rate_hz_ =
         declare_parameter<double>("visualization.publish_rate_hz", 5.0);
+    visualization_enabled_ =
+        declare_parameter<bool>("visualization.enabled", true);
     const auto visualization_max_samples =
         declare_parameter<int64_t>("visualization.max_mppi_samples", 80);
 
@@ -230,6 +236,11 @@ public:
         declare_parameter<double>("mppi.collision_weight", 1.0e6);
     cost.collision_radius_m =
         declare_parameter<double>("safety.collision_radius_m", 1.5);
+    const double validation_collision_radius_override =
+        declare_parameter<double>("validation.collision_radius_m_override",
+                                  -1.0);
+    if (validation_collision_radius_override > 0.0)
+      cost.collision_radius_m = validation_collision_radius_override;
     cost.collision_cost_buffer_m =
         declare_parameter<double>("mppi.collision_cost_buffer_m", 0.0);
     cost.w_effort = declare_parameter<double>("mppi.effort_weight", 0.05);
@@ -289,6 +300,8 @@ public:
         "obstacles_topic", "/perception/obstacles");
     const auto output_topic = declare_parameter<std::string>(
         "output_command_topic", "/control/safe_velocity_command");
+    const auto raw_output_topic = declare_parameter<std::string>(
+        "raw_command_topic", "/control/raw_velocity_command");
     const auto predicted_topic = declare_parameter<std::string>(
         "predicted_path_topic", "/planning/mppi/predicted_path");
     const auto samples_topic = declare_parameter<std::string>(
@@ -298,6 +311,8 @@ public:
 
     command_publisher_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(output_topic, 1);
+    raw_command_publisher_ =
+        create_publisher<geometry_msgs::msg::TwistStamped>(raw_output_topic, 1);
     predicted_path_publisher_ =
         create_publisher<nav_msgs::msg::Path>(predicted_topic, 1);
     sample_publisher_ = create_publisher<visualization_msgs::msg::MarkerArray>(
@@ -324,9 +339,11 @@ public:
     control_timer_ =
         create_wall_timer(std::chrono::duration<double>(1.0 / control_rate_hz_),
                           [this] { ControlCycle(); });
-    visualization_timer_ = create_wall_timer(
-        std::chrono::duration<double>(1.0 / visualization_rate_hz_),
-        [this] { PublishVisualization(); });
+    if (visualization_enabled_) {
+      visualization_timer_ = create_wall_timer(
+          std::chrono::duration<double>(1.0 / visualization_rate_hz_),
+          [this] { PublishVisualization(); });
+    }
     RCLCPP_INFO(get_logger(),
                 "local navigation ready: %zu samples x %zu steps, %.1f Hz, "
                 "deadline %.1f ms",
@@ -596,6 +613,15 @@ private:
       }
     }
 
+    geometry_msgs::msg::TwistStamped raw_command;
+    raw_command.header.stamp = now();
+    raw_command.header.frame_id = planning_frame_;
+    raw_command.twist.linear.x = selected_actions.front().velocity_enu_m_s.x;
+    raw_command.twist.linear.y = selected_actions.front().velocity_enu_m_s.y;
+    raw_command.twist.linear.z = selected_actions.front().velocity_enu_m_s.z;
+    raw_command.twist.angular.z = selected_actions.front().yaw_rate_enu_rad_s;
+    raw_command_publisher_->publish(raw_command);
+
     const auto conditioner_started = std::chrono::steady_clock::now();
     const auto safe_control =
         conditioner_->Apply(ToCoreState(state_), selected_actions.front());
@@ -632,19 +658,26 @@ private:
       squared_weights += weight * weight;
     const double ess = squared_weights > 0 ? 1.0 / squared_weights : 0.0;
     last_result_ = std::move(result);
+    double best_feasible_cost = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < last_result_->total_costs.size(); ++i)
+      if (last_result_->safe[i])
+        best_feasible_cost =
+            std::min(best_feasible_cost, last_result_->total_costs[i]);
     PublishDiagnostic(total_ms, last_result_->rollout_time_ms,
                       last_result_->cost_time_ms,
                       last_result_->safety_time_ms + final_safety_ms,
                       last_result_->weights.size(), safe_count, ess,
                       std::min(final_safety.minimum_collision_clearance_m,
                                final_safety.minimum_stopping_clearance_m),
-                      conditioner_ms);
+                      conditioner_ms, best_feasible_cost);
   }
 
   void PublishDiagnostic(double total_ms, double rollout_ms, double cost_ms,
                          double safety_ms, std::size_t samples,
                          std::size_t safe_samples, double ess, double clearance,
-                         double conditioner_ms = 0.0) {
+                         double conditioner_ms = 0.0,
+                         double best_feasible_cost =
+                             std::numeric_limits<double>::infinity()) {
     diagnostic_msgs::msg::DiagnosticArray message;
     message.header.stamp = now();
     diagnostic_msgs::msg::DiagnosticStatus status;
@@ -670,6 +703,14 @@ private:
         KeyValue("safe_samples", std::to_string(safe_samples)),
         KeyValue("ess", std::to_string(ess)),
         KeyValue("minimum_clearance_m", std::to_string(clearance)),
+        KeyValue("best_feasible_cost", std::to_string(best_feasible_cost)),
+        KeyValue("cross_track_error_m",
+                 reference_path_
+                     ? std::to_string(reference_path_->Distance(
+                           state_.position_enu_m))
+                     : "0"),
+        KeyValue("deadline_miss",
+                 mode_ == Mode::kPlannerTimeout ? "true" : "false"),
         KeyValue("path_progress_m",
                  reference_path_ ? std::to_string(reference_path_->Progress(
                                        state_.position_enu_m))
@@ -761,6 +802,7 @@ private:
   std::size_t obstacle_max_points_{800};
   std::size_t visualization_max_samples_{80};
   bool proactive_proposals_{true};
+  bool visualization_enabled_{true};
   bool have_state_{false};
   bool have_obstacles_{false};
   Mode mode_{Mode::kWaitingForState};
@@ -787,6 +829,8 @@ private:
   tf2_ros::TransformListener tf_listener_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr
       command_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr
+      raw_command_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr predicted_path_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       sample_publisher_;

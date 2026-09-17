@@ -1,0 +1,10 @@
+schema_version: 1
+id: S04
+name: static_obstacle_detour
+purpose: Validate A-star and MPPI handoff around static obstacles.
+world: worlds/iris_mppi_slalom.sdf
+goal_enu_m: [30.0, 0.0, 5.0]
+timeout_s: 75
+repetitions: 10
+expected_terminal_modes: [GOAL_REACHED]
+tags: [core, global_planner, obstacle]

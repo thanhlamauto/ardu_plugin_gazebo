@@ -1,0 +1,13 @@
+schema_version: 1
+id: S08
+name: replan_while_moving
+purpose: Validate live global/local handoff from Goal A to Goal B.
+world: worlds/iris_mppi_speed_straight.sdf
+goal_enu_m: [80.0, 0.0, 5.0]
+replans:
+  - after_s: 5.0
+    goal_enu_m: [35.0, 15.0, 5.0]
+timeout_s: 60
+repetitions: 5
+expected_terminal_modes: [GOAL_REACHED]
+tags: [failure, replan]

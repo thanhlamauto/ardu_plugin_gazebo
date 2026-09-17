@@ -1,0 +1,10 @@
+schema_version: 1
+id: S02
+name: turn_45deg
+purpose: Track a path with an approximately 45 degree change of direction.
+world: worlds/iris_mppi_turn45.sdf
+goal_enu_m: [30.0, 0.0, 5.0]
+timeout_s: 60
+repetitions: 10
+expected_terminal_modes: [GOAL_REACHED]
+tags: [core, tracking, turn]

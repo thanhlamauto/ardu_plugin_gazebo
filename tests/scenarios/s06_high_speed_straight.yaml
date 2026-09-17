@@ -1,0 +1,10 @@
+schema_version: 1
+id: S06
+name: high_speed_straight
+purpose: Validate 10 m/s cruise request and stopping/runtime safety.
+world: worlds/iris_mppi_speed_brake_long.sdf
+goal_enu_m: [150.0, 0.0, 5.0]
+timeout_s: 45
+repetitions: 10
+expected_terminal_modes: [GOAL_REACHED]
+tags: [core, high_speed, safety]

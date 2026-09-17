@@ -1,8 +1,11 @@
+# Frozen M7 validation baseline. Do not tune this file during a validation set.
+# Copy it to a separate tuning file, validate the change, then deliberately
+# replace this baseline and start a new result set/config hash.
 global_planner:
   ros__parameters:
     algorithm: astar
     planning_frame: odom
-    world_file: ""  # sim.launch.xml overrides this with the selected installed world
+    world_file: ""
     planning_altitude_m: 5.0
     resolution_m: 0.5
     clearance_m: 1.8
@@ -26,7 +29,7 @@ local_navigation:
     control_rate_hz: 10.0
     state_timeout_s: 1.0
     obstacle_timeout_s: 1.0
-    max_compute_time_ms: 80.0
+    max_compute_time_ms: 100.0
     goal_tolerance_m: 0.5
     goal_speed_tolerance_m_s: 0.5
     obstacle_max_points: 800
@@ -34,6 +37,7 @@ local_navigation:
     global_path_topic: /planning/global_path
     obstacles_topic: /perception/obstacles
     raw_command_topic: /control/raw_velocity_command
+    output_command_topic: /control/safe_velocity_command
     predicted_path_topic: /planning/mppi/predicted_path
     cost_samples_topic: /planning/mppi/cost_samples
     diagnostics_topic: /diagnostics
@@ -78,10 +82,9 @@ local_navigation:
     safety.stopping_delay_s: 0.25
     safety.stopping_uncertainty_m: 0.0
     conditioner.alpha: 0.30
-    visualization.enabled: true
+    visualization.enabled: false
     visualization.publish_rate_hz: 5.0
-    visualization.max_mppi_samples: 80
-    output_command_topic: /control/safe_velocity_command
+    visualization.max_mppi_samples: 0
 
 autopilot_adapter:
   ros__parameters:

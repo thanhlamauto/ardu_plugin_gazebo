@@ -1,0 +1,10 @@
+schema_version: 1
+id: S07
+name: goal_blocked
+purpose: Verify that A-star reports NO_PATH for an occupied goal.
+world: worlds/iris_mppi_narrow_gate.sdf
+goal_enu_m: [10.0, 5.375, 5.0]
+timeout_s: 15
+repetitions: 5
+expected_global_status: NO_PATH
+tags: [failure, global_planner]

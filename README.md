@@ -12,12 +12,14 @@ ArduPilot điều khiển UAV trong Gazebo.
 
 ## Kiến trúc hệ thống
 
-**Trạng thái: M6 integration checkpoint.** A*, trajectory safety, command
+**Trạng thái: M7 validation infrastructure.** A*, trajectory safety, command
 conditioning và MPPI đã nằm trong core C++ thuần. ROS 2 nodes đã chạy global
 planning, local MPPI, safety, diagnostics và RViz visualization trong một
 launch. C++ autopilot adapter dùng MAVROS cho frame conversion và MAVLink; đường
 runtime điều khiển không còn Python. Closed loop Gazebo/ArduPilot SITL đã đi từ
-takeoff tới goal. Python chỉ còn là regression oracle cho thuật toán cũ.
+takeoff tới goal. M7 đã khóa config, định nghĩa ma trận S01–S10 và ghi structured
+metrics; campaign lặp đầy đủ chưa chạy xong. Python chỉ còn là regression oracle
+và công cụ orchestration/phân tích, không nằm trong runtime control path.
 
 Tài liệu thiết kế chính là
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), bao gồm trách nhiệm module,
@@ -374,6 +376,7 @@ Các giới hạn cần giữ khi báo cáo:
 
 Chi tiết số liệu và lập luận:
 
+- [Protocol validation M7](docs/M7_VALIDATION.md)
 - [Checkpoint dành cho mentor](docs/MPPI_MENTOR_CHECKPOINT_AND_NEXT_PHASE_VI.md)
 - [Feasibility-selection](docs/MPPI_FEASIBLE_SELECTION_VI.md)
 - [Mô hình phanh và safety gate](docs/MPPI_MENTOR_SAFETY_PHASE_VI.md)
@@ -407,7 +410,7 @@ python3 Tools/autotest/sim_vehicle.py \
   --add-param-file="$HOME/Projects/ardupilot_gazebo/config/experiments/mppi_yard_high_accel.parm"
 ```
 
-Terminal 2 chạy toàn bộ Gazebo/ROS 2 navigation stack M6:
+Terminal 2 chạy toàn bộ Gazebo/ROS 2 navigation stack:
 
 ```bash
 cd ~/Projects/ardupilot_gazebo
@@ -421,10 +424,28 @@ Trong MAVProxy, chạy `mode guided`, `arm throttle`, `takeoff 5`; chờ hover �
 adapter sẽ forward setpoint local planner ngay khi path tồn tại. Khi tới đích,
 operator vẫn phải `mode land`.
 
-Launch này thay workflow năm terminal cho kiến trúc C++ M6. Adapter C++ chỉ
+Launch này thay workflow năm terminal cho kiến trúc C++. Adapter C++ chỉ
 forward command khi FCU connected, armed, ở `GUIDED` và command chưa quá 250
 ms; MAVROS xử lý ENU→NED và MAVLink. Dùng baseline bên dưới khi cần tái lập
 chính xác số liệu thí nghiệm cũ.
+
+### Chạy validation M7
+
+Sau khi Terminal 1 đã mở SITL, chạy một performance trial bằng baseline đã khóa
+ở Terminal 2:
+
+```bash
+source install/setup.bash
+python3 scripts/run_m7_scenario.py tests/scenarios/s01_straight.yaml \
+  --run 1 --seed 7
+```
+
+Runner khởi động Gazebo/ROS headless, gửi goal và ghi manifest cùng JSONL.
+Trong lúc runner chờ, nhập `mode guided`, `arm throttle`, `takeoff 5` tại
+MAVProxy; goal chỉ được gửi sau khi UAV đã lên trên 4 m. Ma
+trận scenario, fault variants, acceptance criteria và cách tạo `summary.csv`
+nằm trong [M7 validation protocol](docs/M7_VALIDATION.md). Không dùng run bật
+RViz để đưa ra kết luận timing.
 
 ## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
 

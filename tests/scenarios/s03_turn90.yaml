@@ -1,0 +1,10 @@
+schema_version: 1
+id: S03
+name: turn_90deg
+purpose: Cornering through the L-shaped corridor.
+world: worlds/iris_mppi_right_angle.sdf
+goal_enu_m: [10.0, 13.0, 5.0]
+timeout_s: 60
+repetitions: 10
+expected_terminal_modes: [GOAL_REACHED]
+tags: [core, tracking, turn]

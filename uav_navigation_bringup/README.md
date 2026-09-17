@@ -46,6 +46,11 @@ conditioner, deadline, visualization and adapter parameters. The
 `local_navigation_node` publishes MPPI paths and cost markers itself on a
 separate 5 Hz timer, outside the 10 Hz control callback.
 
+M7 performance validation uses the frozen `config/m7_baseline.yaml`, which
+disables trajectory visualization and sets the 10 Hz deadline to 100 ms. The
+scenario runner, metrics and fault variants are documented in
+`../docs/M7_VALIDATION.md` in the source repository.
+
 MAVROS requires the GeographicLib `egm96-5` geoid dataset. On Ubuntu, install
 the MAVROS package and run its `install_geographiclib_datasets.sh` helper once
 before launch.

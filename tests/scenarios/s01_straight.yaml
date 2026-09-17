@@ -1,0 +1,10 @@
+schema_version: 1
+id: S01
+name: straight_30m
+purpose: Baseline path tracking on open ground.
+world: worlds/iris_mppi_speed_straight.sdf
+goal_enu_m: [30.0, 0.0, 5.0]
+timeout_s: 45
+repetitions: 10
+expected_terminal_modes: [GOAL_REACHED]
+tags: [core, tracking]

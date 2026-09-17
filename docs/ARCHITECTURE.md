@@ -339,7 +339,8 @@ control-loop critical path.
 5. ROS local navigation, cost visualization và Gazebo/SITL closed loop — hoàn
    thành ở mức integration checkpoint.
 6. C++ autopilot adapter + MAVROS — hoàn thành.
-7. Full launch regression, stress matrix và deadline statistics — M7.
+7. Full launch regression, stress matrix và deadline statistics — hạ tầng M7
+   đã có; campaign lặp và review kết quả đang chờ thực hiện.
 8. ARM64/x86-64 artifact, HIL và hardware qualification — M8.
 9. PA-MPPI — chỉ bắt đầu sau khi kiến trúc deployment ổn định.
 

@@ -1,0 +1,40 @@
+schema_version: 1
+id: S10
+name: fcu_disconnect
+purpose: Verify adapter DISCONNECTED state and cessation of setpoints.
+world: worlds/iris_mppi_speed_straight.sdf
+goal_enu_m: [30.0, 0.0, 5.0]
+timeout_s: 20
+repetitions: 5
+expected_adapter_states: [DISCONNECTED]
+default_variant: fcu_disconnect
+variants:
+  fcu_disconnect:
+    expected_adapter_states: [DISCONNECTED]
+    fault:
+      after_s: 5.0
+      action: suspend_process
+      process_pattern: __node:=mavros
+      restore_after_s: 2.5
+  local_planner_death:
+    expected_adapter_states: [STALE_COMMAND]
+    fault:
+      after_s: 5.0
+      action: suspend_process
+      process_pattern: __node:=local_navigation
+      restore_after_s: 1.0
+  wrong_mode:
+    expected_adapter_states: [CONNECTED_NOT_READY]
+    fault:
+      after_s: 5.0
+      action: run_command
+      argv: [ros2, service, call, /mavros/set_mode, mavros_msgs/srv/SetMode,
+             "{custom_mode: LOITER}"]
+  disarm:
+    expected_adapter_states: [CONNECTED_NOT_READY]
+    fault:
+      after_s: 5.0
+      action: run_command
+      argv: [ros2, service, call, /mavros/cmd/arming, mavros_msgs/srv/CommandBool,
+             "{value: false}"]
+tags: [failure, fcu, safety]

@@ -1,0 +1,32 @@
+schema_version: 1
+id: S09
+name: stale_input
+purpose: Verify HOLD_STALE and that old commands do not continue.
+world: worlds/iris_mppi_speed_straight.sdf
+goal_enu_m: [30.0, 0.0, 5.0]
+timeout_s: 20
+repetitions: 5
+expected_terminal_modes: [HOLD_STALE]
+default_variant: stale_odometry
+variants:
+  stale_odometry:
+    expected_terminal_modes: [HOLD_STALE]
+    fault:
+      after_s: 5.0
+      action: suspend_process
+      process_pattern: __node:=odometry_bridge
+      restore_after_s: 2.0
+  stale_obstacle:
+    expected_terminal_modes: [HOLD_STALE]
+    fault:
+      after_s: 5.0
+      action: suspend_process
+      process_pattern: __node:=obstacle_bridge
+      restore_after_s: 2.0
+  planner_deadline:
+    expected_terminal_modes: [PLANNER_TIMEOUT]
+    launch_overrides: [validation_max_compute_time_ms:=0.001]
+  no_safe_trajectory:
+    expected_terminal_modes: [NO_SAFE_TRAJECTORY]
+    launch_overrides: [validation_collision_radius_m:=100.0]
+tags: [failure, stale_input, safety]

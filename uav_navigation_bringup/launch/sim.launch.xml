@@ -6,6 +6,10 @@
        default="$(find-pkg-share uav_navigation_bringup)/rviz/navigation.rviz"/>
   <arg name="world_file"
        default="$(find-pkg-share ardupilot_gazebo)/worlds/iris_mppi_yard_runup60.sdf"/>
+  <arg name="gazebo_resource_path"
+       default="$(find-pkg-share ardupilot_gazebo)/models:$(find-pkg-share ardupilot_gazebo)/worlds"/>
+  <arg name="robot_description_file"
+       default="$(find-pkg-share ardupilot_gazebo)/config/iris_sensor_suite.urdf"/>
   <arg name="enable_gazebo" default="true"/>
   <arg name="enable_gazebo_gui" default="true"/>
   <arg name="enable_bridge" default="true"/>
@@ -13,31 +17,44 @@
   <arg name="enable_local_navigation" default="true"/>
   <arg name="enable_autopilot_adapter" default="false"/>
   <arg name="fcu_url" default="tcp://127.0.0.1:5762"/>
+  <arg name="mppi_seed" default="7"/>
+  <arg name="validation_max_compute_time_ms" default="-1.0"/>
+  <arg name="validation_collision_radius_m" default="-1.0"/>
   <arg name="enable_rviz" default="true"/>
 
   <executable if="$(var enable_gazebo)"
               cmd="gz_sim_entrypoint -s -r $(var world_file)"
               name="gazebo_server" output="screen" on_exit="shutdown">
     <env name="GZ_SIM_RESOURCE_PATH"
-         value="$(find-pkg-share ardupilot_gazebo)/models:$(find-pkg-share ardupilot_gazebo)/worlds"/>
+         value="$(var gazebo_resource_path)"/>
   </executable>
   <executable if="$(var enable_gazebo_gui)"
               cmd="gz_sim_entrypoint -g"
               name="gazebo_gui" output="screen">
     <env name="GZ_SIM_RESOURCE_PATH"
-         value="$(find-pkg-share ardupilot_gazebo)/models:$(find-pkg-share ardupilot_gazebo)/worlds"/>
+         value="$(var gazebo_resource_path)"/>
   </executable>
 
   <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
-        name="gazebo_bridge" output="screen"
-        args="/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /iris/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry /tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V /sensor_suite/lidar/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked">
+        name="clock_bridge" output="screen"
+        args="/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"/>
+  <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
+        name="odometry_bridge" output="screen"
+        args="/iris/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry">
     <remap from="/iris/odometry" to="/localization/odometry"/>
+  </node>
+  <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
+        name="tf_bridge" output="screen"
+        args="/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"/>
+  <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
+        name="obstacle_bridge" output="screen"
+        args="/sensor_suite/lidar/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked">
     <remap from="/sensor_suite/lidar/points" to="/perception/obstacles"/>
   </node>
 
   <node if="$(var enable_bridge)" pkg="robot_state_publisher"
         exec="robot_state_publisher" name="robot_state_publisher" output="screen"
-        args="$(find-pkg-share ardupilot_gazebo)/config/iris_sensor_suite.urdf"/>
+        args="$(var robot_description_file)"/>
 
   <node if="$(var enable_global_planner)" pkg="uav_navigation_ros"
         exec="global_planner_node" name="global_planner" output="screen">
@@ -48,6 +65,11 @@
   <node if="$(var enable_local_navigation)" pkg="uav_navigation_ros"
         exec="local_navigation_node" name="local_navigation" output="screen">
     <param from="$(var params_file)"/>
+    <param name="mppi.seed" value="$(var mppi_seed)"/>
+    <param name="validation.max_compute_time_ms_override"
+           value="$(var validation_max_compute_time_ms)"/>
+    <param name="validation.collision_radius_m_override"
+           value="$(var validation_collision_radius_m)"/>
   </node>
   <node if="$(var enable_autopilot_adapter)" pkg="uav_navigation_ros"
         exec="autopilot_adapter_node" name="autopilot_adapter" output="screen">
