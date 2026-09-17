@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Architecture contract only. The planned C++ executables do not exist yet.
+  Keep architecture_only=true until mentor approval and implementation.
+-->
+<launch>
+  <arg name="architecture_only" default="true"/>
+  <arg name="params_file"
+       default="$(find-pkg-share uav_navigation_bringup)/config/navigation.yaml"/>
+  <arg name="rviz_config"
+       default="$(find-pkg-share uav_navigation_bringup)/rviz/navigation.rviz"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="world" default="iris_mppi_yard_runup60.sdf"/>
+  <arg name="ardupilot_dir" default="$(env HOME)/Projects/ardupilot"/>
+
+  <group unless="$(var architecture_only)">
+    <!-- Gazebo/SITL/ros_gz_bridge actions will be added after launch design review. -->
+    <node pkg="uav_navigation_ros" exec="global_planner_node"
+          name="global_planner" output="screen">
+      <param from="$(var params_file)"/>
+    </node>
+    <node pkg="uav_navigation_ros" exec="local_navigation_node"
+          name="local_navigation" output="screen">
+      <param from="$(var params_file)"/>
+      <remap from="odometry" to="/localization/odometry"/>
+      <remap from="obstacles" to="/perception/obstacles"/>
+    </node>
+    <node pkg="uav_navigation_ros" exec="ardupilot_adapter_node"
+          name="autopilot_adapter" output="screen">
+      <param from="$(var params_file)"/>
+    </node>
+    <node pkg="uav_navigation_ros" exec="planning_visualizer_node"
+          name="planning_visualizer" output="screen">
+      <param from="$(var params_file)"/>
+    </node>
+    <node if="$(var use_rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
+          args="-d $(var rviz_config)" output="screen"/>
+  </group>
+</launch>

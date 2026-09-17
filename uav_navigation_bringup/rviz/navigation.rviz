@@ -1,0 +1,63 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Enabled: true
+      Name: Ground Grid
+      Plane: XY
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/Map
+      Enabled: true
+      Name: Global Costmap
+      Topic:
+        Value: /planning/global_costmap
+    - Class: rviz_default_plugins/Path
+      Color: 30; 220; 70
+      Enabled: true
+      Name: Global Path
+      Topic:
+        Value: /planning/global_path
+    - Class: rviz_default_plugins/Path
+      Color: 255; 255; 255
+      Enabled: true
+      Name: MPPI Predicted Path
+      Topic:
+        Value: /planning/mppi/predicted_path
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MPPI Sample Costs
+      Topic:
+        Value: /planning/mppi/cost_samples
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Obstacles
+      Topic:
+        Value: /perception/obstacles
+  Enabled: true
+  Global Options:
+    Background Color: 30; 32; 36
+    Fixed Frame: odom
+    Frame Rate: 20
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /goal_pose
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 40
+      Name: Planning Overview
+      Target Frame: odom
+    Saved: ~
+Window Geometry:
+  Height: 900
+  Width: 1500

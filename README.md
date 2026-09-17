@@ -5,6 +5,10 @@ Integral (MPPI)** trên **ArduPilot SITL + Gazebo Harmonic**. Bài thử chính 
 UAV lấy đà 60 m, đạt cruise request 5 hoặc 10 m/s, tự giảm tốc để qua các góc
 cua trong bãi container rồi tăng tốc lại.
 
+Kiến trúc C++/ROS 2 đề xuất cho edge deployment đang chờ mentor review tại
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Ba package bên dưới hiện chỉ là
+interface/bringup skeleton; controller chạy thí nghiệm vẫn là bản Python.
+
 Đây là phần mở rộng nghiên cứu trên nền
 [`ArduPilot/ardupilot_gazebo`](https://github.com/ArduPilot/ardupilot_gazebo).
 MPPI chạy trên companion side, gửi velocity/yaw-rate setpoint cho ArduPilot;
@@ -185,6 +189,10 @@ lsof -nP -iUDP:9002
 
 | Đường dẫn | Nội dung |
 |---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Kiến trúc C++/ROS 2 đề xuất, contracts, topics, failure policy và test plan |
+| [`uav_navigation_core/`](uav_navigation_core/) | C++ types/interfaces thuần, chưa chứa thuật toán đã port |
+| [`uav_navigation_ros/`](uav_navigation_ros/) | Skeleton ROS 2 adapters/nodes |
+| [`uav_navigation_bringup/`](uav_navigation_bringup/) | Launch/config/RViz skeleton cho simulation và hardware |
 | [`mppi_ardupilot/mppi_controller.py`](mppi_ardupilot/mppi_controller.py) | MPPI rollout, objective, proposal và weighting |
 | [`mppi_ardupilot/mppi_local_planner_node.py`](mppi_ardupilot/mppi_local_planner_node.py) | Closed-loop planner, conditioner, gate và diagnostics |
 | [`mppi_ardupilot/trajectory_safety.py`](mppi_ardupilot/trajectory_safety.py) | Safety predicate dùng chung cho sample và output cuối |
@@ -204,4 +212,4 @@ Phần Gazebo plugin C++, model và world gốc vẫn giữ từ upstream. Luồ
 Gazebo Transport và sensor được mô tả tại
 [closed-loop runtime walkthrough](docs/closed_loop_runtime_walkthrough_vi.md).
 
-Giấy phép: [BSD 3-Clause](LICENSE.md).
+Giấy phép: [LGPL-3.0](LICENSE.md).

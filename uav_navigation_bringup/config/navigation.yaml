@@ -1,0 +1,57 @@
+global_planner:
+  ros__parameters:
+    algorithm: astar
+    planning_frame: odom
+    resolution_m: 0.5
+    clearance_m: 1.8
+    vertical_clearance_m: 0.3
+    allow_diagonal: true
+    max_expansions: 250000
+    costmap_topic: /planning/global_costmap
+    path_topic: /planning/global_path
+
+local_navigation:
+  ros__parameters:
+    planning_frame: odom
+    body_frame: base_link
+    control_rate_hz: 10.0
+    state_timeout_s: 1.0
+    obstacle_timeout_s: 1.0
+    mppi.dt_s: 0.1
+    mppi.horizon_steps: 30
+    mppi.samples: 80
+    mppi.lambda: 1.0
+    mppi.max_speed_xy_m_s: 10.0
+    mppi.max_speed_z_m_s: 0.6
+    mppi.max_accel_xy_m_s2: 3.0
+    mppi.max_accel_z_m_s2: 0.4
+    mppi.path_weight: 400.0
+    mppi.progress_weight: 5000.0
+    mppi.speed_limit_weight: 10000.0
+    response.enabled: true
+    response.jerk_xy_m_s3: 4.0
+    safety.collision_radius_m: 1.5
+    safety.stopping_clearance_m: 1.5
+    safety.stopping_delay_s: 0.25
+    safety.stopping_uncertainty_m: 0.0
+    conditioner.alpha: 0.30
+    output_command_topic: /control/safe_velocity_command
+
+autopilot_adapter:
+  ros__parameters:
+    transport: mavlink
+    connection_url: tcp:127.0.0.1:5762
+    input_frame: odom
+    command_timeout_s: 0.5
+    heartbeat_timeout_s: 2.0
+    arm_on_start: false
+
+planning_visualizer:
+  ros__parameters:
+    enabled: true
+    publish_rate_hz: 5.0
+    max_mppi_samples: 80
+    global_costmap_topic: /planning/global_costmap
+    global_path_topic: /planning/global_path
+    predicted_path_topic: /planning/mppi/predicted_path
+    cost_samples_topic: /planning/mppi/cost_samples
