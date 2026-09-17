@@ -17,6 +17,9 @@ and candidate markers and must not be used for timing claims.
 
 Every run records the Git commit and SHA-256 hashes of the scenario, parameter
 file and world. This prevents results from silently mixing configurations.
+If the recorder/analyzer is fixed without rebuilding the controller, pass
+`--runtime-commit <commit>`; the manifest then records the controller/runtime
+commit separately from `harness_commit`.
 
 ## Scenario matrix
 

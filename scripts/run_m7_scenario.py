@@ -332,6 +332,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=ROOT / "results/m7")
     parser.add_argument("--run", type=int, default=1)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--runtime-commit",
+                        help="commit used to build runtime binaries; defaults to HEAD")
     parser.add_argument("--variant")
     parser.add_argument("--no-launch-stack", action="store_true")
     parser.add_argument("--debug-visualization", action="store_true")
@@ -372,10 +374,14 @@ def main() -> int:
         return 0
 
     run_dir.mkdir(parents=True, exist_ok=False)
+    harness_commit = git_commit()
+    runtime_commit = args.runtime_commit or harness_commit
+    if len(runtime_commit) < 7 or any(character not in "0123456789abcdef" for character in runtime_commit.lower()):
+        parser.error("--runtime-commit must be a hexadecimal Git commit")
     manifest = {
         "schema_version": 1, "scenario": scenario["id"], "scenario_name": scenario["name"],
         "run": args.run, "seed": args.seed, "variant": variant_name,
-        "git_commit": git_commit(),
+        "git_commit": runtime_commit, "harness_commit": harness_commit,
         "scenario_file": str(scenario_path.relative_to(ROOT)),
         "scenario_sha256": sha256(scenario_path), "config_file": str(params.relative_to(ROOT)),
         "config_sha256": sha256(params), "world_file": scenario["world"],
