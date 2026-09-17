@@ -18,6 +18,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -110,7 +111,7 @@ class M7Recorder:
         node.create_subscription(TwistStamped, "/control/raw_velocity_command", self.on_raw, 10)
         node.create_subscription(TwistStamped, "/control/safe_velocity_command", self.on_conditioned, 10)
         node.create_subscription(TwistStamped, "/mavros/setpoint_velocity/cmd_vel",
-                                 self.on_mavros_setpoint, 10)
+                                 self.on_mavros_setpoint, sensor_qos)
         node.create_subscription(DiagnosticArray, "/diagnostics", self.on_diagnostics, 50)
         global_qos = QoSProfile(depth=10)
         global_qos.durability = DurabilityPolicy.VOLATILE
@@ -380,6 +381,8 @@ def main() -> int:
         "config_sha256": sha256(params), "world_file": scenario["world"],
         "world_sha256": sha256(scenario["_world_path"]),
         "performance_mode": not args.debug_visualization,
+        "visualization": bool(args.debug_visualization),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "expected_terminal_modes": scenario.get("expected_terminal_modes", []),
         "expected_global_status": scenario.get("expected_global_status"),
         "expected_adapter_states": scenario.get("expected_adapter_states", []),

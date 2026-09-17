@@ -19,7 +19,11 @@ SUMMARY_FIELDS = [
     "cte_rms_m", "cte_p95_m", "peak_xy_speed_m_s", "peak_accel_m_s2",
     "compute_p50_ms", "compute_p95_ms", "compute_p99_ms", "compute_max_ms",
     "deadline_misses", "min_safe_samples", "ess_min", "collision",
+    "median_safe_samples", "ess_median", "best_feasible_cost_min",
+    "best_feasible_cost_median", "no_safe_trajectory_events",
+    "disconnected_events", "stale_command_events",
     "late_command_accepted", "stale_command_violations",
+    "setpoint_while_disarmed", "setpoint_in_wrong_mode",
     "replan_latency_ms", "replan_to_command_ms",
 ]
 
@@ -92,6 +96,8 @@ def summarize_run(path: Path) -> dict[str, Any]:
     clearance = _finite(row.get("controller", {}).get("minimum_clearance_m") for row in cycles)
     safe_samples = _finite(row.get("controller", {}).get("safe_samples") for row in cycles)
     ess = _finite(row.get("controller", {}).get("ess") for row in cycles)
+    feasible_costs = _finite(
+        row.get("controller", {}).get("best_feasible_cost") for row in cycles)
     local_modes = [row.get("controller", {}).get("mode") for row in cycles]
     global_statuses = [row.get("global_planner", {}).get("status") for row in rows]
     adapter_states = [row.get("adapter", {}).get("adapter_state") for row in rows]
@@ -129,6 +135,8 @@ def summarize_run(path: Path) -> dict[str, Any]:
         for row in cycles
     )
     stale_command_violations = 0
+    setpoint_while_disarmed = 0
+    setpoint_in_wrong_mode = 0
     previous_sequence = None
     unsafe_adapter_states = {"STALE_COMMAND", "DISCONNECTED", "CONNECTED_NOT_READY", "FAULT"}
     for row in (item for item in rows if item.get("event") == "adapter"):
@@ -137,6 +145,12 @@ def summarize_run(path: Path) -> dict[str, Any]:
                 row.get("adapter", {}).get("adapter_state") in unsafe_adapter_states and
                 sequence > previous_sequence):
             stale_command_violations += 1
+        if previous_sequence is not None and sequence is not None and sequence > previous_sequence:
+            adapter = row.get("adapter", {})
+            if adapter.get("armed") is False:
+                setpoint_while_disarmed += 1
+            if adapter.get("mode") not in (None, "GUIDED"):
+                setpoint_in_wrong_mode += 1
         previous_sequence = sequence
     goals = [row for row in rows if row.get("event") == "goal_published"]
     replan_latency_ms = math.nan
@@ -177,10 +191,19 @@ def summarize_run(path: Path) -> dict[str, Any]:
         "compute_max_ms": max(compute, default=math.nan),
         "deadline_misses": deadline_misses,
         "min_safe_samples": min(safe_samples, default=math.nan),
+        "median_safe_samples": statistics.median(safe_samples) if safe_samples else math.nan,
         "ess_min": min(ess, default=math.nan),
+        "ess_median": statistics.median(ess) if ess else math.nan,
+        "best_feasible_cost_min": min(feasible_costs, default=math.nan),
+        "best_feasible_cost_median": statistics.median(feasible_costs) if feasible_costs else math.nan,
+        "no_safe_trajectory_events": sum(mode == "NO_SAFE_TRAJECTORY" for mode in local_modes),
+        "disconnected_events": sum(state == "DISCONNECTED" for state in adapter_states),
+        "stale_command_events": sum(state == "STALE_COMMAND" for state in adapter_states),
         "collision": collision,
         "late_command_accepted": late_command_accepted,
         "stale_command_violations": stale_command_violations,
+        "setpoint_while_disarmed": setpoint_while_disarmed,
+        "setpoint_in_wrong_mode": setpoint_in_wrong_mode,
         "replan_latency_ms": replan_latency_ms,
         "replan_to_command_ms": replan_to_command_ms,
     }
@@ -207,17 +230,19 @@ def write_outputs(root: Path, summaries: list[dict[str, Any]]) -> None:
         by_scenario.setdefault(str(row["scenario"]), []).append(row)
     lines = ["# M7 validation result summary", "",
              "Generated from immutable per-run `events.jsonl` and `manifest.json` files.", "",
-             "| Scenario | Runs | Passed | Collision | Deadline misses | Late accepted | Stale command | Compute p99 worst (ms) | Min clearance (m) |",
-             "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
+             "| Scenario | Runs | Success | Collision | Deadline misses | Late accepted | Stale setpoint | Disarmed setpoint | Wrong-mode setpoint | Compute p99 worst (ms) | Min clearance (m) |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for scenario, rows in sorted(by_scenario.items()):
         p99 = _finite(row["compute_p99_ms"] for row in rows)
         clearance = _finite(row["min_clearance_m"] for row in rows)
         lines.append(
-            f"| {scenario} | {len(rows)} | {sum(bool(r['success']) for r in rows)} | "
+            f"| {scenario} | {len(rows)} | {sum(bool(r['success']) for r in rows) / len(rows):.1%} | "
             f"{sum(bool(r['collision']) for r in rows)} | "
             f"{sum(int(r['deadline_misses']) for r in rows)} | "
             f"{sum(int(r['late_command_accepted']) for r in rows)} | "
             f"{sum(int(r['stale_command_violations']) for r in rows)} | "
+            f"{sum(int(r['setpoint_while_disarmed']) for r in rows)} | "
+            f"{sum(int(r['setpoint_in_wrong_mode']) for r in rows)} | "
             f"{format_value(max(p99, default=math.nan))} | "
             f"{format_value(min(clearance, default=math.nan))} |"
         )

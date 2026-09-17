@@ -64,8 +64,10 @@ only to `/control/safe_velocity_command`.
 [`analyze_m7_results.py`](../scripts/analyze_m7_results.py) derives time to
 goal, path length/efficiency, RMS and p95 cross-track error, minimum clearance,
 peak XY speed and acceleration, controller p50/p95/p99/max, deadline misses,
-minimum `N_safe`, minimum ESS, accepted-trajectory collision indication, late
-accepted commands and MAVROS setpoints published during unsafe adapter modes.
+minimum/median `N_safe`, minimum/median ESS, best feasible cost,
+`NO_SAFE_TRAJECTORY`/`DISCONNECTED`/`STALE_COMMAND` counts,
+accepted-trajectory collision indication, late accepted commands, and MAVROS
+setpoints published while stale, disarmed or outside `GUIDED`.
 It generates `summary.csv` and
 `REPORT.md` from the per-run source logs.
 
