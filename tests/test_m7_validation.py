@@ -72,7 +72,7 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
         "expected_terminal_modes": ["GOAL_REACHED"],
     }
     (run / "manifest.json").write_text(json.dumps(manifest))
-    rows = []
+    rows = [{"event": "run_started", "elapsed_s": 0.0}]
     for i, compute in enumerate([10.0, 20.0, 30.0, 40.0]):
         mode = "GOAL_REACHED" if i == 3 else "ACTIVE"
         rows.append({
@@ -80,6 +80,7 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
             "state": {"position_enu_m": [float(i), 0.0, 5.0],
                       "velocity_enu_m_s": [float(i), 0.0, 0.0]},
             "controller": {"mode": mode, "t_total_ms": compute,
+                           "samples": 0 if mode == "GOAL_REACHED" else 80,
                            "cross_track_error_m": 0.1 * i,
                            "minimum_clearance_m": 2.0 - 0.1 * i,
                            "safe_samples": 8 - i, "ess": 2.0 - 0.1 * i,
@@ -93,10 +94,10 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
     assert summary["success"] is True
     assert summary["path_m"] == 3.0
     assert summary["path_efficiency"] == 1.0
-    assert summary["compute_p50_ms"] == 25.0
-    assert math.isclose(summary["compute_p95_ms"], 38.5)
+    assert summary["compute_p50_ms"] == 20.0
+    assert math.isclose(summary["compute_p95_ms"], 29.0)
     assert summary["deadline_misses"] == 0
-    assert summary["min_safe_samples"] == 5.0
+    assert summary["min_safe_samples"] == 6.0
     assert summary["collision"] is False
     analyzer.write_outputs(tmp_path, [summary])
     with (tmp_path / "summary.csv").open() as stream:
