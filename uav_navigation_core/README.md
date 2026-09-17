@@ -10,12 +10,15 @@ Implemented core components:
   feasibility against dynamic point obstacles and an abstract static geometry;
 - `VelocityCommandConditioner`, with Python-baseline-compatible filtering,
   vector XY slew limiting, scalar Z/yaw limiting, bounds and reset semantics.
+- deterministic MPPI multirotor dynamics and single/batch rollout APIs, including
+  command conditioning, velocity response, optional XY acceleration/jerk memory
+  and timestamp propagation.
 
 `ICollisionEnvironment` is the only static-geometry contract. Simulation can
 adapt an SDF and hardware can adapt an ESDF or voxel map without either
-dependency entering this library. Safety and conditioner golden fixtures are
-generated from the validated Python baseline and consumed by CTest without
-starting Python.
+dependency entering this library. Safety, conditioner and MPPI dynamics golden
+fixtures are generated from the validated Python baseline and consumed by CTest
+without starting Python.
 
 Standalone build and tests:
 
@@ -31,4 +34,5 @@ validated Python behavior:
 
 ```bash
 PYTHONPATH=. python3 scripts/generate_m2_golden_fixtures.py
+PYTHONPATH=. python3 scripts/generate_m3_mppi_golden_fixtures.py
 ```
