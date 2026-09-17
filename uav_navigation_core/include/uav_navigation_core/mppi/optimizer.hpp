@@ -19,6 +19,9 @@ struct MppiOptimizerConfig {
 };
 
 struct MppiOptimizationResult {
+  double rollout_time_ms{0.0};
+  double cost_time_ms{0.0};
+  double safety_time_ms{0.0};
   ControlSequence shifted_nominal{};
   ControlBatch perturbed_actions{};
   ControlBatch effective_noise{};

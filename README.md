@@ -12,14 +12,12 @@ ArduPilot điều khiển UAV trong Gazebo.
 
 ## Kiến trúc hệ thống
 
-**Trạng thái: Architecture reviewed — approved for implementation.** Project
-ban đầu phát triển như một workflow thí nghiệm Python/Gazebo: Gazebo, SITL,
-sensor bridge, RViz và planner được mở thủ công ở nhiều terminal; tham số nằm
-rải rác trong CLI và script; thuật toán, simulator I/O và runtime policy chưa có
-ranh giới đủ rõ để chuyển lên edge device. Kiến trúc đã được review và project
-đang được tổ chức lại thành navigation stack C++/ROS 2 có thể tái sử dụng. Bản
-Python hiện tại tiếp tục là baseline đã kiểm chứng để tái lập và so sánh
-regression; toàn bộ stack mới chưa được xem là đã hoàn thiện.
+**Trạng thái: M5 integration checkpoint.** A*, trajectory safety, command
+conditioning và MPPI đã nằm trong core C++ thuần. ROS 2 nodes đã chạy global
+planning, local MPPI, safety, diagnostics và RViz visualization trong một
+launch; closed loop Gazebo/ArduPilot SITL đã đi từ takeoff tới goal. Python còn
+được giữ làm regression oracle và bridge MAVLink SITL tạm thời. M6 sẽ thay
+bridge này bằng C++ trước khi chuyển sang hardware qualification.
 
 Tài liệu thiết kế chính là
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), bao gồm trách nhiệm module,
@@ -44,10 +42,9 @@ uav_navigation_core
 
 [`uav_navigation_core/`](uav_navigation_core/) sở hữu planning algorithms,
 trajectory/safety logic và reusable data structures. Public API/header của core
-được thiết kế không chứa ROS messages, Gazebo APIs hoặc MAVLink APIs để cùng
-thuật toán có thể dùng trong simulation và sau này trên edge device. Build
-skeleton vẫn có thể dùng `ament_cmake`; điều này không có nghĩa repository hiện
-đã là một shared library hoàn toàn độc lập và sẵn sàng deployment.
+không chứa ROS messages, Gazebo APIs hoặc MAVLink APIs để cùng thuật toán có thể
+dùng trong simulation và sau này trên edge device. Package build độc lập bằng
+CMake hoặc trong ROS 2 bằng `ament_cmake`, và export shared library cùng headers.
 
 Ranh giới này là quyết định riêng của project, dựa trên nhu cầu portability và
 maintainability. Nó phù hợp với động lực chung của ROS 2 về phần mềm robot
@@ -155,8 +152,8 @@ Workflow hướng tới dùng ROS 2 launch để phối hợp các thành phần
 - [`hardware.launch.xml`](uav_navigation_bringup/launch/hardware.launch.xml)
   dành cho sensor thật và edge device trong tương lai.
 
-Hai launch file thể hiện ranh giới và entry point dự kiến; chúng không hàm ý
-mọi component đã hoàn thiện hoặc sẵn sàng production.
+`sim.launch.xml` hiện là entry point M5 cho Gazebo, bridges, C++ planners và
+RViz. `hardware.launch.xml` mới chỉ là boundary dự kiến và chưa sẵn sàng flight.
 
 Thiết kế visualization gồm global costmap, global path, local predicted
 trajectory, MPPI candidate/sample trajectory hoặc cost, obstacle và chọn goal
@@ -396,15 +393,34 @@ colcon build \
 source install/setup.bash
 ```
 
-Entry point dành cho simulation được thiết kế là:
+Terminal 1 chạy ArduPilot SITL và MAVProxy:
 
 ```bash
-ros2 launch uav_navigation_bringup sim.launch.xml
+cd ~/Projects/ardupilot
+python3 Tools/autotest/sim_vehicle.py \
+  -v ArduCopter -f JSON -N -w \
+  -A "--serial1=tcp:2" \
+  --custom-location=-35.363262,149.165237,584,0 \
+  --add-param-file="$HOME/Projects/ardupilot_gazebo/config/experiments/mppi_yard_high_accel.parm"
 ```
 
-Launch này là workflow mục tiêu thay cho việc mở nhiều terminal thủ công. Một
-số component vẫn đang được hoàn thiện; dùng baseline Python bên dưới khi cần
-tái lập chính xác các thí nghiệm hiện tại.
+Terminal 2 chạy toàn bộ Gazebo/ROS 2 navigation stack M5:
+
+```bash
+cd ~/Projects/ardupilot_gazebo
+source install/setup.bash
+ros2 launch uav_navigation_bringup sim.launch.xml \
+  enable_autopilot_adapter:=true
+```
+
+Trong MAVProxy, chạy `mode guided`, `arm throttle`, `takeoff 5`; chờ hover ổn
+định rồi mới đặt **2D Goal Pose** trong RViz. Không đặt goal trước takeoff vì
+bridge M5 sẽ forward setpoint local planner ngay khi path tồn tại. Khi tới đích,
+operator vẫn phải `mode land`.
+
+Launch này thay workflow năm terminal cho kiến trúc C++ M5. Bridge MAVLink vẫn
+là Python mỏng và sẽ được thay bằng C++ ở M6. Dùng baseline bên dưới khi cần tái
+lập chính xác số liệu thí nghiệm cũ.
 
 ## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
 

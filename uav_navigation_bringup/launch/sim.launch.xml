@@ -10,9 +10,8 @@
   <arg name="enable_gazebo_gui" default="true"/>
   <arg name="enable_bridge" default="true"/>
   <arg name="enable_global_planner" default="true"/>
-  <arg name="enable_local_navigation" default="false"/>
+  <arg name="enable_local_navigation" default="true"/>
   <arg name="enable_autopilot_adapter" default="false"/>
-  <arg name="enable_visualizer" default="false"/>
   <arg name="enable_rviz" default="true"/>
 
   <executable if="$(var enable_gazebo)"
@@ -30,26 +29,27 @@
 
   <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
         name="gazebo_bridge" output="screen"
-        args="/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /iris/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry"/>
+        args="/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /iris/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry /tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V /sensor_suite/lidar/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked">
+    <remap from="/iris/odometry" to="/localization/odometry"/>
+    <remap from="/sensor_suite/lidar/points" to="/perception/obstacles"/>
+  </node>
+
+  <node if="$(var enable_bridge)" pkg="robot_state_publisher"
+        exec="robot_state_publisher" name="robot_state_publisher" output="screen"
+        args="$(find-pkg-share ardupilot_gazebo)/config/iris_sensor_suite.urdf"/>
 
   <node if="$(var enable_global_planner)" pkg="uav_navigation_ros"
         exec="global_planner_node" name="global_planner" output="screen">
     <param from="$(var params_file)"/>
     <param name="world_file" value="$(var world_file)"/>
-    <remap from="/localization/odometry" to="/iris/odometry"/>
   </node>
 
-  <!-- Later milestones enable these flags after their C++ executables exist. -->
   <node if="$(var enable_local_navigation)" pkg="uav_navigation_ros"
         exec="local_navigation_node" name="local_navigation" output="screen">
     <param from="$(var params_file)"/>
   </node>
   <node if="$(var enable_autopilot_adapter)" pkg="uav_navigation_ros"
-        exec="ardupilot_adapter_node" name="autopilot_adapter" output="screen">
-    <param from="$(var params_file)"/>
-  </node>
-  <node if="$(var enable_visualizer)" pkg="uav_navigation_ros"
-        exec="planning_visualizer_node" name="planning_visualizer" output="screen">
+        exec="safe_twist_to_mavlink.py" name="autopilot_adapter" output="screen">
     <param from="$(var params_file)"/>
   </node>
 

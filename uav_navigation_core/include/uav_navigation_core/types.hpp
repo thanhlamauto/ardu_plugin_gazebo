@@ -60,6 +60,8 @@ struct CostGrid2D {
 
 struct ObstacleMap {
   TimeNs stamp_ns{0};
+  // Distinguishes a fresh empty observation from no observation.
+  bool observation_valid{false};
   std::vector<Vec3> points_enu_m;
   std::optional<CostGrid2D> prior_cost_grid;
 };
@@ -104,4 +106,4 @@ struct SafetyResult {
   std::string reason;
 };
 
-}  // namespace uav_navigation_core
+} // namespace uav_navigation_core

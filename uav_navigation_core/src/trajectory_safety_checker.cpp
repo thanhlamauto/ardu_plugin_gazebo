@@ -103,7 +103,8 @@ TrajectorySafetyChecker::Evaluate(const State &initial_state,
       return Invalid("invalid_obstacle_map");
 
   try {
-    const bool cloud_present = !obstacles.points_enu_m.empty();
+    const bool cloud_present =
+        obstacles.observation_valid || !obstacles.points_enu_m.empty();
     double map_expansion = 0.0;
     std::vector<Vec3> cloud;
     cloud.reserve(obstacles.points_enu_m.size());

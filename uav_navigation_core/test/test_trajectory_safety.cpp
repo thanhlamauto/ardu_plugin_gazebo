@@ -145,6 +145,14 @@ void EdgeCases() {
     p.state.velocity_enu_m_s = {};
   Check(base.checker.Evaluate(base.initial, zero, base.obstacles).safe,
         "zero velocity is valid and safe");
+  core::TrajectorySafetyChecker cloud_only;
+  core::ObstacleMap fresh_empty;
+  fresh_empty.observation_valid = true;
+  Check(cloud_only.Evaluate(base.initial, zero, fresh_empty).safe,
+        "fresh empty cloud is a valid open-space observation");
+  core::ObstacleMap missing;
+  Check(!cloud_only.Evaluate(base.initial, zero, missing).safe,
+        "missing cloud remains fail-closed");
   auto low = Load("safety_stopping.json");
   for (auto &p : low.trajectory.points)
     p.state.velocity_enu_m_s = {1, 0, 0};

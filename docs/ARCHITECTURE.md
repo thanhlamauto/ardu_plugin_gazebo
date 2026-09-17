@@ -1,11 +1,11 @@
 # Kiến trúc UAV Navigation
 
-**Trạng thái:** mentor đã duyệt ngày 17/09/2026; đang implementation theo từng
-vertical slice. Milestone 1 đã có A* C++ thuần, SDF simulation adapter, ROS 2
-global-planner node, native parameters và launch Gazebo–bridge–RViz. Milestone
-2 đã có trajectory safety và velocity command conditioner C++ thuần với golden
-fixtures từ Python. MPPI và autopilot adapter vẫn dùng baseline Python cho tới
-các milestone sau.
+**Trạng thái:** mentor đã duyệt ngày 17/09/2026. M1–M4 đã port A*, safety,
+conditioner, MPPI dynamics/rollout/objective/optimizer sang C++ thuần và kiểm
+parity bằng golden fixtures. M5 đã nối các module vào `local_navigation_node`,
+ROS 2 launch, Gazebo/ArduPilot SITL closed loop, diagnostics và RViz cost view.
+MAVLink vẫn dùng bridge Python mỏng đã kiểm chứng; C++ autopilot adapter thuộc
+M6.
 
 ## 1. Mục tiêu
 
@@ -22,28 +22,22 @@ Phạm vi kiến trúc đã chốt:
 - định nghĩa visualization và test matrix;
 - đóng gói để người sau có thể thay adapter mà dùng lại cùng core.
 
-Chưa triển khai sau Milestone 2:
+Chưa triển khai sau Milestone 5:
 
-- port MPPI dynamics, rollout, objective và sampling sang C++;
 - PA-MPPI;
-- tuning thêm tốc độ, reward hoặc safety margin;
-- thay controller Python đang dùng cho thí nghiệm;
-- điều khiển ArduPilot từ stack C++.
+- C++ MAVLink/autopilot adapter và hardware qualification;
+- full simulation stress matrix và edge-device benchmark;
+- tuning thuật toán ngoài cấu hình MPPI hiện đã kiểm chứng.
 
 ## 2. Hiện trạng và khoảng trống
 
-Pipeline Python hiện đã có A*, MPPI, response model, command conditioner,
-trajectory safety, MAVLink adapter, RViz goal và trajectory visualization. Nó
-đã chạy closed loop trong Gazebo/ArduPilot SITL. Tuy nhiên:
+Pipeline Python vẫn là oracle/regression baseline. Luồng C++/ROS 2 hiện đã chạy
+closed loop trong Gazebo/ArduPilot SITL, nhưng còn các khoảng trống:
 
-- `mppi_velocity_avoidance.py` vẫn là entry point kết hợp config, planner, I/O,
-  diagnostics và runtime policy;
-- `run_sensor_rviz.sh` tự spawn bridge, robot-state publisher, marker process và
-  RViz;
-- Gazebo, SITL, bridge, RViz và planner được chạy bằng năm terminal;
-- parameter nằm trong custom YAML, CLI, environment và ArduPilot `.parm`;
-- CMake/package hiện chủ yếu build Gazebo plugins;
-- chưa có binary/library contract để một nhóm edge-device tích hợp.
+- bridge MAVLink M5 còn là Python và chỉ dành cho SITL;
+- SITL vẫn cần operator arm/takeoff/land, không thuộc navigation launch;
+- chưa chạy đủ stress matrix và chưa đo p95/p99 trên edge device mục tiêu;
+- hardware sensor/localization/map adapters chưa được chốt.
 
 Mục tiêu của kiến trúc mới là thay các coupling này, không thay đổi kết luận
 thuật toán hiện tại.
@@ -103,7 +97,7 @@ Trách nhiệm:
 
 - kiểu dữ liệu SI/ENU và timestamp;
 - `IGlobalPlanner`, `ILocalPlanner`, `ISafetyChecker`, `ICommandConditioner`;
-- A*, MPPI, response model, stopping/collision predicates sau khi port;
+- A*, MPPI, response model và stopping/collision predicates;
 - deterministic unit tests và benchmark API.
 
 Target deployment artifact sau khi implement:
@@ -114,12 +108,11 @@ include/uav_navigation_core/*.hpp
 ```
 
 Target hiện sinh shared library `libuav_navigation_core` và export CMake package.
-Milestone 1 đã implement `CostGrid2D` và A* deterministic. Milestone 2 bổ sung
-`ICollisionEnvironment`, `TrajectorySafetyChecker` và
-`VelocityCommandConditioner`. Safety kiểm swept segment và stopping distance
-trên dynamic cloud lẫn static geometry; conditioner giữ đúng filter, slew,
-bounds và reset semantics của baseline Python. Hai implementation dùng golden
-fixtures do Python sinh nhưng CTest không phụ thuộc Python.
+Core có `CostGrid2D`, A*, `ICollisionEnvironment`, trajectory safety, velocity
+conditioner và toàn bộ MPPI CPU gồm dynamics, rollout, objective, sampling,
+proposal và optimizer update. Safety kiểm swept segment và stopping distance
+trên dynamic cloud lẫn static geometry. Golden fixtures do Python sinh nhưng
+CTest không phụ thuộc Python.
 
 ### `uav_navigation_ros`
 
@@ -150,9 +143,9 @@ Chỉ chứa launch, ROS parameter YAML và RViz config.
 - `navigation.yaml`: source of truth cho navigation parameters;
 - `navigation.rviz`: goal, cost grid, paths và MPPI sample cost.
 
-`sim.launch.xml` hiện chạy được vertical slice Milestone 1: Gazebo server/GUI,
-odometry bridge, C++ global planner và RViz. Feature flags của các executable
-chưa có được đặt `false` mặc định.
+`sim.launch.xml` chạy Gazebo server/GUI, bridge odometry/TF/LiDAR, C++ global
+planner, C++ local navigation và RViz. Bridge MAVLink Python tạm thời được tắt
+mặc định vì operator phải arm/takeoff SITL trước khi planner gửi setpoint.
 
 ## 5. Core C++ contracts
 
@@ -186,8 +179,8 @@ ICommandConditioner       └──► defined recovery/abort policy
 safe Control
 ```
 
-Chưa chốt backend MPPI C++. Interface không được phụ thuộc Eigen/CUDA/Torch để
-có thể đánh giá CPU, CUDA hoặc backend khác sau review.
+Backend MPPI hiện là C++17 CPU và public interface không phụ thuộc
+Eigen/CUDA/Torch, nên có thể thay backend mà không đổi ROS contract.
 
 ## 6. ROS graph và topic contract
 
@@ -222,7 +215,7 @@ Source of truth mục tiêu:
 | `local_navigation` | rate, horizon, samples, temperature, limits, costs, response model |
 | `local_navigation` | stopping/collision predicate và conditioner vì cùng process |
 | `autopilot_adapter` | transport URL, frame conversion, heartbeat, command timeout |
-| `planning_visualizer` | publish rate, sample count, color/range |
+| `local_navigation` | publish rate, sample count, color/range |
 | ArduPilot `.parm` | flight-controller parameters; không copy vào planner YAML |
 
 Mọi parameter safety-critical phải có range validation và được ghi vào run
@@ -239,8 +232,7 @@ ArduPilot SITL
 ros_gz_bridge / robot_state_publisher
 global_planner_node
 local_navigation_node
-ardupilot_adapter_node
-planning_visualizer_node
+safe_twist_to_mavlink.py (M5, thay bằng C++ ở M6)
 optional RViz
 ```
 
@@ -251,8 +243,8 @@ LiDAR driver + localization/VIO/LIO
 sensor/state adapters
 global_planner_node
 local_navigation_node
-ardupilot_adapter_node
-optional planning_visualizer/RViz
+C++ autopilot adapter (M6)
+optional RViz
 ```
 
 Core và navigation config schema giữ nguyên. Chỉ launch adapter, topic remap,
@@ -334,20 +326,23 @@ control-loop critical path.
 - restart, mất sensor, mất MAVLink;
 - HIL trước flight test.
 
-## 12. Migration sau khi design được duyệt
+## 12. Roadmap triển khai
 
-1. Chốt interfaces, topic names, frame và failure policy.
-2. Port global cost-grid + A* sang core C++; đối chiếu path với Python fixtures.
-3. Port geometry, response model, safety và conditioner; chạy exact regression.
-4. Chọn/benchmark MPPI C++ backend rồi port local planner.
-5. Implement ROS adapters và cost visualization.
-6. Bật target launch, chạy simulation matrix.
-7. Build ARM64/x86-64 artifact, HIL và hardware qualification.
+1. Interfaces, topic, frame và failure policy — hoàn thành.
+2. Global cost-grid + A* C++ và Python fixtures — hoàn thành.
+3. Response model, safety và conditioner C++ — hoàn thành.
+4. MPPI C++ CPU và component-level parity — hoàn thành.
+5. ROS local navigation, cost visualization và Gazebo/SITL closed loop — hoàn
+   thành ở mức integration checkpoint.
+6. C++ autopilot adapter — M6.
+7. Full launch regression, stress matrix và deadline statistics — M7.
+8. ARM64/x86-64 artifact, HIL và hardware qualification — M8.
+9. PA-MPPI — chỉ bắt đầu sau khi kiến trúc deployment ổn định.
 
 Python implementation tiếp tục là oracle/regression reference trong quá trình
 port; không xóa trước khi C++ đạt parity.
 
-## 13. Các quyết định cần mentor chốt
+## 13. Các quyết định deployment còn mở
 
 1. ROS 2 distro và Ubuntu version mục tiêu?
 2. Edge device cụ thể, CPU/GPU/RAM và có CUDA hay không?
@@ -358,7 +353,8 @@ port; không xóa trước khi C++ đạt parity.
 7. Có cho phép runtime parameter update đối với nhóm nào?
 8. Acceptance rate, latency và hardware test gates cần đạt?
 
-Sau khi tám điểm này được chốt mới bắt đầu port thuật toán.
+Các mục này phải được chốt trước hardware qualification; chúng không chặn core
+C++ và Gazebo/SITL integration hiện tại.
 
 ## 14. Tham khảo kiến trúc
 

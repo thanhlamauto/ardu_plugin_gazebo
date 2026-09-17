@@ -1,6 +1,7 @@
 #include "uav_navigation_core/mppi/optimizer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -162,8 +163,14 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
       effective[t] = Sub(actions[t], result.shifted_nominal[t]);
   }
 
+  const auto rollout_started = std::chrono::steady_clock::now();
   result.trajectories =
       RolloutBatch(model, initial_state, result.perturbed_actions, dt_s);
+  result.rollout_time_ms =
+      std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - rollout_started)
+          .count();
+  const auto cost_started = std::chrono::steady_clock::now();
   result.cost_breakdowns.reserve(result.trajectories.size());
   result.rollout_costs.reserve(result.trajectories.size());
   result.perturbation_costs.reserve(result.trajectories.size());
@@ -186,14 +193,23 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
     result.perturbation_costs.push_back(perturbation);
     result.total_costs.push_back(breakdown.Total() + perturbation);
     if (safety_checker) {
+      const auto safety_started = std::chrono::steady_clock::now();
       result.safe[sample] =
           safety_checker
               ->Evaluate(ToSafetyState(initial_state),
                          ToSafetyTrajectory(result.trajectories[sample]),
                          *safety_obstacles)
               .safe;
+      result.safety_time_ms +=
+          std::chrono::duration<double, std::milli>(
+              std::chrono::steady_clock::now() - safety_started)
+              .count();
     }
   }
+  result.cost_time_ms = std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - cost_started)
+                            .count() -
+                        result.safety_time_ms;
 
   result.weights.assign(result.total_costs.size(), 0.0);
   bool any_safe = safety_checker == nullptr;

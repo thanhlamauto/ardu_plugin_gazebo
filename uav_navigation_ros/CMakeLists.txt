@@ -7,7 +7,10 @@ find_package(uav_navigation_core REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
 find_package(tinyxml2 REQUIRED CONFIG)
 
@@ -27,11 +30,20 @@ ament_target_dependencies(global_planner_node
   rclcpp geometry_msgs nav_msgs diagnostic_msgs)
 set_target_properties(global_planner_node PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+add_executable(local_navigation_node src/local_navigation_node.cpp)
+target_compile_features(local_navigation_node PRIVATE cxx_std_17)
+target_link_libraries(local_navigation_node
+  uav_navigation_core::uav_navigation_core)
+ament_target_dependencies(local_navigation_node
+  rclcpp geometry_msgs nav_msgs sensor_msgs visualization_msgs diagnostic_msgs tf2_ros)
+set_target_properties(local_navigation_node PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 # RoboStack's macOS message libraries are Python extension modules with
 # dynamic Python symbols. Native Ubuntu ROS 2 does not need this workaround.
 if(APPLE)
   find_library(ROS_PYTHON_RUNTIME NAMES python3.12 PATH_SUFFIXES lib REQUIRED)
   target_link_libraries(global_planner_node ${ROS_PYTHON_RUNTIME})
+  target_link_libraries(local_navigation_node ${ROS_PYTHON_RUNTIME})
 endif()
 
 if(BUILD_TESTING)
@@ -48,9 +60,11 @@ if(BUILD_TESTING)
 endif()
 
 install(DIRECTORY include/ DESTINATION include)
-install(TARGETS sdf_static_map_loader global_planner_node
+install(TARGETS sdf_static_map_loader global_planner_node local_navigation_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(FILES README.md DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/safe_twist_to_mavlink.py
+  DESTINATION lib/${PROJECT_NAME})
 ament_package()
