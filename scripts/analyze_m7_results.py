@@ -68,10 +68,21 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def summarize_run(path: Path) -> dict[str, Any]:
     rows = read_jsonl(path)
-    cycles = [row for row in rows if row.get("event") == "control_cycle"]
+    start_indices = [index for index, row in enumerate(rows)
+                     if row.get("event") == "run_started"]
+    result_indices = [index for index, row in enumerate(rows)
+                      if row.get("event") == "run_result"]
+    start_index = start_indices[0] if start_indices else 0
+    end_index = result_indices[-1] + 1 if result_indices else len(rows)
+    run_rows = rows[start_index:end_index]
+    cycles = [row for row in run_rows if row.get("event") == "control_cycle"]
+    planner_cycles = [
+        row for row in cycles
+        if float(row.get("controller", {}).get("samples", 0.0) or 0.0) > 0.0
+    ]
     manifest_path = path.with_name("manifest.json")
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
-    timestamps = _finite(row.get("elapsed_s") for row in rows)
+    timestamps = _finite(row.get("elapsed_s") for row in run_rows)
     positions = [row.get("state", {}).get("position_enu_m") for row in cycles]
     positions = [p for p in positions if isinstance(p, list) and len(p) == 3]
     velocities = [row.get("state", {}).get("velocity_enu_m_s") for row in cycles]
@@ -89,18 +100,20 @@ def summarize_run(path: Path) -> dict[str, Any]:
     for i in range(1, min(len(velocities), len(cycle_times))):
         dt = cycle_times[i] - cycle_times[i - 1]
         if dt > 1e-6:
-            accelerations.append(math.dist(velocities[i], velocities[i - 1]) / dt)
+            accelerations.append(
+                math.hypot(velocities[i][0] - velocities[i - 1][0],
+                           velocities[i][1] - velocities[i - 1][1]) / dt)
 
-    compute = _finite(row.get("controller", {}).get("t_total_ms") for row in cycles)
-    cte = _finite(row.get("controller", {}).get("cross_track_error_m") for row in cycles)
-    clearance = _finite(row.get("controller", {}).get("minimum_clearance_m") for row in cycles)
-    safe_samples = _finite(row.get("controller", {}).get("safe_samples") for row in cycles)
-    ess = _finite(row.get("controller", {}).get("ess") for row in cycles)
+    compute = _finite(row.get("controller", {}).get("t_total_ms") for row in planner_cycles)
+    cte = _finite(row.get("controller", {}).get("cross_track_error_m") for row in planner_cycles)
+    clearance = _finite(row.get("controller", {}).get("minimum_clearance_m") for row in planner_cycles)
+    safe_samples = _finite(row.get("controller", {}).get("safe_samples") for row in planner_cycles)
+    ess = _finite(row.get("controller", {}).get("ess") for row in planner_cycles)
     feasible_costs = _finite(
-        row.get("controller", {}).get("best_feasible_cost") for row in cycles)
+        row.get("controller", {}).get("best_feasible_cost") for row in planner_cycles)
     local_modes = [row.get("controller", {}).get("mode") for row in cycles]
-    global_statuses = [row.get("global_planner", {}).get("status") for row in rows]
-    adapter_states = [row.get("adapter", {}).get("adapter_state") for row in rows]
+    global_statuses = [row.get("global_planner", {}).get("status") for row in run_rows]
+    adapter_states = [row.get("adapter", {}).get("adapter_state") for row in run_rows]
     expected_modes = manifest.get("expected_terminal_modes", [])
     expected_global = manifest.get("expected_global_status")
     expected_adapter = manifest.get("expected_adapter_states", [])
@@ -109,7 +122,7 @@ def summarize_run(path: Path) -> dict[str, Any]:
         success = success and expected_global in global_statuses
     if expected_adapter:
         success = success and any(state in expected_adapter for state in adapter_states)
-    result_events = [row for row in rows if row.get("event") == "run_result"]
+    result_events = [row for row in run_rows if row.get("event") == "run_result"]
     if result_events:
         success = bool(result_events[-1].get("success", success))
         terminal_reason = result_events[-1].get("reason", "")
@@ -139,7 +152,7 @@ def summarize_run(path: Path) -> dict[str, Any]:
     setpoint_in_wrong_mode = 0
     previous_sequence = None
     unsafe_adapter_states = {"STALE_COMMAND", "DISCONNECTED", "CONNECTED_NOT_READY", "FAULT"}
-    for row in (item for item in rows if item.get("event") == "adapter"):
+    for row in (item for item in run_rows if item.get("event") == "adapter"):
         sequence = row.get("mavros_setpoint_sequence")
         if (previous_sequence is not None and sequence is not None and
                 row.get("adapter", {}).get("adapter_state") in unsafe_adapter_states and

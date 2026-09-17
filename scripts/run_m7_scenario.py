@@ -58,9 +58,14 @@ def load_scenario(path: Path) -> dict[str, Any]:
 
 
 def git_commit() -> str:
+    environment = os.environ.copy()
+    # Conda's libiconv can break Homebrew Git on macOS when ROS requires a
+    # custom DYLD_LIBRARY_PATH. Git does not need the ROS runtime libraries.
+    environment.pop("DYLD_LIBRARY_PATH", None)
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+        env=environment)
     return result.stdout.strip() or "unknown"
 
 
