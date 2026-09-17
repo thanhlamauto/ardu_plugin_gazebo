@@ -88,6 +88,9 @@ python3 scripts/run_m7_scenario.py tests/scenarios/s01_straight.yaml \
   --run 1 --seed 7
 ```
 
+On slow startup or automated SITL resets, `--readiness-timeout 120` extends
+only the preflight wait. Scenario timing still begins at goal publication.
+
 Use a unique run number. The runner refuses to overwrite an existing run.
 Inspect the exact command and destination without starting ROS:
 

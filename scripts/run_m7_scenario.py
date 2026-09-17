@@ -78,7 +78,8 @@ def process_ids(pattern: str) -> list[int]:
 
 class M7Recorder:
     def __init__(self, node: Any, scenario: dict[str, Any], stream: Any,
-                 start_immediately: bool, allow_process_faults: bool):
+                 start_immediately: bool, allow_process_faults: bool,
+                 readiness_timeout_s: float):
         from diagnostic_msgs.msg import DiagnosticArray
         from geometry_msgs.msg import PoseStamped, TwistStamped
         from nav_msgs.msg import Odometry
@@ -89,6 +90,7 @@ class M7Recorder:
         self.stream = stream
         self.start_immediately = start_immediately
         self.allow_process_faults = allow_process_faults
+        self.readiness_timeout_s = readiness_timeout_s
         self.created = time.monotonic()
         self.started: float | None = None
         self.done = False
@@ -297,8 +299,10 @@ class M7Recorder:
                 self.started = time.monotonic()
                 self.publish_goal(self.scenario["goal_enu_m"])
                 self.write("run_started")
-            elif time.monotonic() - self.created > 60.0:
-                self.finish(False, "vehicle did not become flight-ready within 60 s")
+            elif time.monotonic() - self.created > self.readiness_timeout_s:
+                self.finish(
+                    False,
+                    f"vehicle did not become flight-ready within {self.readiness_timeout_s:g} s")
             return
         for index, replan in enumerate(self.scenario.get("replans", [])):
             if index not in self.replans_sent and self.elapsed() >= float(replan["after_s"]):
@@ -343,12 +347,15 @@ def main() -> int:
     parser.add_argument("--no-launch-stack", action="store_true")
     parser.add_argument("--debug-visualization", action="store_true")
     parser.add_argument("--start-immediately", action="store_true")
+    parser.add_argument("--readiness-timeout", type=float, default=60.0)
     parser.add_argument("--allow-process-faults", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     scenario_path = args.scenario.resolve()
     config_path = args.config.resolve()
     scenario = load_scenario(scenario_path)
+    if args.readiness_timeout <= 0.0:
+        parser.error("--readiness-timeout must be positive")
     variants = scenario.get("variants", {})
     variant_name = args.variant or scenario.get("default_variant")
     if variant_name:
@@ -418,9 +425,11 @@ def main() -> int:
         node = rclpy.create_node(f"m7_recorder_{scenario['id'].lower()}_{args.run}")
         with (run_dir / "events.jsonl").open("w", encoding="utf-8") as stream:
             recorder = M7Recorder(node, scenario, stream, args.start_immediately,
-                                  args.allow_process_faults)
+                                  args.allow_process_faults,
+                                  args.readiness_timeout)
             if not args.start_immediately:
-                print("waiting up to 60 s for odometry, GUIDED, armed, and altitude >= 4 m")
+                print(f"waiting up to {args.readiness_timeout:g} s for odometry, "
+                      "GUIDED, armed, and altitude >= 4 m")
             while rclpy.ok() and not recorder.done:
                 rclpy.spin_once(node, timeout_sec=0.1)
             success = recorder.success
