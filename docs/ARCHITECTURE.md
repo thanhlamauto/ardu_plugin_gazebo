@@ -2,9 +2,10 @@
 
 **Trạng thái:** mentor đã duyệt ngày 17/09/2026; đang implementation theo từng
 vertical slice. Milestone 1 đã có A* C++ thuần, SDF simulation adapter, ROS 2
-global-planner node, native parameters và launch Gazebo–bridge–RViz. MPPI,
-safety/conditioner và autopilot adapter vẫn dùng baseline Python cho tới các
-milestone sau.
+global-planner node, native parameters và launch Gazebo–bridge–RViz. Milestone
+2 đã có trajectory safety và velocity command conditioner C++ thuần với golden
+fixtures từ Python. MPPI và autopilot adapter vẫn dùng baseline Python cho tới
+các milestone sau.
 
 ## 1. Mục tiêu
 
@@ -21,9 +22,9 @@ Phạm vi kiến trúc đã chốt:
 - định nghĩa visualization và test matrix;
 - đóng gói để người sau có thể thay adapter mà dùng lại cùng core.
 
-Chưa triển khai ở Milestone 1:
+Chưa triển khai sau Milestone 2:
 
-- port MPPI Python sang C++;
+- port MPPI dynamics, rollout, objective và sampling sang C++;
 - PA-MPPI;
 - tuning thêm tốc độ, reward hoặc safety margin;
 - thay controller Python đang dùng cho thí nghiệm;
@@ -113,8 +114,12 @@ include/uav_navigation_core/*.hpp
 ```
 
 Target hiện sinh shared library `libuav_navigation_core` và export CMake package.
-Milestone 1 đã implement `CostGrid2D` và A* deterministic; các core object còn
-lại được bổ sung ở milestone sau.
+Milestone 1 đã implement `CostGrid2D` và A* deterministic. Milestone 2 bổ sung
+`ICollisionEnvironment`, `TrajectorySafetyChecker` và
+`VelocityCommandConditioner`. Safety kiểm swept segment và stopping distance
+trên dynamic cloud lẫn static geometry; conditioner giữ đúng filter, slew,
+bounds và reset semantics của baseline Python. Hai implementation dùng golden
+fixtures do Python sinh nhưng CTest không phụ thuộc Python.
 
 ### `uav_navigation_ros`
 

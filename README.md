@@ -8,8 +8,10 @@ cua trong bãi container rồi tăng tốc lại.
 Kiến trúc C++/ROS 2 cho edge deployment đã được mentor duyệt và đang được hiện
 thực theo từng vertical slice tại [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 Milestone 1 đã chạy end-to-end phần global planning: A* C++ thuần → ROS 2 node
-→ costmap/path trên RViz → Gazebo. MPPI thí nghiệm vẫn giữ bản Python làm
-regression baseline cho đến milestone port local planner.
+→ costmap/path trên RViz → Gazebo. Milestone 2 đã port trajectory safety và
+velocity command conditioner sang C++ thuần, có golden test đối chiếu baseline
+Python. MPPI thí nghiệm vẫn giữ bản Python làm regression baseline cho đến
+milestone port local planner.
 
 Đây là phần mở rộng nghiên cứu trên nền
 [`ArduPilot/ardupilot_gazebo`](https://github.com/ArduPilot/ardupilot_gazebo).
@@ -71,7 +73,7 @@ Chi tiết số liệu và lập luận:
 - [Kết quả Experiment 7A](results/yard_experiment7a_20260916/)
 - [Claim-to-source audit](docs/SOURCE_AUDIT.md)
 
-## C++ Milestone 1 — một launch file
+## C++ Milestone 1–2
 
 Trên Ubuntu ROS 2 Jazzy, build cả package Gazebo gốc và ba package navigation
 (ba package navigation nằm lồng trong repo nên cần liệt kê `--base-paths`):
@@ -96,6 +98,11 @@ RViz. Chọn **2D Goal Pose** trong RViz để cập nhật `/planning/global_pa
 `/planning/global_costmap` hiển thị footprint SDF đã inflate. Toàn bộ tham số A*
 nằm trong
 [`uav_navigation_bringup/config/navigation.yaml`](uav_navigation_bringup/config/navigation.yaml).
+
+Safety checker và conditioner của Milestone 2 hiện là thư viện core đã test,
+chưa được nối vào ROS node hay thay controller Python đang bay trong Gazebo.
+Milestone kế tiếp port MPPI dynamics/rollout rồi mới compose ba phần trong
+`local_navigation_node`.
 
 ## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
 
@@ -222,7 +229,7 @@ lsof -nP -iUDP:9002
 | Đường dẫn | Nội dung |
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Kiến trúc C++/ROS 2 đã duyệt, contracts, topics, failure policy và test plan |
-| [`uav_navigation_core/`](uav_navigation_core/) | C++ types/interfaces và A* thuần, không phụ thuộc ROS/Gazebo/SDF |
+| [`uav_navigation_core/`](uav_navigation_core/) | C++ types/interfaces, A*, trajectory safety và command conditioner thuần; không phụ thuộc ROS/Gazebo/SDF |
 | [`uav_navigation_ros/`](uav_navigation_ros/) | SDF simulation adapter và C++ `global_planner_node` |
 | [`uav_navigation_bringup/`](uav_navigation_bringup/) | Launch/config/RViz; Milestone 1 chạy global planner end-to-end |
 | [`mppi_ardupilot/mppi_controller.py`](mppi_ardupilot/mppi_controller.py) | MPPI rollout, objective, proposal và weighting |

@@ -7,7 +7,9 @@ include(CMakePackageConfigHelpers)
 
 add_library(${PROJECT_NAME} SHARED
   src/astar_planner.cpp
-  src/cost_grid.cpp)
+  src/command_conditioner.cpp
+  src/cost_grid.cpp
+  src/trajectory_safety_checker.cpp)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -21,6 +23,18 @@ if(BUILD_TESTING)
   add_executable(test_astar test/test_astar.cpp)
   target_link_libraries(test_astar PRIVATE ${PROJECT_NAME})
   add_test(NAME astar_core_tests COMMAND test_astar)
+
+  add_executable(test_command_conditioner test/test_command_conditioner.cpp)
+  target_link_libraries(test_command_conditioner PRIVATE ${PROJECT_NAME})
+  target_compile_definitions(test_command_conditioner PRIVATE
+    UAV_NAVIGATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures")
+  add_test(NAME command_conditioner_tests COMMAND test_command_conditioner)
+
+  add_executable(test_trajectory_safety test/test_trajectory_safety.cpp)
+  target_link_libraries(test_trajectory_safety PRIVATE ${PROJECT_NAME})
+  target_compile_definitions(test_trajectory_safety PRIVATE
+    UAV_NAVIGATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures")
+  add_test(NAME trajectory_safety_tests COMMAND test_trajectory_safety)
 endif()
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

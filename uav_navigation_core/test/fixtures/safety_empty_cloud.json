@@ -1,0 +1,37 @@
+{
+  "state_width": 6,
+  "states_flat": [
+    0,
+    0,
+    5,
+    0,
+    0,
+    0,
+    1,
+    0,
+    5,
+    0,
+    0,
+    0
+  ],
+  "cloud_flat": [],
+  "spheres_flat": [
+    30.0,
+    30.0,
+    5.0,
+    1.0
+  ],
+  "collision_radius": 1.0,
+  "acceleration": 3.0,
+  "delay": 0.25,
+  "stopping_clearance": 1.0,
+  "uncertainty": 0.2,
+  "sample_spacing": 0.1,
+  "cloud_map_tolerance": 0.1,
+  "expected_safe": false,
+  "expected_reason": "swept_collision",
+  "expected_collision_finite": false,
+  "expected_collision_clearance": 0.0,
+  "expected_stopping_finite": true,
+  "expected_stopping_clearance": 40.72529209005013
+}
