@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# RoboStack on macOS may place a transport-only `gz` before Homebrew's full
+# Gazebo CLI. Ubuntu normally resolves the first candidate.
+candidates=("$(command -v gz 2>/dev/null || true)" /opt/homebrew/bin/gz /usr/bin/gz)
+for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" && -x "$candidate" ]] || continue
+    if "$candidate" --commands 2>/dev/null | grep -qx sim; then
+        if [[ "$candidate" == /opt/homebrew/* ]]; then
+            export GZ_CONFIG_PATH="/opt/homebrew/share/gz${GZ_CONFIG_PATH:+:$GZ_CONFIG_PATH}"
+        fi
+        exec "$candidate" sim "$@"
+    fi
+done
+
+echo "No Gazebo CLI with the 'sim' command was found." >&2
+exit 127

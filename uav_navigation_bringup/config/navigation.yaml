@@ -2,13 +2,22 @@ global_planner:
   ros__parameters:
     algorithm: astar
     planning_frame: odom
+    world_file: ""  # sim.launch.xml overrides this with the selected installed world
+    planning_altitude_m: 5.0
     resolution_m: 0.5
     clearance_m: 1.8
     vertical_clearance_m: 0.3
+    bounds_padding_m: 4.0
     allow_diagonal: true
+    prevent_corner_cutting: true
     max_expansions: 250000
+    max_grid_cells: 5000000
+    traversal_cost_weight: 1.0
+    odometry_topic: /localization/odometry
+    goal_topic: /goal_pose
     costmap_topic: /planning/global_costmap
     path_topic: /planning/global_path
+    diagnostics_topic: /planning/global_planner/diagnostics
 
 local_navigation:
   ros__parameters:

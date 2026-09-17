@@ -1,40 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Architecture contract only. The planned C++ executables do not exist yet.
-  Keep architecture_only=true until mentor approval and implementation.
--->
 <launch>
-  <arg name="architecture_only" default="true"/>
   <arg name="params_file"
        default="$(find-pkg-share uav_navigation_bringup)/config/navigation.yaml"/>
   <arg name="rviz_config"
        default="$(find-pkg-share uav_navigation_bringup)/rviz/navigation.rviz"/>
-  <arg name="use_rviz" default="true"/>
-  <!-- Reserved for post-review Gazebo/SITL ExecuteProcess actions. -->
-  <arg name="world" default="iris_mppi_yard_runup60.sdf"/>
-  <arg name="ardupilot_dir" default="$(env HOME)/Projects/ardupilot"/>
+  <arg name="world_file"
+       default="$(find-pkg-share ardupilot_gazebo)/worlds/iris_mppi_yard_runup60.sdf"/>
+  <arg name="enable_gazebo" default="true"/>
+  <arg name="enable_gazebo_gui" default="true"/>
+  <arg name="enable_bridge" default="true"/>
+  <arg name="enable_global_planner" default="true"/>
+  <arg name="enable_local_navigation" default="false"/>
+  <arg name="enable_autopilot_adapter" default="false"/>
+  <arg name="enable_visualizer" default="false"/>
+  <arg name="enable_rviz" default="true"/>
 
-  <group unless="$(var architecture_only)">
-    <!-- Gazebo/SITL/ros_gz_bridge actions will be added after launch design review. -->
-    <node pkg="uav_navigation_ros" exec="global_planner_node"
-          name="global_planner" output="screen">
-      <param from="$(var params_file)"/>
-    </node>
-    <node pkg="uav_navigation_ros" exec="local_navigation_node"
-          name="local_navigation" output="screen">
-      <param from="$(var params_file)"/>
-      <remap from="odometry" to="/localization/odometry"/>
-      <remap from="obstacles" to="/perception/obstacles"/>
-    </node>
-    <node pkg="uav_navigation_ros" exec="ardupilot_adapter_node"
-          name="autopilot_adapter" output="screen">
-      <param from="$(var params_file)"/>
-    </node>
-    <node pkg="uav_navigation_ros" exec="planning_visualizer_node"
-          name="planning_visualizer" output="screen">
-      <param from="$(var params_file)"/>
-    </node>
-    <node if="$(var use_rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
-          args="-d $(var rviz_config)" output="screen"/>
-  </group>
+  <executable if="$(var enable_gazebo)"
+              cmd="gz_sim_entrypoint -s -r $(var world_file)"
+              name="gazebo_server" output="screen" on_exit="shutdown">
+    <env name="GZ_SIM_RESOURCE_PATH"
+         value="$(find-pkg-share ardupilot_gazebo)/models:$(find-pkg-share ardupilot_gazebo)/worlds"/>
+  </executable>
+  <executable if="$(var enable_gazebo_gui)"
+              cmd="gz_sim_entrypoint -g"
+              name="gazebo_gui" output="screen">
+    <env name="GZ_SIM_RESOURCE_PATH"
+         value="$(find-pkg-share ardupilot_gazebo)/models:$(find-pkg-share ardupilot_gazebo)/worlds"/>
+  </executable>
+
+  <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
+        name="gazebo_bridge" output="screen"
+        args="/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /iris/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry"/>
+
+  <node if="$(var enable_global_planner)" pkg="uav_navigation_ros"
+        exec="global_planner_node" name="global_planner" output="screen">
+    <param from="$(var params_file)"/>
+    <param name="world_file" value="$(var world_file)"/>
+    <remap from="/localization/odometry" to="/iris/odometry"/>
+  </node>
+
+  <!-- Later milestones enable these flags after their C++ executables exist. -->
+  <node if="$(var enable_local_navigation)" pkg="uav_navigation_ros"
+        exec="local_navigation_node" name="local_navigation" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+  <node if="$(var enable_autopilot_adapter)" pkg="uav_navigation_ros"
+        exec="ardupilot_adapter_node" name="autopilot_adapter" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+  <node if="$(var enable_visualizer)" pkg="uav_navigation_ros"
+        exec="planning_visualizer_node" name="planning_visualizer" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+
+  <node if="$(var enable_rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
+        args="-d $(var rviz_config)" output="screen"/>
 </launch>

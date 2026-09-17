@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/uav_navigation_coreTargets.cmake")
+check_required_components(uav_navigation_core)

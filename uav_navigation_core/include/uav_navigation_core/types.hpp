@@ -76,6 +76,7 @@ enum class StatusCode {
 
 struct PlannerDiagnostics {
   double compute_time_ms{0.0};
+  std::uint32_t expanded_nodes{0};
   std::uint32_t sampled_trajectories{0};
   std::uint32_t feasible_trajectories{0};
   double effective_sample_size{0.0};

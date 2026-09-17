@@ -2,7 +2,7 @@
 <package format="3">
   <name>uav_navigation_core</name>
   <version>0.1.0</version>
-  <description>ROS-independent C++ interface skeleton for UAV navigation.</description>
+  <description>ROS-independent C++ planning library for UAV navigation.</description>
   <maintainer email="78715071+thanhlamauto@users.noreply.github.com">Nguyen Thanh Lam</maintainer>
   <license>LGPL-3.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>

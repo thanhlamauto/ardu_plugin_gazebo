@@ -1,7 +1,10 @@
-# Kiến trúc UAV Navigation — bản đề xuất để mentor review
+# Kiến trúc UAV Navigation
 
-**Trạng thái:** proposal, ngày 17/09/2026. Chưa phải kiến trúc đã chốt và chưa
-phải implementation C++ hoàn chỉnh.
+**Trạng thái:** mentor đã duyệt ngày 17/09/2026; đang implementation theo từng
+vertical slice. Milestone 1 đã có A* C++ thuần, SDF simulation adapter, ROS 2
+global-planner node, native parameters và launch Gazebo–bridge–RViz. MPPI,
+safety/conditioner và autopilot adapter vẫn dùng baseline Python cho tới các
+milestone sau.
 
 ## 1. Mục tiêu
 
@@ -10,21 +13,21 @@ có thể dùng chung cho Gazebo/SITL và edge device. ROS 2 chỉ đảm nhiệ
 lifecycle, parameters, launch và visualization. Gazebo, MAVLink và ROS không
 được xuất hiện trong API của core.
 
-Phạm vi checkpoint này:
+Phạm vi kiến trúc đã chốt:
 
 - định nghĩa module, dependency direction và interface;
 - định nghĩa topic, frame, QoS và parameter ownership;
 - định nghĩa cách bringup simulation/hardware;
 - định nghĩa visualization và test matrix;
-- tạo package skeleton để review cấu trúc.
+- đóng gói để người sau có thể thay adapter mà dùng lại cùng core.
 
-Ngoài phạm vi trước khi mentor chốt:
+Chưa triển khai ở Milestone 1:
 
-- port thuật toán MPPI/A* Python sang C++;
+- port MPPI Python sang C++;
 - PA-MPPI;
 - tuning thêm tốc độ, reward hoặc safety margin;
 - thay controller Python đang dùng cho thí nghiệm;
-- tuyên bố launch skeleton hiện đã chạy được.
+- điều khiển ArduPilot từ stack C++.
 
 ## 2. Hiện trạng và khoảng trống
 
@@ -92,9 +95,8 @@ uav_navigation_bringup → uav_navigation_ros → uav_navigation_core
 ### `uav_navigation_core`
 
 API C++ thuần, không có ROS, Gazebo hoặc MAVLink runtime/header dependency.
-Skeleton hiện vẫn dùng `ament_cmake` để được đóng gói trong ROS workspace; vì
-vậy build system **chưa độc lập ROS hoàn toàn**. Standalone CMake configure,
-install và package export là yêu cầu phải đạt trước khi bàn giao edge deployment.
+Build hỗ trợ standalone CMake và ament/colcon. Public headers và target không
+phụ thuộc ROS, Gazebo hoặc SDF.
 
 Trách nhiệm:
 
@@ -110,8 +112,9 @@ libuav_navigation_core.so
 include/uav_navigation_core/*.hpp
 ```
 
-Ở checkpoint hiện tại target CMake là `INTERFACE`, nên chỉ export headers và
-compile requirements; **chưa sinh `libuav_navigation_core.so`**.
+Target hiện sinh shared library `libuav_navigation_core` và export CMake package.
+Milestone 1 đã implement `CostGrid2D` và A* deterministic; các core object còn
+lại được bổ sung ở milestone sau.
 
 ### `uav_navigation_ros`
 
@@ -127,7 +130,7 @@ Trách nhiệm:
 - ArduPilot adapter;
 - cost/trajectory visualization.
 
-**Quyết định đề xuất:** MPPI, safety checker và conditioner là ba core objects
+**Quyết định đã duyệt:** MPPI, safety checker và conditioner là ba core objects
 nhưng được compose trong cùng `local_navigation_node`. Trajectory có time,
 velocity và control không phải serialize qua `nav_msgs/Path`; safety luôn kiểm
 đúng object mà MPPI vừa sinh. ROS chỉ publish bản visualization và safe command.
@@ -142,9 +145,9 @@ Chỉ chứa launch, ROS parameter YAML và RViz config.
 - `navigation.yaml`: source of truth cho navigation parameters;
 - `navigation.rviz`: goal, cost grid, paths và MPPI sample cost.
 
-Skeleton launch trong repo là **design contract, chưa runnable** vì các C++
-executables chưa được implement. Nó mặc định `architecture_only=true` để không
-khởi động executable chưa tồn tại.
+`sim.launch.xml` hiện chạy được vertical slice Milestone 1: Gazebo server/GUI,
+odometry bridge, C++ global planner và RViz. Feature flags của các executable
+chưa có được đặt `false` mặc định.
 
 ## 5. Core C++ contracts
 

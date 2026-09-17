@@ -7,6 +7,7 @@
   <license>LGPL-3.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <exec_depend>uav_navigation_ros</exec_depend>
+  <exec_depend>ardupilot_gazebo</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>rviz2</exec_depend>

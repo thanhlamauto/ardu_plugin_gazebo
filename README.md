@@ -5,9 +5,11 @@ Integral (MPPI)** trên **ArduPilot SITL + Gazebo Harmonic**. Bài thử chính 
 UAV lấy đà 60 m, đạt cruise request 5 hoặc 10 m/s, tự giảm tốc để qua các góc
 cua trong bãi container rồi tăng tốc lại.
 
-Kiến trúc C++/ROS 2 đề xuất cho edge deployment đang chờ mentor review tại
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Ba package bên dưới hiện chỉ là
-interface/bringup skeleton; controller chạy thí nghiệm vẫn là bản Python.
+Kiến trúc C++/ROS 2 cho edge deployment đã được mentor duyệt và đang được hiện
+thực theo từng vertical slice tại [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Milestone 1 đã chạy end-to-end phần global planning: A* C++ thuần → ROS 2 node
+→ costmap/path trên RViz → Gazebo. MPPI thí nghiệm vẫn giữ bản Python làm
+regression baseline cho đến milestone port local planner.
 
 Đây là phần mở rộng nghiên cứu trên nền
 [`ArduPilot/ardupilot_gazebo`](https://github.com/ArduPilot/ardupilot_gazebo).
@@ -69,11 +71,37 @@ Chi tiết số liệu và lập luận:
 - [Kết quả Experiment 7A](results/yard_experiment7a_20260916/)
 - [Claim-to-source audit](docs/SOURCE_AUDIT.md)
 
+## C++ Milestone 1 — một launch file
+
+Trên Ubuntu ROS 2 Jazzy, build cả package Gazebo gốc và ba package navigation
+(ba package navigation nằm lồng trong repo nên cần liệt kê `--base-paths`):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon build \
+  --base-paths . uav_navigation_core uav_navigation_ros uav_navigation_bringup \
+  --merge-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+source install/setup.bash
+```
+
+Sau đó chạy:
+
+```bash
+ros2 launch uav_navigation_bringup sim.launch.xml
+```
+
+Lệnh này mở Gazebo server/GUI, bridge `/iris/odometry`, C++ global planner và
+RViz. Chọn **2D Goal Pose** trong RViz để cập nhật `/planning/global_path`;
+`/planning/global_costmap` hiển thị footprint SDF đã inflate. Toàn bộ tham số A*
+nằm trong
+[`uav_navigation_bringup/config/navigation.yaml`](uav_navigation_bringup/config/navigation.yaml).
+
 ## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
 
 > Đây là workflow hiện tại dùng để tái lập các kết quả đã báo cáo. Nó được giữ
 > làm regression oracle trong quá trình port. Kiến trúc mục tiêu sẽ thay năm
-> terminal bằng ROS 2 launch sau khi mentor review và chốt thiết kế.
+> terminal bằng ROS 2 launch theo từng milestone.
 
 Các lệnh gốc đã chạy trên macOS. Trên Ubuntu, đường dẫn Python/Gazebo có thể
 khác; dùng Python environment đã cài `numpy`, `torch`, `PyYAML`, `pymavlink` và
@@ -193,10 +221,10 @@ lsof -nP -iUDP:9002
 
 | Đường dẫn | Nội dung |
 |---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Kiến trúc C++/ROS 2 đề xuất, contracts, topics, failure policy và test plan |
-| [`uav_navigation_core/`](uav_navigation_core/) | C++ types/interfaces thuần, chưa chứa thuật toán đã port |
-| [`uav_navigation_ros/`](uav_navigation_ros/) | Skeleton ROS 2 adapters/nodes |
-| [`uav_navigation_bringup/`](uav_navigation_bringup/) | Launch/config/RViz skeleton cho simulation và hardware |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Kiến trúc C++/ROS 2 đã duyệt, contracts, topics, failure policy và test plan |
+| [`uav_navigation_core/`](uav_navigation_core/) | C++ types/interfaces và A* thuần, không phụ thuộc ROS/Gazebo/SDF |
+| [`uav_navigation_ros/`](uav_navigation_ros/) | SDF simulation adapter và C++ `global_planner_node` |
+| [`uav_navigation_bringup/`](uav_navigation_bringup/) | Launch/config/RViz; Milestone 1 chạy global planner end-to-end |
 | [`mppi_ardupilot/mppi_controller.py`](mppi_ardupilot/mppi_controller.py) | MPPI rollout, objective, proposal và weighting |
 | [`mppi_ardupilot/mppi_local_planner_node.py`](mppi_ardupilot/mppi_local_planner_node.py) | Closed-loop planner, conditioner, gate và diagnostics |
 | [`mppi_ardupilot/trajectory_safety.py`](mppi_ardupilot/trajectory_safety.py) | Safety predicate dùng chung cho sample và output cuối |

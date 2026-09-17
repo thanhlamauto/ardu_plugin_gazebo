@@ -1,10 +1,16 @@
 # uav_navigation_core
 
-Architecture-review skeleton for a ROS/Gazebo-independent C++ navigation
-library. Only data and abstract interfaces exist. A*, MPPI, safety and command
-conditioning remain in the Python reference until the design is approved.
+Pure C++17 planning library. It has no ROS, Gazebo or SDF dependency.
 
-The public API has no ROS, Gazebo or MAVLink header/runtime dependency. This
-skeleton still uses `ament_cmake` for ROS workspace packaging and defines an
-`INTERFACE` target, so it does not yet produce `libuav_navigation_core.so`.
-Standalone CMake packaging is a deployment requirement after design approval.
+Milestone 1 implements deterministic 2D A* over `CostGrid2D`, including
+optional diagonal motion, corner-cut prevention, inflated traversal costs and
+bounded node expansion. Simulation and hardware adapters construct the grid.
+
+Standalone build and tests:
+
+```bash
+cmake -S uav_navigation_core -B build/uav_navigation_core \
+  -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build/uav_navigation_core
+ctest --test-dir build/uav_navigation_core --output-on-failure
+```

@@ -1,34 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Architecture contract only; no automatic arming is permitted here. -->
+<!-- Hardware adapters are enabled only after their milestone is implemented. -->
 <launch>
-  <arg name="architecture_only" default="true"/>
   <arg name="params_file"
        default="$(find-pkg-share uav_navigation_bringup)/config/navigation.yaml"/>
-  <arg name="use_rviz" default="false"/>
   <arg name="rviz_config"
        default="$(find-pkg-share uav_navigation_bringup)/rviz/navigation.rviz"/>
+  <arg name="enable_global_planner" default="false"/>
+  <arg name="enable_local_navigation" default="false"/>
+  <arg name="enable_autopilot_adapter" default="false"/>
+  <arg name="enable_visualizer" default="false"/>
+  <arg name="enable_rviz" default="false"/>
 
-  <group unless="$(var architecture_only)">
-    <!-- Real LiDAR/localization drivers remain deployment-specific includes. -->
-    <node pkg="uav_navigation_ros" exec="global_planner_node"
-          name="global_planner" output="screen">
-      <param from="$(var params_file)"/>
-    </node>
-    <node pkg="uav_navigation_ros" exec="local_navigation_node"
-          name="local_navigation" output="screen">
-      <param from="$(var params_file)"/>
-      <remap from="odometry" to="/localization/odometry"/>
-      <remap from="obstacles" to="/perception/obstacles"/>
-    </node>
-    <node pkg="uav_navigation_ros" exec="ardupilot_adapter_node"
-          name="autopilot_adapter" output="screen">
-      <param from="$(var params_file)"/>
-    </node>
-    <node pkg="uav_navigation_ros" exec="planning_visualizer_node"
-          name="planning_visualizer" output="screen">
-      <param from="$(var params_file)"/>
-    </node>
-    <node if="$(var use_rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
-          args="-d $(var rviz_config)" output="screen"/>
-  </group>
+  <!-- A hardware map adapter must provide CostGrid before enabling this node. -->
+  <node if="$(var enable_global_planner)" pkg="uav_navigation_ros"
+        exec="global_planner_node" name="global_planner" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+  <node if="$(var enable_local_navigation)" pkg="uav_navigation_ros"
+        exec="local_navigation_node" name="local_navigation" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+  <node if="$(var enable_autopilot_adapter)" pkg="uav_navigation_ros"
+        exec="ardupilot_adapter_node" name="autopilot_adapter" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+  <node if="$(var enable_visualizer)" pkg="uav_navigation_ros"
+        exec="planning_visualizer_node" name="planning_visualizer" output="screen">
+    <param from="$(var params_file)"/>
+  </node>
+  <node if="$(var enable_rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
+        args="-d $(var rviz_config)" output="screen"/>
 </launch>
