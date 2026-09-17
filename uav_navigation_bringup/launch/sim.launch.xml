@@ -10,6 +10,7 @@
   <arg name="rviz_config"
        default="$(find-pkg-share uav_navigation_bringup)/rviz/navigation.rviz"/>
   <arg name="use_rviz" default="true"/>
+  <!-- Reserved for post-review Gazebo/SITL ExecuteProcess actions. -->
   <arg name="world" default="iris_mppi_yard_runup60.sdf"/>
   <arg name="ardupilot_dir" default="$(env HOME)/Projects/ardupilot"/>
 

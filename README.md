@@ -69,7 +69,11 @@ Chi tiết số liệu và lập luận:
 - [Kết quả Experiment 7A](results/yard_experiment7a_20260916/)
 - [Claim-to-source audit](docs/SOURCE_AUDIT.md)
 
-## Chạy Gazebo 3D bằng 5 terminal
+## Legacy Python validated baseline — Gazebo 3D bằng 5 terminal
+
+> Đây là workflow hiện tại dùng để tái lập các kết quả đã báo cáo. Nó được giữ
+> làm regression oracle trong quá trình port. Kiến trúc mục tiêu sẽ thay năm
+> terminal bằng ROS 2 launch sau khi mentor review và chốt thiết kế.
 
 Các lệnh gốc đã chạy trên macOS. Trên Ubuntu, đường dẫn Python/Gazebo có thể
 khác; dùng Python environment đã cài `numpy`, `torch`, `PyYAML`, `pymavlink` và

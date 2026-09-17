@@ -84,14 +84,17 @@ Dependency chỉ đi một chiều:
 ```text
 uav_navigation_bringup → uav_navigation_ros → uav_navigation_core
                                               ↑
-                                    không phụ thuộc ROS/Gazebo
+                              API/header không chứa ROS/Gazebo/MAVLink
 ```
 
 ## 4. Ba package mục tiêu
 
 ### `uav_navigation_core`
 
-C++ library không phụ thuộc ROS, Gazebo hoặc MAVLink.
+API C++ thuần, không có ROS, Gazebo hoặc MAVLink runtime/header dependency.
+Skeleton hiện vẫn dùng `ament_cmake` để được đóng gói trong ROS workspace; vì
+vậy build system **chưa độc lập ROS hoàn toàn**. Standalone CMake configure,
+install và package export là yêu cầu phải đạt trước khi bàn giao edge deployment.
 
 Trách nhiệm:
 
@@ -100,12 +103,15 @@ Trách nhiệm:
 - A*, MPPI, response model, stopping/collision predicates sau khi port;
 - deterministic unit tests và benchmark API.
 
-Artifact bàn giao cho edge device:
+Target deployment artifact sau khi implement:
 
 ```text
 libuav_navigation_core.so
 include/uav_navigation_core/*.hpp
 ```
+
+Ở checkpoint hiện tại target CMake là `INTERFACE`, nên chỉ export headers và
+compile requirements; **chưa sinh `libuav_navigation_core.so`**.
 
 ### `uav_navigation_ros`
 
