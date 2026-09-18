@@ -56,6 +56,9 @@ def test_s10_fcu_fault_targets_mavros_executable_name():
     scenario = yaml.safe_load((ROOT / "tests/scenarios/s10_fcu_disconnect.yaml").read_text())
     pattern = scenario["variants"]["fcu_disconnect"]["fault"]["process_pattern"]
     assert pattern == "/mavros/mavros_node"
+    disarm = scenario["variants"]["disarm"]["fault"]["argv"]
+    assert "/mavros/cmd/command" in disarm
+    assert "param2: 21196.0" in disarm[-1]
 
 
 def test_m7_cleanup_stops_children_after_launch_leader_exits(monkeypatch):
