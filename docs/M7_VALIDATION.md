@@ -291,13 +291,103 @@ the C++ adapter. A five-run smoke test passed S01 and all four S10 variants with
 zero internal publication-invariant counters. Artifacts are in
 [`results/m7_m72_c1e187f_smoke/`](../results/m7_m72_c1e187f_smoke/).
 
+## M7.2 stable-start full regression — 2026-09-18
+
+The full regression used controller/runtime commit
+`c1e187fe5428bb9af4d515324817848aff3671f0`, harness commit
+`6e35400e53be88ec34a1acdb945cdef7e0a65a23`, and the unchanged
+`m7_baseline.yaml` SHA-256
+`5d6948f725483d63d8088c67e367a10828e1776fa606ca60c2b43d1e2f44d451`.
+Every run required total speed at or below 0.3 m/s continuously for 2 s before
+goal publication. The controller config and planned seeds were frozen; failed
+runs were preserved without rerunning. A managed foreground driver verified
+targeted process cleanup after every run.
+
+The machine and performance settings match M7.1: Apple M2 MacBook Air, 8 CPU
+cores, 16 GB RAM, macOS 26.1, ROS 2 Jazzy, Fast DDS and Gazebo Sim 8.15.0;
+RViz, MPPI sample markers and live plotting were disabled. The campaign
+produced all 115 requested manifests and event logs. Committed artifacts are
+in
+[`results/m7_campaign_stable_start_c1e187f_20260918/`](../results/m7_campaign_stable_start_c1e187f_20260918/),
+including the [summary CSV](../results/m7_campaign_stable_start_c1e187f_20260918/summary.csv),
+[manifests](../results/m7_campaign_stable_start_c1e187f_20260918/manifests.jsonl),
+[aggregate report](../results/m7_campaign_stable_start_c1e187f_20260918/aggregate_report.md)
+and [plots](../results/m7_campaign_stable_start_c1e187f_20260918/plots/).
+The 118 MB raw logs remain at
+`/tmp/m7_campaign_stable_start_c1e187f_20260918_v1` on the campaign machine.
+
+| Scenario/variant | Result | Classification |
+|---|---:|---|
+| S01 straight | 10/10 | functional pass |
+| S02 45-degree turn | 9/10 | intermittent scenario timeout |
+| S03 90-degree turn | 7/10 | recurrent controller/closed-loop failure |
+| S04 obstacle detour | 10/10 | functional pass, recorded margin reaches 0.055 m |
+| S05 narrow passage | 7/10 | functional and planning-margin failure |
+| S06 high-speed straight | 10/10 | functional pass |
+| S07 blocked goal | 5/5 | correct `NO_PATH` response |
+| S08 replanning | 7/10 | two scenario timeouts, one startup failure |
+| S09 stale odometry | 5/5 | expected `HOLD_STALE` |
+| S09 stale obstacle | 3/5 | 3/3 exercised faults passed; two startup failures |
+| S09 planner deadline | 5/5 | expected `PLANNER_TIMEOUT`, late results rejected |
+| S09 no safe trajectory | 5/5 | expected `NO_SAFE_TRAJECTORY` |
+| S10 FCU disconnect | 5/5 | expected `DISCONNECTED` |
+| S10 planner death | 5/5 | expected `STALE_COMMAND` |
+| S10 wrong mode | 5/5 | expected `CONNECTED_NOT_READY` |
+| S10 disarm | 4/5 | 4/4 exercised faults passed; one startup failure |
+
+Overall, 102/115 recorded cases passed. Nine failures were scenario timeouts
+after the test began: S02 seed 87; S03 seeds 17, 27 and 67; S05 seeds 7, 37
+and 87; and S08 seeds 17 and 67. Four failures occurred before the stable
+flight-ready condition: S08 seed 37, S09 stale-obstacle seeds 37 and 47, and
+S10 disarm seed 37. These startup/interface failures remain separate from
+controller failures.
+
+Across 14,259 MPPI solves in normal reachable S01-S06/S08 runs, total compute
+time was p50 10.014 ms, p95 28.952 ms, p99 41.908 ms and maximum 99.698 ms.
+Accepted `ACTIVE` results had p50/p95/p99/max of
+8.943/22.767/32.975/93.926 ms. No accepted result exceeded 100 ms. However,
+normal runs recorded 53 `PLANNER_TIMEOUT` cycles; the deliberate S09 fault
+added five. All 58 deadline outcomes were rejected and no late result was
+accepted. The baseline therefore fails the zero-deadline-miss requirement even
+though measured solve times remained below the hard deadline.
+
+The C++ counters at the adapter publication boundary recorded zero stale or
+disconnected publication attempts, zero publication attempts while disarmed,
+and zero attempts outside `GUIDED`. The analyzer also found zero late accepted
+outputs and zero accepted-trajectory collision indications. The latter is the
+shared safety-predicate result, not a Gazebo contact-sensor measurement.
+
+The focused S03 stable-start result of 10/10 did not reproduce in the full
+campaign. The three S03 failures accumulated 1,481 `NO_SAFE_TRAJECTORY` cycles,
+had median RMS CTE 4.999 m, median peak speed 7.694 m/s, median feasible-sample
+count zero and minimum clearance 0.009 m. The seven passes accumulated 76
+no-safe cycles and had median RMS CTE 0.499 m, median peak speed 4.056 m/s and
+median feasible-sample count 78. Stable start removed the known takeoff
+transient but did not make the corner reliable.
+
+S05 also has a material margin problem. It passed only 7/10; six of those seven
+passes still entered `NO_SAFE_TRAJECTORY`, two passes reached recorded
+clearance below 0.1 m, and the campaign minimum was 0.0049 m. The ten runs
+accumulated 1,118 no-safe cycles. Representative pass/fail plots show
+clearance, `N_safe`, speed, best feasible cost and ESS.
+
+The acceleration caveat from M7.1 remains: callback-time finite differences
+are unsuitable as a dynamics claim. MPPI seed alone is also insufficient for
+exact replay because simulator scheduling, sensor timing and warm-start state
+are not captured. Fast DDS shared-memory warnings preceded part of the startup
+failure cluster.
+
+Regression verification passed 100 Python tests plus 3 subtests. The C++ core
+passed 7/7 tests in Release and Debug, and the ROS adapter layer passed 2/2 in
+Release and Debug. All four C++ builds enabled `-Wall -Wextra -Wpedantic
+-Werror`.
+
 ## Decision
 
-M7.1 is complete and its failed results remain preserved. S03 focused
-revalidation after the harness fix is 10/10, but the project remains **not ready
-for M8/hardware** until the full regression campaign with stable-start passes.
-The full regression is pending and must run in a foreground/managed job because
-the detached macOS shell left orphan simulator processes. The next decision
-stays in M7.2: finish that campaign, inspect the remaining
-near-boundary `N_safe=0` runs and use the new internal counters for the safety
-decision. The original baseline result is never overwritten.
+M7 remains **NOT READY FOR M8/hardware**. The blockers are the S02, S03, S05
+and S08 reliability failures; severe `N_safe=0` and clearance margin in S03/S05;
+53 baseline planner-timeout cycles; and four startup/interface failures. The
+adapter publication boundary passed every exercised safety-fault case, but
+functional reliability, planning margin and end-to-end deadline reliability
+must be resolved in M7.2 and then revalidated. Historical M7.1 results remain
+unchanged; no M8 or PA-MPPI work starts from this decision.
