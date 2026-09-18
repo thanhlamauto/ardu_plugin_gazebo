@@ -285,11 +285,19 @@ output was accepted. One reported stale-setpoint violation is being treated as
 a recorder-ordering anomaly until adapter sequence/timestamp ordering is
 verified, so the focused set does not replace the frozen M7.1 safety claim.
 
+Commit `c1e187f` resolves that measurement ambiguity by checking and counting
+stale/disconnected, disarmed and wrong-mode publication attempts atomically in
+the C++ adapter. A five-run smoke test passed S01 and all four S10 variants with
+zero internal publication-invariant counters. Artifacts are in
+[`results/m7_m72_c1e187f_smoke/`](../results/m7_m72_c1e187f_smoke/).
+
 ## Decision
 
 M7.1 is complete and its failed results remain preserved. S03 focused
 revalidation after the harness fix is 10/10, but the project remains **not ready
 for M8/hardware** until the full regression campaign with stable-start passes.
-The next decision stays in M7.2: finish that campaign, inspect the remaining
-near-boundary `N_safe=0` runs and verify recorder ordering for the apparent
-stale-setpoint event. The original baseline result is never overwritten.
+The full regression is pending and must run in a foreground/managed job because
+the detached macOS shell left orphan simulator processes. The next decision
+stays in M7.2: finish that campaign, inspect the remaining
+near-boundary `N_safe=0` runs and use the new internal counters for the safety
+decision. The original baseline result is never overwritten.

@@ -20,7 +20,8 @@ runtime điều khiển không còn Python. Closed loop Gazebo/ArduPilot SITL đ
 takeoff tới goal. M7.1 đã chạy đủ 115 trial với config khóa: toàn bộ invariant
 an toàn và deadline runtime đều đạt, nhưng S03 90-degree turn chỉ đạt 5/10.
 Sau khi harness chờ hover ổn định trước khi gửi goal, focused rerun S03 đạt
-10/10; full regression đang được chạy trước khi sang hardware. Python chỉ còn
+10/10; full regression mới vẫn phải hoàn tất trước khi sang hardware. Python
+chỉ còn
 là regression oracle
 và công cụ orchestration/phân tích, không nằm trong runtime control path.
 
