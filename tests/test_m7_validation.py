@@ -144,6 +144,18 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
                            "safe_samples": 8 - i, "ess": 2.0 - 0.1 * i,
                            "deadline_miss": False},
         })
+    rows.extend([
+        {"event": "adapter", "elapsed_s": 1.0,
+         "adapter": {"unsafe_publish_attempts": 0,
+                     "stale_publish_attempts": 0,
+                     "disarmed_publish_attempts": 0,
+                     "wrong_mode_publish_attempts": 0}},
+        {"event": "adapter", "elapsed_s": 2.0,
+         "adapter": {"unsafe_publish_attempts": 2,
+                     "stale_publish_attempts": 2,
+                     "disarmed_publish_attempts": 1,
+                     "wrong_mode_publish_attempts": 1}},
+    ])
     rows.append({"event": "run_result", "elapsed_s": 3.0,
                  "success": True, "reason": "observed local mode GOAL_REACHED"})
     (run / "events.jsonl").write_text(
@@ -157,6 +169,9 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
     assert summary["deadline_misses"] == 0
     assert summary["min_safe_samples"] == 6.0
     assert summary["collision"] is False
+    assert summary["stale_command_violations"] == 2
+    assert summary["setpoint_while_disarmed"] == 1
+    assert summary["setpoint_in_wrong_mode"] == 1
     analyzer.write_outputs(tmp_path, [summary])
     with (tmp_path / "summary.csv").open() as stream:
         output = list(csv.DictReader(stream))

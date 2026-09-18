@@ -147,24 +147,44 @@ def summarize_run(path: Path) -> dict[str, Any]:
         float(row.get("controller", {}).get("t_total_ms", 0.0) or 0.0) > 100.0
         for row in cycles
     )
-    stale_command_violations = 0
-    setpoint_while_disarmed = 0
-    setpoint_in_wrong_mode = 0
-    previous_sequence = None
-    unsafe_adapter_states = {"STALE_COMMAND", "DISCONNECTED", "CONNECTED_NOT_READY", "FAULT"}
-    for row in (item for item in run_rows if item.get("event") == "adapter"):
-        sequence = row.get("mavros_setpoint_sequence")
-        if (previous_sequence is not None and sequence is not None and
-                row.get("adapter", {}).get("adapter_state") in unsafe_adapter_states and
-                sequence > previous_sequence):
-            stale_command_violations += 1
-        if previous_sequence is not None and sequence is not None and sequence > previous_sequence:
+    adapter_rows = [item for item in run_rows if item.get("event") == "adapter"]
+    has_internal_invariants = any(
+        "stale_publish_attempts" in row.get("adapter", {}) for row in adapter_rows)
+    if has_internal_invariants:
+        stale_command_violations = int(max(
+            _finite(row.get("adapter", {}).get("stale_publish_attempts")
+                    for row in adapter_rows), default=0.0))
+        setpoint_while_disarmed = int(max(
+            _finite(row.get("adapter", {}).get("disarmed_publish_attempts")
+                    for row in adapter_rows), default=0.0))
+        setpoint_in_wrong_mode = int(max(
+            _finite(row.get("adapter", {}).get("wrong_mode_publish_attempts")
+                    for row in adapter_rows), default=0.0))
+    else:
+        # Legacy fallback. The diagnostic and setpoint topics are asynchronous,
+        # so this may over-count at a state transition. New runtime builds use
+        # the counters checked atomically at the adapter publication boundary.
+        stale_command_violations = 0
+        setpoint_while_disarmed = 0
+        setpoint_in_wrong_mode = 0
+        previous_sequence = None
+        unsafe_adapter_states = {
+            "STALE_COMMAND", "DISCONNECTED", "CONNECTED_NOT_READY", "FAULT"
+        }
+        for row in adapter_rows:
+            sequence = row.get("mavros_setpoint_sequence")
             adapter = row.get("adapter", {})
-            if adapter.get("armed") is False:
-                setpoint_while_disarmed += 1
-            if adapter.get("mode") not in (None, "GUIDED"):
-                setpoint_in_wrong_mode += 1
-        previous_sequence = sequence
+            if (previous_sequence is not None and sequence is not None and
+                    adapter.get("adapter_state") in unsafe_adapter_states and
+                    sequence > previous_sequence):
+                stale_command_violations += 1
+            if (previous_sequence is not None and sequence is not None and
+                    sequence > previous_sequence):
+                if adapter.get("armed") is False:
+                    setpoint_while_disarmed += 1
+                if adapter.get("mode") not in (None, "GUIDED"):
+                    setpoint_in_wrong_mode += 1
+            previous_sequence = sequence
     goals = [row for row in rows if row.get("event") == "goal_published"]
     replan_latency_ms = math.nan
     replan_to_command_ms = math.nan

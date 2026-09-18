@@ -174,10 +174,30 @@ class AutopilotAdapterNode final : public rclcpp::Node {
     reason_ = decision.reason;
     last_send_success_ = false;
     if (decision.send_command && last_command_) {
-      last_send_success_ = backend_->SendVelocityCommand(*last_command_);
-      if (!last_send_success_) {
+      const auto status = backend_->GetStatus();
+      const bool stale = !backend_->HasStatus() ||
+                         backend_->StatusAgeSeconds() >
+                             config_.heartbeat_timeout_s ||
+                         command_age_s > config_.command_timeout_s;
+      const bool disconnected = !status.connected;
+      const bool disarmed = !status.armed;
+      const bool wrong_mode = status.mode != config_.required_mode;
+      if (stale || disconnected || disarmed || wrong_mode) {
+        ++unsafe_publish_attempts_;
+        stale_publish_attempts_ +=
+            static_cast<std::uint64_t>(stale || disconnected);
+        disarmed_publish_attempts_ += static_cast<std::uint64_t>(disarmed);
+        wrong_mode_publish_attempts_ += static_cast<std::uint64_t>(wrong_mode);
         state_ = AdapterState::kFault;
-        reason_ = "MAVROS backend rejected setpoint publication";
+        reason_ = "setpoint publication blocked by adapter invariant";
+      } else {
+        last_send_success_ = backend_->SendVelocityCommand(*last_command_);
+        if (last_send_success_) {
+          ++setpoints_published_;
+        } else {
+          state_ = AdapterState::kFault;
+          reason_ = "MAVROS backend rejected setpoint publication";
+        }
       }
     }
     PublishDiagnostic(command_age_s);
@@ -213,7 +233,16 @@ class AutopilotAdapterNode final : public rclcpp::Node {
         KeyValue("setpoint_rate_hz",
                  std::to_string(config_.setpoint_rate_hz)),
         KeyValue("last_send_success",
-                 last_send_success_ ? "true" : "false")};
+                 last_send_success_ ? "true" : "false"),
+        KeyValue("setpoints_published", std::to_string(setpoints_published_)),
+        KeyValue("unsafe_publish_attempts",
+                 std::to_string(unsafe_publish_attempts_)),
+        KeyValue("stale_publish_attempts",
+                 std::to_string(stale_publish_attempts_)),
+        KeyValue("disarmed_publish_attempts",
+                 std::to_string(disarmed_publish_attempts_)),
+        KeyValue("wrong_mode_publish_attempts",
+                 std::to_string(wrong_mode_publish_attempts_))};
     message.status.push_back(std::move(status));
     diagnostics_publisher_->publish(message);
   }
@@ -223,6 +252,11 @@ class AutopilotAdapterNode final : public rclcpp::Node {
   std::string reason_{"startup"};
   std::string command_fault_;
   bool last_send_success_{false};
+  std::uint64_t setpoints_published_{0};
+  std::uint64_t unsafe_publish_attempts_{0};
+  std::uint64_t stale_publish_attempts_{0};
+  std::uint64_t disarmed_publish_attempts_{0};
+  std::uint64_t wrong_mode_publish_attempts_{0};
   std::optional<VelocityCommand> last_command_;
   std::chrono::steady_clock::time_point last_command_received_{};
   std::unique_ptr<CommandTranslator> translator_;
