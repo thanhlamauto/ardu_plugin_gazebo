@@ -27,7 +27,14 @@ def main() -> int:
     except ImportError as error:
         parser.error(f"matplotlib is required: {error}")
     rows = [json.loads(line) for line in args.events.read_text().splitlines() if line.strip()]
-    cycles = [row for row in rows if row.get("event") == "control_cycle"]
+    starts = [index for index, row in enumerate(rows)
+              if row.get("event") == "run_started"]
+    results = [index for index, row in enumerate(rows)
+               if row.get("event") == "run_result"]
+    start = starts[0] if starts else 0
+    end = results[-1] + 1 if results else len(rows)
+    cycles = [row for row in rows[start:end]
+              if row.get("event") == "control_cycle"]
     if not cycles:
         parser.error("no control_cycle records")
     t = [number(row.get("elapsed_s")) for row in cycles]
@@ -35,13 +42,15 @@ def main() -> int:
     safe = [number(row.get("controller", {}).get("safe_samples")) for row in cycles]
     speed = []
     cost = [number(row.get("controller", {}).get("best_feasible_cost")) for row in cycles]
+    ess = [number(row.get("controller", {}).get("ess")) for row in cycles]
     for row in cycles:
         velocity = row.get("state", {}).get("velocity_enu_m_s", [math.nan] * 3)
         speed.append(math.hypot(number(velocity[0]), number(velocity[1])))
-    figure, axes = plt.subplots(4, 1, sharex=True, figsize=(10, 9))
+    figure, axes = plt.subplots(5, 1, sharex=True, figsize=(10, 11))
     for axis, values, label in zip(
-            axes, (clearance, safe, speed, cost),
-            ("Minimum clearance (m)", "N_safe", "XY speed (m/s)", "Best feasible cost")):
+            axes, (clearance, safe, speed, cost, ess),
+            ("Minimum clearance (m)", "N_safe", "XY speed (m/s)",
+             "Best feasible cost", "ESS")):
         axis.plot(t, values, linewidth=1.3)
         axis.set_ylabel(label)
         axis.grid(True, alpha=0.3)
