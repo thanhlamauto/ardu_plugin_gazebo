@@ -97,7 +97,7 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
     run = tmp_path / "s01" / "run_01_seed_7"
     run.mkdir(parents=True)
     manifest = {
-        "scenario": "S01", "run": 1, "seed": 7,
+        "scenario": "S01", "variant": "nominal", "run": 1, "seed": 7,
         "expected_terminal_modes": ["GOAL_REACHED"],
     }
     (run / "manifest.json").write_text(json.dumps(manifest))
@@ -132,4 +132,5 @@ def test_analyzer_computes_percentiles_and_safety_metrics(tmp_path):
     with (tmp_path / "summary.csv").open() as stream:
         output = list(csv.DictReader(stream))
     assert output[0]["scenario"] == "S01"
+    assert output[0]["variant"] == "nominal"
     assert (tmp_path / "REPORT.md").is_file()

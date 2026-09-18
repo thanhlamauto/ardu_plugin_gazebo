@@ -13,7 +13,7 @@ from typing import Any, Iterable
 
 
 SUMMARY_FIELDS = [
-    "scenario", "run", "seed", "success", "terminal_reason", "time_s",
+    "scenario", "variant", "run", "seed", "success", "terminal_reason", "time_s",
     "performance_mode",
     "time_to_goal_s", "path_m", "path_efficiency", "min_clearance_m",
     "cte_rms_m", "cte_p95_m", "peak_xy_speed_m_s", "peak_accel_m_s2",
@@ -184,6 +184,7 @@ def summarize_run(path: Path) -> dict[str, Any]:
                 replan_to_command_ms = (float(commands[0]["elapsed_s"]) - plan_time) * 1000.0
     return {
         "scenario": manifest.get("scenario", path.parent.parent.name),
+        "variant": manifest.get("variant") or "base",
         "run": manifest.get("run", path.parent.name),
         "seed": manifest.get("seed", ""),
         "performance_mode": bool(manifest.get("performance_mode", True)),
@@ -238,18 +239,19 @@ def write_outputs(root: Path, summaries: list[dict[str, Any]]) -> None:
         for row in summaries:
             writer.writerow({key: format_value(row.get(key, "")) for key in SUMMARY_FIELDS})
 
-    by_scenario: dict[str, list[dict[str, Any]]] = {}
+    by_scenario: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in summaries:
-        by_scenario.setdefault(str(row["scenario"]), []).append(row)
+        key = (str(row["scenario"]), str(row.get("variant", "base")))
+        by_scenario.setdefault(key, []).append(row)
     lines = ["# M7 validation result summary", "",
              "Generated from immutable per-run `events.jsonl` and `manifest.json` files.", "",
              "| Scenario | Runs | Success | Collision | Deadline misses | Late accepted | Stale setpoint | Disarmed setpoint | Wrong-mode setpoint | Compute p99 worst (ms) | Min clearance (m) |",
              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
-    for scenario, rows in sorted(by_scenario.items()):
+    for (scenario, variant), rows in sorted(by_scenario.items()):
         p99 = _finite(row["compute_p99_ms"] for row in rows)
         clearance = _finite(row["min_clearance_m"] for row in rows)
         lines.append(
-            f"| {scenario} | {len(rows)} | {sum(bool(r['success']) for r in rows) / len(rows):.1%} | "
+            f"| {scenario}/{variant} | {len(rows)} | {sum(bool(r['success']) for r in rows) / len(rows):.1%} | "
             f"{sum(bool(r['collision']) for r in rows)} | "
             f"{sum(int(r['deadline_misses']) for r in rows)} | "
             f"{sum(int(r['late_command_accepted']) for r in rows)} | "
