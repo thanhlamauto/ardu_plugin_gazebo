@@ -14,7 +14,7 @@ variants:
     fault:
       after_s: 5.0
       action: suspend_process
-      process_pattern: __node:=mavros
+      process_pattern: /mavros/mavros_node
       restore_after_s: 2.5
   local_planner_death:
     expected_adapter_states: [STALE_COMMAND]
