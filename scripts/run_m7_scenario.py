@@ -2,8 +2,9 @@
 """Run and record one M7 ROS 2 scenario.
 
 ArduPilot SITL must already be running. By default this script also starts the
-headless navigation launch, waits until the vehicle is armed in GUIDED above
-the configured altitude, publishes the scenario goal, and writes JSONL data.
+headless navigation launch, waits until the vehicle is armed in GUIDED and
+hovering above the configured altitude, publishes the scenario goal, and
+writes JSONL data.
 """
 
 from __future__ import annotations
@@ -103,7 +104,9 @@ def stop_process_group(process_group: int, grace_s: float = 10.0) -> None:
 class M7Recorder:
     def __init__(self, node: Any, scenario: dict[str, Any], stream: Any,
                  start_immediately: bool, allow_process_faults: bool,
-                 readiness_timeout_s: float):
+                 readiness_timeout_s: float,
+                 start_max_speed_m_s: float | None = None,
+                 start_stable_s: float = 0.0):
         from diagnostic_msgs.msg import DiagnosticArray
         from geometry_msgs.msg import PoseStamped, TwistStamped
         from nav_msgs.msg import Odometry
@@ -115,6 +118,9 @@ class M7Recorder:
         self.start_immediately = start_immediately
         self.allow_process_faults = allow_process_faults
         self.readiness_timeout_s = readiness_timeout_s
+        self.start_max_speed_m_s = start_max_speed_m_s
+        self.start_stable_s = start_stable_s
+        self.ready_since: float | None = None
         self.created = time.monotonic()
         self.started: float | None = None
         self.done = False
@@ -243,9 +249,22 @@ class M7Recorder:
         if self.start_immediately:
             return bool(self.latest_state)
         altitude = self.latest_state.get("position_enu_m", [0.0, 0.0, 0.0])[2]
-        return (altitude >= float(self.scenario.get("start_min_altitude_m", 4.0)) and
-                self.latest_adapter.get("armed") is True and
-                self.latest_adapter.get("mode") == "GUIDED")
+        basic_ready = (
+            altitude >= float(self.scenario.get("start_min_altitude_m", 4.0))
+            and self.latest_adapter.get("armed") is True
+            and self.latest_adapter.get("mode") == "GUIDED"
+        )
+        velocity = self.latest_state.get("velocity_enu_m_s", [])
+        speed_ready = self.start_max_speed_m_s is None
+        if self.start_max_speed_m_s is not None and len(velocity) == 3:
+            speed_ready = math.sqrt(sum(float(value) ** 2 for value in velocity)) <= self.start_max_speed_m_s
+        if not basic_ready or not speed_ready:
+            self.ready_since = None
+            return False
+        now = time.monotonic()
+        if self.ready_since is None:
+            self.ready_since = now
+        return now - self.ready_since >= self.start_stable_s
 
     def current_goal(self) -> list[float]:
         goal = self.scenario["goal_enu_m"]
@@ -372,6 +391,10 @@ def main() -> int:
     parser.add_argument("--debug-visualization", action="store_true")
     parser.add_argument("--start-immediately", action="store_true")
     parser.add_argument("--readiness-timeout", type=float, default=60.0)
+    parser.add_argument("--start-max-speed", type=float, default=0.3,
+                        help="wait for total vehicle speed at or below this value before goal publication")
+    parser.add_argument("--start-stable", type=float, default=2.0,
+                        help="seconds that all readiness conditions must remain true")
     parser.add_argument("--allow-process-faults", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -380,6 +403,10 @@ def main() -> int:
     scenario = load_scenario(scenario_path)
     if args.readiness_timeout <= 0.0:
         parser.error("--readiness-timeout must be positive")
+    if args.start_max_speed is not None and args.start_max_speed < 0.0:
+        parser.error("--start-max-speed must be nonnegative")
+    if args.start_stable < 0.0:
+        parser.error("--start-stable must be nonnegative")
     variants = scenario.get("variants", {})
     variant_name = args.variant or scenario.get("default_variant")
     if variant_name:
@@ -428,6 +455,9 @@ def main() -> int:
         "expected_terminal_modes": scenario.get("expected_terminal_modes", []),
         "expected_global_status": scenario.get("expected_global_status"),
         "expected_adapter_states": scenario.get("expected_adapter_states", []),
+        "readiness": {"minimum_altitude_m": scenario.get("start_min_altitude_m", 4.0),
+                      "maximum_speed_m_s": args.start_max_speed,
+                      "stable_duration_s": args.start_stable},
         "launch_command": launch_command,
         "environment": {"platform": platform.platform(),
                         "python": sys.version.split()[0],
@@ -450,10 +480,14 @@ def main() -> int:
         with (run_dir / "events.jsonl").open("w", encoding="utf-8") as stream:
             recorder = M7Recorder(node, scenario, stream, args.start_immediately,
                                   args.allow_process_faults,
-                                  args.readiness_timeout)
+                                  args.readiness_timeout,
+                                  args.start_max_speed, args.start_stable)
             if not args.start_immediately:
+                speed_condition = ("" if args.start_max_speed is None else
+                                   f", speed <= {args.start_max_speed:g} m/s for "
+                                   f"{args.start_stable:g} s")
                 print(f"waiting up to {args.readiness_timeout:g} s for odometry, "
-                      "GUIDED, armed, and altitude >= 4 m")
+                      f"GUIDED, armed, altitude >= 4 m{speed_condition}")
             while rclpy.ok() and not recorder.done:
                 rclpy.spin_once(node, timeout_sec=0.1)
             success = recorder.success

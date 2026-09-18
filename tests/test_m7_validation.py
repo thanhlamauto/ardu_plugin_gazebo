@@ -83,6 +83,32 @@ def test_m7_cleanup_stops_children_after_launch_leader_exits(monkeypatch):
     assert any(group_signal == 0 for _, group_signal in sent)
 
 
+def test_m7_stable_hover_gate_resets_when_speed_rises(monkeypatch):
+    runner = load_script("run_m7_scenario")
+    recorder = runner.M7Recorder.__new__(runner.M7Recorder)
+    recorder.start_immediately = False
+    recorder.scenario = {"start_min_altitude_m": 4.0}
+    recorder.latest_state = {
+        "position_enu_m": [0.0, 0.0, 5.0],
+        "velocity_enu_m_s": [0.1, 0.0, 0.0],
+    }
+    recorder.latest_adapter = {"armed": True, "mode": "GUIDED"}
+    recorder.start_max_speed_m_s = 0.3
+    recorder.start_stable_s = 2.0
+    recorder.ready_since = None
+    now = iter([10.0, 11.9, 12.1, 20.0, 22.1])
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(now))
+
+    assert recorder.ready() is False
+    assert recorder.ready() is False
+    assert recorder.ready() is True
+    recorder.latest_state["velocity_enu_m_s"] = [0.4, 0.0, 0.0]
+    assert recorder.ready() is False
+    assert recorder.ready_since is None
+    recorder.latest_state["velocity_enu_m_s"] = [0.0, 0.0, 0.0]
+    assert recorder.ready() is False
+
+
 def test_s02_geometry_really_creates_an_approximately_45_degree_turn():
     scenario = yaml.safe_load((ROOT / "tests/scenarios/s02_turn45.yaml").read_text())
     planner = AStarGlobalPlanner.from_sdf(
