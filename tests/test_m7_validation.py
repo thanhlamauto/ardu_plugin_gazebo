@@ -32,7 +32,10 @@ def test_m7_scenario_matrix_is_complete_and_references_real_worlds():
         assert scenario["schema_version"] == 1
         assert len(scenario["goal_enu_m"]) == 3
         assert scenario["timeout_s"] > 0
-        assert scenario["repetitions"] == (10 if scenario["id"] <= "S06" else 5)
+        expected_repetitions = (
+            10 if scenario["id"] <= "S06" or scenario["id"] == "S08" else 5
+        )
+        assert scenario["repetitions"] == expected_repetitions
         assert (ROOT / scenario["world"]).is_file()
         expected = (scenario.get("expected_terminal_modes") or
                     scenario.get("expected_global_status") or

@@ -35,7 +35,7 @@ conditions are data, not shell-script constants.
 | S05 | Narrow passage | clearance, `N_safe`, ESS | 10 |
 | S06 | High-speed straight | cruise and stopping/runtime safety | 10 |
 | S07 | Blocked goal | global planner reaches `NO_PATH` | 5 |
-| S08 | Replan while moving | Goal A to Goal B handoff | 5 |
+| S08 | Replan while moving | Goal A to Goal B handoff | 10 |
 | S09 | Stale input and local-planner faults | local safety states | 5/variant |
 | S10 | FCU/adapter faults | actuator boundary safety | 5/variant |
 
@@ -177,10 +177,95 @@ The current simulator model has no contact topic in this harness, so the
 `collision` column is the shared safety predicate on accepted trajectories; it
 is not a claim from a Gazebo physics contact sensor.
 
-## Current checkpoint
+## M7.1 campaign result — 2026-09-18
 
-The M7 instrumentation, scenario definitions, fault variants and analysis path
-are implemented. The repeated 80-run campaign has not yet been executed, so
-this document makes no M7 reliability or hardware-readiness claim. Existing M6
-closed-loop results remain the latest flight evidence until the M7 result set
-is complete.
+The campaign used the frozen controller/runtime commit
+`7e47663a80c3ef990a2223ed665819035b01cccb` and the frozen
+`m7_baseline.yaml` SHA-256
+`5d6948f725483d63d8088c67e367a10828e1776fa606ca60c2b43d1e2f44d451`.
+No controller parameter changed during the campaign. The machine was an Apple
+M2 MacBook Air with 8 CPU cores and 16 GB RAM, macOS 26.1, ROS 2 Jazzy,
+Fast DDS and Gazebo Sim 8.15.0. RViz, MPPI markers and live plotting were off.
+Harness-only fixes during collection hardened process cleanup and corrected
+the S10 MAVROS/disarm fault injectors; manifests identify harness commits
+`4e339a9`, `a0045ec` and `cfa1ef3`. All 115 runs still execute the same
+`7e47663` controller binary and the same config hash above.
+
+The 115-run aggregate contains 75 reachable/replanning runs, 5 blocked-goal
+runs and 35 fault-injection runs. The committed artifacts are
+[`summary.csv`](../results/m7_campaign_7e47663_20260918/summary.csv),
+[`manifests.jsonl`](../results/m7_campaign_7e47663_20260918/manifests.jsonl),
+and the generated
+[`aggregate_report.md`](../results/m7_campaign_7e47663_20260918/aggregate_report.md).
+Raw per-cycle JSONL and launch logs total about 90 MB and are retained outside
+Git at `/tmp/m7_campaign_7e47663_20260918_combined2` on the campaign machine.
+
+| Scenario/variant | Pass | Median goal time (s) | Median CTE RMS (m) | Minimum clearance (m) | Peak speed (m/s) | Minimum `N_safe` | Worst p99 (ms) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| S01/base | 10/10 | 10.91 | 0.443 | 4.531 | 7.61 | 80 | 12.76 |
+| S02/base | 10/10 | 13.70 | 1.198 | 0.091 | 6.11 | 0 | 14.21 |
+| S03/base | 5/10 | 10.00 | 1.454 | 0.004 | 8.53 | 0 | 19.05 |
+| S04/base | 10/10 | 13.00 | 0.807 | 0.833 | 7.63 | 0 | 9.85 |
+| S05/base | 9/10 | 14.23 | 1.730 | 0.006 | 9.37 | 0 | 15.75 |
+| S06/base | 9/10 | 25.66 | 1.101 | 4.018 | 10.01 | 80 | 12.30 |
+| S07/base | 5/5 | — | — | — | — | — | — |
+| S08/base | 10/10 | 13.96 | 2.050 | 4.607 | 8.76 | 80 | 6.53 |
+
+All four S09 variants and all four S10 variants passed 5/5. The five deadline
+misses in the aggregate belong only to the deliberate S09 `planner_deadline`
+injection; each late result was rejected. Reachable baseline runs had zero
+deadline misses. Their worst per-run p99 was 19.05 ms and the largest recorded
+controller cycle was 51.84 ms, both below the 100 ms control period.
+
+The campaign observed zero accepted-trajectory collision indications, zero
+late accepted outputs, zero stale-command violations, zero MAVROS setpoints
+while disarmed and zero setpoints in the wrong mode. As stated in the acceptance
+criteria, the collision result comes from the shared trajectory predicate and
+not a Gazebo contact sensor.
+
+The reported peak-acceleration column is not suitable as a vehicle-dynamics
+claim. It finite-differences velocity samples using recorder callback time, so
+DDS delivery bursts create artificial spikes. Position, velocity, controller
+timing and safety-event metrics remain usable; acceleration requires odometry
+header timestamps or a synchronized estimator before publication.
+
+## M7.2 failure triage and exact rerun
+
+The seven failed M7.1 reachable runs were replayed once with the same runtime,
+config, scenario, run number and seed. No controller parameter was changed.
+The rerun aggregate is in
+[`m72_exact_rerun_summary.csv`](../results/m7_campaign_7e47663_20260918/m72_exact_rerun_summary.csv).
+
+| Scenario | Failed in M7.1 | Exact rerun result | Interpretation |
+|---|---:|---:|---|
+| S03 90-degree turn | 5/10 | 2/5 pass | recurrent controller/closed-loop failure; outcome is not fixed by seed alone |
+| S05 narrow passage | 1/10 | 1/1 pass | intermittent; retain as an unresolved reliability failure |
+| S06 high-speed straight | 1/10 | 1/1 pass | original run never received the planned path; interface/startup failure |
+
+The original S03 seed 27 run failed preflight, but its exact rerun passed
+preflight and then timed out in the turn. Across the four original S03 flight
+failures, median peak speed was 7.96 m/s, median RMS cross-track error was
+5.24 m, median feasible-sample count was zero and median
+`NO_SAFE_TRAJECTORY` count was 543.5. The five successful S03 runs had median
+peak speed 4.09 m/s, median RMS cross-track error 0.50 m and median feasible
+sample count 78. This separates the observed failure signature clearly:
+the fast approach reaches a state where the 80-sample planner repeatedly finds
+no safe trajectory, after which the vehicle cannot complete the corner.
+
+An exact seed does not reproduce the outcome deterministically. Seed 37 and 87
+failed in M7.1 but passed the rerun; seed 47 and 57 failed both times. Simulator
+state, asynchronous sensor/path timing and warm-start history therefore remain
+part of the experiment state and must be captured before the next root-cause
+experiment. Representative pass/fail plots are under
+[`results/m7_campaign_7e47663_20260918/plots/`](../results/m7_campaign_7e47663_20260918/plots/).
+
+## Decision
+
+M7.1 is complete and its failed results remain preserved. The baseline is
+**not ready for M8/hardware** because reachable deterministic scenarios did not
+meet the required 10/10 result, chiefly S03 at 5/10. Runtime deadline handling
+and all injected safety boundaries passed. The next work stays in M7.2: capture
+the complete pre-turn state/warm-start/sensor timing for S03, determine why the
+same nominal seed enters either the low-speed feasible branch or the high-speed
+`N_safe=0` branch, fix that root cause in a new commit/config, then rerun S03
+and the full regression campaign without overwriting this baseline.

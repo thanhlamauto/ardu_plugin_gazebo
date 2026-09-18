@@ -12,13 +12,14 @@ ArduPilot điều khiển UAV trong Gazebo.
 
 ## Kiến trúc hệ thống
 
-**Trạng thái: M7 validation infrastructure.** A*, trajectory safety, command
+**Trạng thái: M7.2 failure triage.** A*, trajectory safety, command
 conditioning và MPPI đã nằm trong core C++ thuần. ROS 2 nodes đã chạy global
 planning, local MPPI, safety, diagnostics và RViz visualization trong một
 launch. C++ autopilot adapter dùng MAVROS cho frame conversion và MAVLink; đường
 runtime điều khiển không còn Python. Closed loop Gazebo/ArduPilot SITL đã đi từ
-takeoff tới goal. M7 đã khóa config, định nghĩa ma trận S01–S10 và ghi structured
-metrics; campaign lặp đầy đủ chưa chạy xong. Python chỉ còn là regression oracle
+takeoff tới goal. M7.1 đã chạy đủ 115 trial với config khóa: toàn bộ invariant
+an toàn và deadline runtime đều đạt, nhưng S03 90-degree turn chỉ đạt 5/10 nên
+baseline chưa sẵn sàng cho hardware. Python chỉ còn là regression oracle
 và công cụ orchestration/phân tích, không nằm trong runtime control path.
 
 Tài liệu thiết kế chính là
@@ -365,6 +366,7 @@ flowchart LR
 | Gazebo GUI | Seed 7, chạy riêng 5 và 10 m/s, không bật RViz | Cả hai tới đích; peak 4.98 và 8.68 m/s | Đủ để demo GUI, chưa chứng minh giữ ổn định 10 m/s trong yard |
 | Experiment 7A | 12 failure + 8 control snapshots; K=80/160/320/640; 20 RNG/K; tổng 1.600 solve | Failure: `P_hit=0` ở mọi K. Control: `P_hit=1` ở mọi K | Tăng random samples không giải quyết `N_safe=0`; nguyên nhân hiện nghiêng về viability loss hoặc độ nhạy model/margin |
 | M6 C++ adapter | MAVROS, axis bench và closed loop từ `(2.55,2.47,6.07)` tới `(30,2.5,5)` | Dấu X/Y/Z/yaw đúng; tới goal sau 24.4 s; peak XY 6.06 m/s; command/FCU loss chuyển `STALE_COMMAND`/`DISCONNECTED` | Runtime control path không còn Python; chưa phải benchmark controller tốc độ cao |
+| M7.1 C++ campaign | Runtime `7e47663`, config khóa, 115 run S01–S10, headless | 108/115 đạt terminal expectation; không vi phạm safety invariant; reachable runtime p99 tệ nhất 19.05 ms; S03 chỉ 5/10 | Runtime và safety boundary đạt, nhưng reliability qua cua 90° chưa đạt nên chưa sang M8/hardware |
 
 Các giới hạn cần giữ khi báo cáo:
 
@@ -377,6 +379,7 @@ Các giới hạn cần giữ khi báo cáo:
 Chi tiết số liệu và lập luận:
 
 - [Protocol validation M7](docs/M7_VALIDATION.md)
+- [Aggregate M7.1](results/m7_campaign_7e47663_20260918/)
 - [Checkpoint dành cho mentor](docs/MPPI_MENTOR_CHECKPOINT_AND_NEXT_PHASE_VI.md)
 - [Feasibility-selection](docs/MPPI_FEASIBLE_SELECTION_VI.md)
 - [Mô hình phanh và safety gate](docs/MPPI_MENTOR_SAFETY_PHASE_VI.md)
