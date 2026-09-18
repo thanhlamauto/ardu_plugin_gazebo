@@ -80,7 +80,8 @@ Build and source the ROS 2 workspace, then start ArduPilot SITL as documented in
 the root README. Start the runner in a second terminal; it launches the
 Gazebo/ROS stack and waits up to 60 seconds. During that wait, enter `mode
 guided`, `arm throttle`, `takeoff 5` in MAVProxy. The goal is published only
-after odometry reports the armed, GUIDED vehicle above 4 m:
+after the armed, GUIDED vehicle is above 4 m and its total speed remains at or
+below 0.3 m/s for 2 seconds:
 
 ```bash
 source install/setup.bash
@@ -259,13 +260,36 @@ part of the experiment state and must be captured before the next root-cause
 experiment. Representative pass/fail plots are under
 [`results/m7_campaign_7e47663_20260918/plots/`](../results/m7_campaign_7e47663_20260918/plots/).
 
+The triage found a protocol defect: M7.1 published the goal as soon as altitude
+crossed 4 m. At the first active MPPI cycle, the vehicle was still climbing at
+1.44–1.66 m/s. The local controller therefore started from a variable takeoff
+transient even though the operator procedure required a stable hover.
+Commit `a5743fd` adds a harness readiness gate of total speed at or below
+0.3 m/s continuously for 2 seconds; it does not change the frozen controller
+binary or MPPI parameters.
+
+A focused S03 rerun with this gate used all ten original seeds and reached
+`GOAL_REACHED` in 10/10 runs. Median time to goal was 11.82 s, median RMS CTE
+was 0.445 m, median peak XY speed was 4.01 m/s and median minimum clearance was
+1.50 m. Four runs still entered `NO_SAFE_TRAJECTORY` briefly; the worst had 65
+such cycles and the minimum clearance over the set was 0.029 m. The gate fixes
+the reproducibility/initial-condition defect and removes the recurrent timeout
+in this focused set, but it does not prove a wide safety margin.
+
+The focused artifacts are
+[`m72_s03_stable_start_summary.csv`](../results/m7_campaign_7e47663_20260918/m72_s03_stable_start_summary.csv)
+and
+[`m72_s03_stable_start_manifests.jsonl`](../results/m7_campaign_7e47663_20260918/m72_s03_stable_start_manifests.jsonl).
+Six planner deadline rejects occurred in one run under host load; no late MPPI
+output was accepted. One reported stale-setpoint violation is being treated as
+a recorder-ordering anomaly until adapter sequence/timestamp ordering is
+verified, so the focused set does not replace the frozen M7.1 safety claim.
+
 ## Decision
 
-M7.1 is complete and its failed results remain preserved. The baseline is
-**not ready for M8/hardware** because reachable deterministic scenarios did not
-meet the required 10/10 result, chiefly S03 at 5/10. Runtime deadline handling
-and all injected safety boundaries passed. The next work stays in M7.2: capture
-the complete pre-turn state/warm-start/sensor timing for S03, determine why the
-same nominal seed enters either the low-speed feasible branch or the high-speed
-`N_safe=0` branch, fix that root cause in a new commit/config, then rerun S03
-and the full regression campaign without overwriting this baseline.
+M7.1 is complete and its failed results remain preserved. S03 focused
+revalidation after the harness fix is 10/10, but the project remains **not ready
+for M8/hardware** until the full regression campaign with stable-start passes.
+The next decision stays in M7.2: finish that campaign, inspect the remaining
+near-boundary `N_safe=0` runs and verify recorder ordering for the apparent
+stale-setpoint event. The original baseline result is never overwritten.

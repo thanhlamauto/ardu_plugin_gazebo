@@ -18,8 +18,10 @@ planning, local MPPI, safety, diagnostics và RViz visualization trong một
 launch. C++ autopilot adapter dùng MAVROS cho frame conversion và MAVLink; đường
 runtime điều khiển không còn Python. Closed loop Gazebo/ArduPilot SITL đã đi từ
 takeoff tới goal. M7.1 đã chạy đủ 115 trial với config khóa: toàn bộ invariant
-an toàn và deadline runtime đều đạt, nhưng S03 90-degree turn chỉ đạt 5/10 nên
-baseline chưa sẵn sàng cho hardware. Python chỉ còn là regression oracle
+an toàn và deadline runtime đều đạt, nhưng S03 90-degree turn chỉ đạt 5/10.
+Sau khi harness chờ hover ổn định trước khi gửi goal, focused rerun S03 đạt
+10/10; full regression đang được chạy trước khi sang hardware. Python chỉ còn
+là regression oracle
 và công cụ orchestration/phân tích, không nằm trong runtime control path.
 
 Tài liệu thiết kế chính là

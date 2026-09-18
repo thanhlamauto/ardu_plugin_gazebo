@@ -19,7 +19,11 @@ Files:
 - `aggregate_report.md`: generated scenario/variant safety summary;
 - `m72_exact_rerun_summary.csv`: exact rerun of the seven reachable failures;
 - `m72_exact_rerun_report.md`: generated rerun summary;
-- `plots/`: representative pass/fail plots for S03 and S05.
+- `m72_s03_stable_start_summary.csv`: ten-seed S03 focused revalidation after
+  enforcing a stable hover before goal publication;
+- `m72_s03_stable_start_manifests.jsonl`: metadata for those ten runs;
+- `m72_s03_stable_start_report.md`: generated focused summary;
+- `plots/`: representative pass/fail/stable-start plots for S03 and S05.
 
 The source raw results are retained on the campaign machine at
 `/tmp/m7_campaign_7e47663_20260918_combined2`; exact rerun raw results are at
