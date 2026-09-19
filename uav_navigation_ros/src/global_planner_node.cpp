@@ -183,6 +183,10 @@ class GlobalPlannerNode final : public rclcpp::Node {
     core::Goal goal;
     goal.frame_id = planning_frame_;
     goal.position_enu_m = {p.x, p.y, planning_altitude_m_};
+    // A new external goal is accepted here. goal_id identifies the request and
+    // global_path_id identifies the plan produced for it; both are monotonic.
+    ++goal_id_;
+    ++global_path_id_;
     try {
       cost_grid_ = map_loader_->BuildCostGrid(
           planning_altitude_m_, {state_.position_enu_m, goal.position_enu_m});
@@ -192,10 +196,20 @@ class GlobalPlannerNode final : public rclcpp::Node {
           std::chrono::steady_clock::now() - start_time).count();
       result.diagnostics.compute_time_ms = elapsed;
       const auto stamp = now();
+      const auto path_stamp_ns = stamp.nanoseconds();
       costmap_publisher_->publish(ToRosGrid(cost_grid_, stamp));
       path_publisher_->publish(ToRosPath(result.path, planning_frame_, stamp));
+      // The local node reads the same header stamp back, so path_stamp_ns here
+      // is the join key between the global planner goal/path ids and the local
+      // planner's active path id.
       PublishDiagnostic(result.status, result.diagnostics.detail,
-                        result.diagnostics.expanded_nodes, elapsed);
+                        result.diagnostics.expanded_nodes, elapsed, goal_id_,
+                        global_path_id_, path_stamp_ns);
+      RCLCPP_INFO(get_logger(),
+                  "goal_id=%llu global_path_id=%llu path_stamp_ns=%lld",
+                  static_cast<unsigned long long>(goal_id_),
+                  static_cast<unsigned long long>(global_path_id_),
+                  static_cast<long long>(path_stamp_ns));
       if (result.status == core::StatusCode::kOk) {
         RCLCPP_INFO(get_logger(), "A* OK: %zu points, %u expanded, %.2f ms",
                     result.path.points_enu_m.size(), result.diagnostics.expanded_nodes, elapsed);
@@ -204,14 +218,19 @@ class GlobalPlannerNode final : public rclcpp::Node {
                     result.diagnostics.detail.c_str());
       }
     } catch (const std::exception& error) {
-      path_publisher_->publish(ToRosPath({}, planning_frame_, now()));
-      PublishDiagnostic(core::StatusCode::kInternalError, error.what(), 0, 0.0);
+      const auto stamp = now();
+      path_publisher_->publish(ToRosPath({}, planning_frame_, stamp));
+      PublishDiagnostic(core::StatusCode::kInternalError, error.what(), 0, 0.0,
+                        goal_id_, global_path_id_, stamp.nanoseconds());
       RCLCPP_ERROR(get_logger(), "Global planning failed: %s", error.what());
     }
   }
 
   void PublishDiagnostic(core::StatusCode status, const std::string& detail,
-                         std::uint32_t expanded, double compute_time_ms) {
+                         std::uint32_t expanded, double compute_time_ms,
+                         std::uint64_t goal_id = 0,
+                         std::uint64_t global_path_id = 0,
+                         std::int64_t path_stamp_ns = 0) {
     diagnostic_msgs::msg::DiagnosticArray array;
     array.header.stamp = now();
     diagnostic_msgs::msg::DiagnosticStatus item;
@@ -223,20 +242,29 @@ class GlobalPlannerNode final : public rclcpp::Node {
                             ? diagnostic_msgs::msg::DiagnosticStatus::WARN
                             : diagnostic_msgs::msg::DiagnosticStatus::ERROR);
     item.message = StatusName(status) + ": " + detail;
-    diagnostic_msgs::msg::KeyValue expanded_value;
-    expanded_value.key = "expanded_nodes";
-    expanded_value.value = std::to_string(expanded);
-    diagnostic_msgs::msg::KeyValue time_value;
-    time_value.key = "compute_time_ms";
-    time_value.value = std::to_string(compute_time_ms);
-    item.values = {expanded_value, time_value};
+    item.values = {
+        MakeKeyValue("expanded_nodes", std::to_string(expanded)),
+        MakeKeyValue("compute_time_ms", std::to_string(compute_time_ms)),
+        MakeKeyValue("goal_id", std::to_string(goal_id)),
+        MakeKeyValue("global_path_id", std::to_string(global_path_id)),
+        MakeKeyValue("path_stamp_ns", std::to_string(path_stamp_ns))};
     array.status.push_back(item);
     diagnostics_publisher_->publish(array);
+  }
+
+  static diagnostic_msgs::msg::KeyValue MakeKeyValue(const std::string& key,
+                                                     const std::string& value) {
+    diagnostic_msgs::msg::KeyValue output;
+    output.key = key;
+    output.value = value;
+    return output;
   }
 
   std::string planning_frame_;
   double planning_altitude_m_{5.0};
   bool have_odometry_{false};
+  std::uint64_t goal_id_{0};
+  std::uint64_t global_path_id_{0};
   core::State state_;
   core::CostGrid2D cost_grid_;
   std::unique_ptr<SdfStaticMapLoader> map_loader_;

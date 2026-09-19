@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace uav_navigation_core::mppi {
@@ -70,6 +71,48 @@ State ToSafetyState(const MppiState &input) {
   output.yaw_enu_rad = input.yaw_enu_rad;
   return output;
 }
+// Maps the safety checker verdict onto the diagnostic rejection categories.
+// The checker already reports the first failing predicate, so this mapping
+// preserves the deterministic "first failure" policy and never double counts.
+RejectionReason ClassifyRejection(const SafetyResult &safety) {
+  if (safety.safe || safety.reason == "clear_trajectory")
+    return RejectionReason::kSafe;
+  if (safety.reason == "swept_collision")
+    return RejectionReason::kSweptCollision;
+  if (safety.reason == "known_map_collision")
+    return RejectionReason::kStaticCollision;
+  if (safety.reason == "predicted_stopping_clearance")
+    return RejectionReason::kStoppingDistance;
+  if (safety.reason.rfind("invalid", 0) == 0)
+    return RejectionReason::kNonFinite;
+  return RejectionReason::kOther;
+}
+void AccumulateRejection(RejectionCounts &counts, RejectionReason reason) {
+  counts.total += 1;
+  switch (reason) {
+  case RejectionReason::kSafe:
+    counts.safe += 1;
+    break;
+  case RejectionReason::kNonFinite:
+    counts.reject_non_finite += 1;
+    break;
+  case RejectionReason::kSweptCollision:
+    counts.reject_swept_collision += 1;
+    break;
+  case RejectionReason::kStaticCollision:
+    counts.reject_static_collision += 1;
+    break;
+  case RejectionReason::kDynamicCollision:
+    counts.reject_dynamic_collision += 1;
+    break;
+  case RejectionReason::kStoppingDistance:
+    counts.reject_stopping_distance += 1;
+    break;
+  case RejectionReason::kOther:
+    counts.reject_other += 1;
+    break;
+  }
+}
 } // namespace
 
 GaussianNoiseSampler::GaussianNoiseSampler(
@@ -114,7 +157,8 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
     const ControlBatch &injected_noise, double dt_s,
     const ControlBatch &specific_actions,
     const TrajectorySafetyChecker *safety_checker,
-    const ObstacleMap *safety_obstacles) const {
+    const ObstacleMap *safety_obstacles,
+    const std::vector<ProposalSource> *proposal_sources) const {
   if (nominal_before_shift.empty() || injected_noise.empty())
     throw std::invalid_argument("MPPI optimizer needs a horizon and samples");
   const std::size_t horizon = nominal_before_shift.size();
@@ -135,6 +179,10 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
   for (const auto &sequence : specific_actions)
     if (sequence.size() != horizon)
       throw std::invalid_argument("MPPI proposal shape does not match horizon");
+  if (proposal_sources != nullptr &&
+      proposal_sources->size() != specific_actions.size())
+    throw std::invalid_argument(
+        "MPPI proposal source labels do not match proposals");
   if ((safety_checker == nullptr) != (safety_obstacles == nullptr))
     throw std::invalid_argument(
         "MPPI safety checker and obstacle map must be paired");
@@ -163,6 +211,16 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
       effective[t] = Sub(actions[t], result.shifted_nominal[t]);
   }
 
+  result.sample_sources.resize(injected_noise.size(), ProposalSource::kGaussian);
+  for (std::size_t sample = 0; sample < injected_noise.size(); ++sample) {
+    if (sample < specific_actions.size()) {
+      result.sample_sources[sample] =
+          proposal_sources != nullptr
+              ? (*proposal_sources)[sample]
+              : ProposalSource::kSpecificAction;
+    }
+  }
+
   const auto rollout_started = std::chrono::steady_clock::now();
   result.trajectories =
       RolloutBatch(model, initial_state, result.perturbed_actions, dt_s);
@@ -176,6 +234,8 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
   result.perturbation_costs.reserve(result.trajectories.size());
   result.total_costs.reserve(result.trajectories.size());
   result.safe.assign(result.trajectories.size(), true);
+  result.rejection_reasons.assign(result.trajectories.size(),
+                                  RejectionReason::kSafe);
   for (std::size_t sample = 0; sample < result.trajectories.size(); ++sample) {
     const auto breakdown = cost_evaluator.EvaluateTrajectory(
         result.trajectories[sample], result.perturbed_actions[sample],
@@ -194,16 +254,30 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
     result.total_costs.push_back(breakdown.Total() + perturbation);
     if (safety_checker) {
       const auto safety_started = std::chrono::steady_clock::now();
-      result.safe[sample] =
-          safety_checker
-              ->Evaluate(ToSafetyState(initial_state),
-                         ToSafetyTrajectory(result.trajectories[sample]),
-                         *safety_obstacles)
-              .safe;
+      const auto safety = safety_checker->Evaluate(
+          ToSafetyState(initial_state),
+          ToSafetyTrajectory(result.trajectories[sample]), *safety_obstacles);
+      result.safe[sample] = safety.safe;
+      const auto reason = ClassifyRejection(safety);
+      result.rejection_reasons[sample] = reason;
+      AccumulateRejection(result.rejection_counts, reason);
       result.safety_time_ms +=
           std::chrono::duration<double, std::milli>(
               std::chrono::steady_clock::now() - safety_started)
               .count();
+    }
+  }
+  if (!safety_checker) {
+    result.rejection_counts.total = result.trajectories.size();
+    result.rejection_counts.safe = result.trajectories.size();
+  }
+  for (std::size_t sample = 0; sample < result.trajectories.size(); ++sample) {
+    auto &stats = result.proposal_source_stats[static_cast<std::size_t>(
+        result.sample_sources[sample])];
+    stats.generated += 1;
+    if (result.safe[sample]) {
+      stats.safe += 1;
+      stats.best_cost = std::min(stats.best_cost, result.total_costs[sample]);
     }
   }
   result.cost_time_ms = std::chrono::duration<double, std::milli>(
@@ -248,10 +322,9 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
   return result;
 }
 
-ControlBatch BuildRecoveryProposals(const PathReference *reference_path,
-                                    double path_progress_m,
-                                    double initial_horizontal_speed_m_s,
-                                    const RecoveryProposalConfig &config) {
+RecoveryProposals BuildRecoveryProposalsWithSources(
+    const PathReference *reference_path, double path_progress_m,
+    double initial_horizontal_speed_m_s, const RecoveryProposalConfig &config) {
   if (config.horizon == 0 || config.max_samples == 0 ||
       !std::isfinite(config.dt_s) || config.dt_s <= 0.0 ||
       !std::isfinite(config.reference_speed_m_s) ||
@@ -267,9 +340,13 @@ ControlBatch BuildRecoveryProposals(const PathReference *reference_path,
       throw std::invalid_argument("MPPI recovery proposal bounds are invalid");
   if (!config.proactive && !config.rejection_recovery)
     return {};
-  ControlBatch proposals(1, ControlSequence(config.horizon));
+  RecoveryProposals output;
+  // The first sequence is the deliberate zero/hold specific action. It is
+  // classified as a specific action because it is not derived from the path.
+  output.proposals.push_back(ControlSequence(config.horizon));
+  output.sources.push_back(ProposalSource::kSpecificAction);
   const auto append_path_speeds = [&](const std::vector<double> &speeds,
-                                      ControlBatch &output) {
+                                      ProposalSource source) {
     ControlSequence actions(config.horizon);
     double progress = path_progress_m;
     Vec3 previous = reference_path->Sample(progress);
@@ -282,11 +359,13 @@ ControlBatch BuildRecoveryProposals(const PathReference *reference_path,
       previous = current;
       actions[t] = Clamp(actions[t], config.minimum, config.maximum);
     }
-    output.push_back(std::move(actions));
+    output.proposals.push_back(std::move(actions));
+    output.sources.push_back(source);
   };
   if (reference_path) {
     for (double speed : {0.5, 1.0, 2.0, 4.0})
-      append_path_speeds(std::vector<double>(config.horizon, speed), proposals);
+      append_path_speeds(std::vector<double>(config.horizon, speed),
+                         ProposalSource::kReferenceProposal);
   }
   if (config.proactive && reference_path) {
     for (double target : {1.0, 2.0, 4.0, 6.0, config.reference_speed_m_s})
@@ -299,12 +378,27 @@ ControlBatch BuildRecoveryProposals(const PathReference *reference_path,
                               deceleration * config.dt_s);
           speeds.push_back(speed);
         }
-        append_path_speeds(speeds, proposals);
+        const ProposalSource source =
+            target < initial_horizontal_speed_m_s
+                ? ProposalSource::kBrakingProposal
+                : ProposalSource::kRecoveryProposal;
+        append_path_speeds(speeds, source);
       }
   }
-  if (proposals.size() > config.max_samples)
-    proposals.resize(config.max_samples);
-  return proposals;
+  if (output.proposals.size() > config.max_samples) {
+    output.proposals.resize(config.max_samples);
+    output.sources.resize(config.max_samples);
+  }
+  return output;
+}
+
+ControlBatch BuildRecoveryProposals(const PathReference *reference_path,
+                                    double path_progress_m,
+                                    double initial_horizontal_speed_m_s,
+                                    const RecoveryProposalConfig &config) {
+  return BuildRecoveryProposalsWithSources(reference_path, path_progress_m,
+                                           initial_horizontal_speed_m_s, config)
+      .proposals;
 }
 
 } // namespace uav_navigation_core::mppi

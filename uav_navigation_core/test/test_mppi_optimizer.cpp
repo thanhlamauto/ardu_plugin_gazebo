@@ -221,6 +221,141 @@ void RecoveryProposals() {
   CheckVector(Flatten(actual), Numbers(json, "expected_proposals_flat"), 1e-9,
               "recovery proposals match Python");
 }
+void RejectionAccounting() {
+  mppi::MppiOptimizerConfig optimizer_config;
+  optimizer_config.minimum = {{-2, -2, -1, -1}};
+  optimizer_config.maximum = {{2, 2, 1, 1}};
+  mppi::MppiCostConfig cost_config;
+  cost_config.w_goal = 0;
+  cost_config.w_terminal = 0;
+  cost_config.w_obstacle = 0;
+  cost_config.w_effort = 0;
+  cost_config.w_smoothness = 0;
+  cost_config.w_yaw = 0;
+  const mppi::MppiOptimizer optimizer(optimizer_config);
+  const mppi::CostEvaluator evaluator(cost_config);
+  DirectMotionModel model;
+  mppi::MppiState initial;
+  mppi::CostContext context;
+  context.initial_state = initial;
+  mppi::ControlSequence nominal(2), noise_positive(2), noise_negative(2);
+  for (auto &control : noise_positive)
+    control.velocity_enu_m_s.x = 1.0;
+  for (auto &control : noise_negative)
+    control.velocity_enu_m_s.x = -1.0;
+  core::TrajectorySafetyConfig safety_config;
+  safety_config.collision_radius_m = .1;
+  safety_config.braking_acceleration_m_s2 = 10.;
+  safety_config.stopping_delay_s = 0.;
+  safety_config.stopping_clearance_m = .1;
+  core::TrajectorySafetyChecker checker(safety_config);
+  core::ObstacleMap obstacles;
+  obstacles.points_enu_m.push_back({1., 0., 0.});
+  const auto result = optimizer.OptimizeInjected(
+      model, evaluator, context, initial, nominal, {},
+      {noise_positive, noise_negative}, 1., {}, &checker, &obstacles);
+  const auto &counts = result.rejection_counts;
+  Check(counts.total == 2 && counts.safe == 1,
+        "rejection accounting counts accepted and rejected samples");
+  Check(counts.reject_swept_collision == 1 &&
+            counts.reject_stopping_distance == 0 &&
+            counts.reject_non_finite == 0 && counts.reject_other == 0 &&
+            counts.reject_static_collision == 0 &&
+            counts.reject_dynamic_collision == 0,
+        "rejection accounting classifies a swept collision");
+  Check(result.rejection_reasons.size() == 2 &&
+            result.rejection_reasons[0] ==
+                mppi::RejectionReason::kSweptCollision &&
+            result.rejection_reasons[1] == mppi::RejectionReason::kSafe,
+        "rejection accounting stores one reason per sample");
+  Check(counts.safe + counts.reject_non_finite +
+            counts.reject_swept_collision + counts.reject_static_collision +
+            counts.reject_dynamic_collision + counts.reject_stopping_distance +
+            counts.reject_other ==
+        counts.total,
+        "rejection categories partition all samples without double counting");
+  const auto &gaussian = result.proposal_source_stats[static_cast<std::size_t>(
+      mppi::ProposalSource::kGaussian)];
+  Check(gaussian.generated == 2 && gaussian.safe == 1,
+        "proposal-source accounting attributes gaussian samples");
+  for (const auto &stats : result.proposal_source_stats)
+    Check(stats.generated >= stats.safe,
+          "proposal-source safe count does not exceed generated count");
+}
+
+void ProposalSourceAccounting() {
+  const auto json = ReadFixture("mppi_m4/recovery_proposals.json");
+  const auto path_points = m4_test::Vec3Array(Numbers(json, "path_flat"));
+  const mppi::PathReference path(path_points);
+  mppi::RecoveryProposalConfig config;
+  config.horizon = static_cast<std::size_t>(Number(json, "horizon"));
+  config.max_samples = static_cast<std::size_t>(Number(json, "samples"));
+  config.dt_s = Number(json, "dt");
+  config.reference_speed_m_s = Number(json, "reference_speed_m_s");
+  const double vmax = Number(json, "vmax");
+  const double vzmax = Number(json, "vzmax");
+  const double yawmax = Number(json, "yaw_rate_max");
+  config.minimum = {{-vmax, -vmax, -vzmax, -yawmax}};
+  config.maximum = {{vmax, vmax, vzmax, yawmax}};
+  config.proactive = true;
+  const double progress = Number(json, "path_progress_m");
+  const double speed = Number(json, "initial_horizontal_speed_m_s");
+  const auto labelled = mppi::BuildRecoveryProposalsWithSources(
+      &path, progress, speed, config);
+  const auto plain = mppi::BuildRecoveryProposals(&path, progress, speed, config);
+  Check(labelled.proposals.size() == labelled.sources.size(),
+        "proposal source labels align with proposals");
+  Check(plain.size() == labelled.proposals.size() &&
+            Flatten(plain) == Flatten(labelled.proposals),
+        "labelled proposals match the existing proposal builder");
+  CheckVector(Flatten(labelled.proposals),
+              Numbers(json, "expected_proposals_flat"), 1e-9,
+              "labelled proposals still match Python golden data");
+  Check(!labelled.sources.empty() &&
+            labelled.sources.front() ==
+                mppi::ProposalSource::kSpecificAction,
+        "zero/hold proposal is classified as a specific action");
+  std::size_t reference = 0, braking = 0, recovery = 0;
+  for (const auto source : labelled.sources) {
+    if (source == mppi::ProposalSource::kReferenceProposal)
+      ++reference;
+    else if (source == mppi::ProposalSource::kBrakingProposal)
+      ++braking;
+    else if (source == mppi::ProposalSource::kRecoveryProposal)
+      ++recovery;
+  }
+  Check(reference > 0 && braking > 0 && recovery > 0,
+        "proposal families are distinguished by source label");
+
+  mppi::MppiOptimizerConfig optimizer_config;
+  optimizer_config.minimum = {{-vmax, -vmax, -vzmax, -yawmax}};
+  optimizer_config.maximum = {{vmax, vmax, vzmax, yawmax}};
+  mppi::MppiCostConfig cost_config;
+  const mppi::MppiOptimizer optimizer(optimizer_config);
+  const mppi::CostEvaluator evaluator(cost_config);
+  DirectMotionModel model;
+  mppi::MppiState initial;
+  mppi::ControlSequence nominal(config.horizon);
+  mppi::CostContext context;
+  context.initial_state = initial;
+  mppi::ControlBatch noise(labelled.proposals.size() + 3,
+                           mppi::ControlSequence(config.horizon));
+  const auto result = optimizer.OptimizeInjected(
+      model, evaluator, context, initial, nominal, {}, noise, config.dt_s,
+      labelled.proposals, nullptr, nullptr, &labelled.sources);
+  Check(result.sample_sources.size() == noise.size(),
+        "optimizer records a source for every sample");
+  for (std::size_t i = 0; i < labelled.sources.size(); ++i)
+    Check(result.sample_sources[i] == labelled.sources[i],
+          "optimizer propagates supplied proposal source labels");
+  Check(result.sample_sources.back() == mppi::ProposalSource::kGaussian,
+        "optimizer labels remaining samples as gaussian");
+  std::size_t generated = 0;
+  for (const auto &stats : result.proposal_source_stats)
+    generated += stats.generated;
+  Check(generated == noise.size(),
+        "proposal-source accounting covers every generated sample");
+}
 } // namespace
 
 int main() {
@@ -229,5 +364,7 @@ int main() {
   NativeSampler();
   SafetyWeighting();
   RecoveryProposals();
+  RejectionAccounting();
+  ProposalSourceAccounting();
   return failures == 0 ? 0 : 1;
 }
