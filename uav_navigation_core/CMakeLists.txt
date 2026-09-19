@@ -14,6 +14,7 @@ add_library(${PROJECT_NAME} SHARED
   src/mppi/optimizer.cpp
   src/mppi/path_reference.cpp
   src/mppi/rollout.cpp
+  src/stabilization.cpp
   src/trajectory_safety_checker.cpp)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
@@ -44,6 +45,10 @@ if(BUILD_TESTING)
   add_executable(test_safety_prepared test/test_safety_prepared.cpp)
   target_link_libraries(test_safety_prepared PRIVATE ${PROJECT_NAME})
   add_test(NAME safety_prepared_tests COMMAND test_safety_prepared)
+
+  add_executable(test_stabilization test/test_stabilization.cpp)
+  target_link_libraries(test_stabilization PRIVATE ${PROJECT_NAME})
+  add_test(NAME stabilization_tests COMMAND test_stabilization)
 
   add_executable(test_mppi_dynamics test/test_mppi_dynamics.cpp)
   target_link_libraries(test_mppi_dynamics PRIVATE ${PROJECT_NAME})

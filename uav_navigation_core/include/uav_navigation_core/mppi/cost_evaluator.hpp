@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -47,6 +48,9 @@ struct CostContext {
   std::vector<Vec3> reference_positions{};
   std::vector<Vec3> reference_velocities{};
   MppiState initial_state{};
+  // Optional per-cycle reference speed cap used by the speed-limit term.
+  // Infinity (the default) reproduces the original vmax_m_s-only behavior.
+  double reference_speed_limit_m_s{std::numeric_limits<double>::infinity()};
 };
 
 struct CostBreakdown {

@@ -31,6 +31,7 @@
 #include "uav_navigation_core/mppi/optimizer.hpp"
 #include "uav_navigation_core/mppi/path_reference.hpp"
 #include "uav_navigation_core/mppi/rollout.hpp"
+#include "uav_navigation_core/stabilization.hpp"
 #include "uav_navigation_core/trajectory_safety_checker.hpp"
 
 namespace core = uav_navigation_core;
@@ -53,6 +54,7 @@ enum class Mode {
   kActive,
   kHoldStale,
   kNoSafeTrajectory,
+  kStoppingRecovery,
   kPlannerTimeout,
   kGoalReached,
   kInvalidInput,
@@ -72,6 +74,8 @@ const char *ModeName(Mode mode) {
     return "HOLD_STALE";
   case Mode::kNoSafeTrajectory:
     return "NO_SAFE_TRAJECTORY";
+  case Mode::kStoppingRecovery:
+    return "STOPPING_RECOVERY";
   case Mode::kPlannerTimeout:
     return "PLANNER_TIMEOUT";
   case Mode::kGoalReached:
@@ -306,6 +310,53 @@ public:
     stopping_delay_s_ = safety.stopping_delay_s;
     braking_accel_m_s2_ = accel_xy;
 
+    speed_shaping_enabled_ =
+        declare_parameter<bool>("stabilization.speed_shaping.enabled", false);
+    speed_shaping_nominal_speed_m_s_ = declare_parameter<double>(
+        "stabilization.speed_shaping.nominal_speed_m_s", vmax);
+    speed_shaping_turn_speed_m_s_ = declare_parameter<double>(
+        "stabilization.speed_shaping.turn_speed_m_s", 3.0);
+    speed_shaping_min_speed_m_s_ = declare_parameter<double>(
+        "stabilization.speed_shaping.min_speed_m_s", 0.5);
+    speed_shaping_lateral_accel_m_s2_ = declare_parameter<double>(
+        "stabilization.speed_shaping.lateral_accel_m_s2", 2.0);
+    speed_shaping_braking_accel_m_s2_ = declare_parameter<double>(
+        "stabilization.speed_shaping.braking_accel_m_s2", accel_xy);
+    speed_shaping_reaction_delay_s_ = declare_parameter<double>(
+        "stabilization.speed_shaping.reaction_delay_s", safety.stopping_delay_s);
+    speed_shaping_turn_angle_rad_ = declare_parameter<double>(
+        "stabilization.speed_shaping.turn_angle_rad", kTurnAngle);
+    speed_shaping_lookahead_m_ = declare_parameter<double>(
+        "stabilization.speed_shaping.lookahead_m", 2.0);
+    stopping_recovery_enabled_ =
+        declare_parameter<bool>("stabilization.stopping_recovery.enabled",
+                                false);
+    stopping_recovery_deceleration_m_s2_ = declare_parameter<double>(
+        "stabilization.stopping_recovery.deceleration_m_s2", accel_xy);
+    if (speed_shaping_nominal_speed_m_s_ <= 0.0 ||
+        speed_shaping_turn_speed_m_s_ < 0.0 ||
+        speed_shaping_min_speed_m_s_ < 0.0 ||
+        speed_shaping_min_speed_m_s_ > speed_shaping_turn_speed_m_s_ ||
+        speed_shaping_turn_speed_m_s_ > speed_shaping_nominal_speed_m_s_ ||
+        speed_shaping_lateral_accel_m_s2_ <= 0.0 ||
+        speed_shaping_braking_accel_m_s2_ <= 0.0 ||
+        speed_shaping_reaction_delay_s_ < 0.0 ||
+        speed_shaping_turn_angle_rad_ <= 0.0 ||
+        speed_shaping_turn_angle_rad_ >= kPi ||
+        speed_shaping_lookahead_m_ <= 0.0 ||
+        stopping_recovery_deceleration_m_s2_ <= 0.0)
+      throw std::invalid_argument("invalid stabilization parameter");
+    speed_shaping_config_.enabled = speed_shaping_enabled_;
+    speed_shaping_config_.nominal_speed_m_s = speed_shaping_nominal_speed_m_s_;
+    speed_shaping_config_.turn_speed_m_s = speed_shaping_turn_speed_m_s_;
+    speed_shaping_config_.min_speed_m_s = speed_shaping_min_speed_m_s_;
+    speed_shaping_config_.lateral_accel_m_s2 = speed_shaping_lateral_accel_m_s2_;
+    speed_shaping_config_.braking_accel_m_s2 = speed_shaping_braking_accel_m_s2_;
+    speed_shaping_config_.reaction_delay_s = speed_shaping_reaction_delay_s_;
+    speed_shaping_config_.turn_angle_rad = speed_shaping_turn_angle_rad_;
+    speed_shaping_config_.lookahead_m = speed_shaping_lookahead_m_;
+    stopping_recovery_tracker_.Configure(stopping_recovery_enabled_);
+
     core::VelocityCommandConditionerConfig conditioner;
     conditioner.dt_s = dt;
     conditioner.alpha = command_alpha;
@@ -400,6 +451,7 @@ private:
     double distance_to_next_turn_m{
         std::numeric_limits<double>::infinity()};
     double stopping_distance_m{0.0};
+    double reference_speed_cap_m_s{std::numeric_limits<double>::infinity()};
     double path_progress_m{0.0};
     double minimum_collision_clearance_m{
         std::numeric_limits<double>::infinity()};
@@ -570,6 +622,7 @@ private:
   void Hold(Mode mode, const std::string &reason, double total_ms = 0.0,
             double rollout_ms = 0.0, double cost_ms = 0.0,
             double safety_ms = 0.0) {
+    ExitStoppingRecovery();
     mode_ = mode;
     reason_ = reason;
     ResetController();
@@ -644,6 +697,9 @@ private:
     context.obstacles_enu_m = obstacles_.points_enu_m;
     context.reference_path = reference_path_;
     context.initial_state = state_;
+    const double reference_speed_cap = ComputeReferenceSpeedCap();
+    context.reference_speed_limit_m_s = reference_speed_cap;
+    cycle_diag_.reference_speed_cap_m_s = reference_speed_cap;
     const core::Control warm_start = nominal_.front();
     FillMotionDiagnostics(warm_start);
     cycle_diag_.input_snapshot_ms = ms_since(input_snapshot_started);
@@ -660,7 +716,8 @@ private:
       proposal_config.horizon = horizon_;
       proposal_config.max_samples = samples_;
       proposal_config.dt_s = dt_s_;
-      proposal_config.reference_speed_m_s = optimizer_->config().maximum[0];
+      proposal_config.reference_speed_m_s =
+          std::min(optimizer_->config().maximum[0], reference_speed_cap);
       proposal_config.minimum = optimizer_->config().minimum;
       proposal_config.maximum = optimizer_->config().maximum;
       proposal_config.proactive = true;
@@ -724,6 +781,9 @@ private:
             (!best || result.total_costs[i] < result.total_costs[*best]))
           best = i;
       if (!best) {
+        if (TryStoppingRecovery(result, cycle_started))
+          return;
+        ExitStoppingRecovery();
         last_result_ = std::move(result);
         mode_ = Mode::kNoSafeTrajectory;
         reason_ = final_safety.reason;
@@ -795,6 +855,7 @@ private:
     cycle_diag_.publish_ms = ms_since(publish_started);
 
     nominal_ = std::move(selected_actions);
+    ExitStoppingRecovery();
     mode_ = Mode::kActive;
     reason_ = "safe command published";
     selected_trajectory_ = std::move(selected);
@@ -848,13 +909,13 @@ private:
     return std::atan2(b.y - a.y, b.x - a.x);
   }
 
-  double DistanceToNextTurn(const mppi::PathReference &path,
-                            double progress_m) const {
+  double DistanceToNextTurn(const mppi::PathReference &path, double progress_m,
+                            double turn_angle = kTurnAngle) const {
     const double length = path.length_m();
     const double step = 0.5;
     const double base = PathTangentHeading(path, progress_m);
     for (double s = progress_m + step; s <= length; s += step)
-      if (std::abs(WrapAngle(PathTangentHeading(path, s) - base)) > kTurnAngle)
+      if (std::abs(WrapAngle(PathTangentHeading(path, s) - base)) > turn_angle)
         return s - progress_m;
     return std::numeric_limits<double>::infinity();
   }
@@ -904,6 +965,91 @@ private:
   static std::array<double, 4> ComponentsOf(const core::Control &control) {
     return {control.velocity_enu_m_s.x, control.velocity_enu_m_s.y,
             control.velocity_enu_m_s.z, control.yaw_rate_enu_rad_s};
+  }
+
+  // M7.4 Candidate 1: conservative reference-speed shaping delegated to the
+  // core stabilization module (unit-tested there). Inert when disabled.
+  double ComputeReferenceSpeedCap() const {
+    if (!reference_path_)
+      return std::numeric_limits<double>::infinity();
+    return core::ComputeReferenceSpeedCap(
+        speed_shaping_config_, *reference_path_, state_.position_enu_m,
+        state_.velocity_enu_m_s);
+  }
+
+  void ExitStoppingRecovery() {
+    stopping_recovery_tracker_.RecordOtherCycle();
+  }
+
+  // M7.4 Candidate 2: when all samples are rejected and the stopping-distance
+  // predicate dominates, command a bounded braking action only if the existing
+  // safety checker certifies its rollout. Otherwise fail closed as before.
+  bool TryStoppingRecovery(const mppi::MppiOptimizationResult &result,
+                           SteadyTime cycle_started) {
+    if (!stopping_recovery_enabled_ ||
+        !core::StoppingDominant(result.rejection_counts))
+      return false;
+    const auto recovery_started = std::chrono::steady_clock::now();
+    const mppi::ControlSequence braking = core::BuildBrakingSequence(
+        state_.velocity_enu_m_s, stopping_recovery_deceleration_m_s2_,
+        horizon_, dt_s_);
+    if (braking.empty())
+      return false;
+    const mppi::MppiTrajectory trajectory =
+        mppi::Rollout(*motion_model_, state_, braking, dt_s_);
+    const auto safety = safety_checker_->Evaluate(
+        ToCoreState(state_), ToCoreTrajectory(trajectory), obstacles_);
+    const double recovery_ms =
+        std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - recovery_started)
+            .count();
+    if (!safety.safe)
+      return false;
+    const double total_ms =
+        std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - cycle_started)
+            .count();
+    if (total_ms > max_compute_time_ms_)
+      return false;
+
+    const core::Control requested = braking.front();
+    geometry_msgs::msg::TwistStamped raw_command;
+    raw_command.header.stamp = now();
+    raw_command.header.frame_id = planning_frame_;
+    raw_command.twist.linear.x = requested.velocity_enu_m_s.x;
+    raw_command.twist.linear.y = requested.velocity_enu_m_s.y;
+    raw_command.twist.linear.z = requested.velocity_enu_m_s.z;
+    raw_command.twist.angular.z = requested.yaw_rate_enu_rad_s;
+    raw_command_publisher_->publish(raw_command);
+
+    const auto conditioner_started = std::chrono::steady_clock::now();
+    const auto safe_control =
+        conditioner_->Apply(ToCoreState(state_), requested);
+    const double conditioner_ms =
+        std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - conditioner_started)
+            .count();
+    geometry_msgs::msg::TwistStamped command;
+    command.header.stamp = now();
+    command.header.frame_id = planning_frame_;
+    command.twist.linear.x = safe_control.velocity_enu_m_s.x;
+    command.twist.linear.y = safe_control.velocity_enu_m_s.y;
+    command.twist.linear.z = safe_control.velocity_enu_m_s.z;
+    command.twist.angular.z = safe_control.yaw_rate_enu_rad_s;
+    command_publisher_->publish(command);
+
+    nominal_ = braking;
+    selected_trajectory_ = trajectory;
+    mode_ = Mode::kStoppingRecovery;
+    reason_ = "stopping-dominant infeasibility: verified bounded braking";
+    stopping_recovery_tracker_.RecordRecoveryCycle();
+    PublishDiagnostic(
+        total_ms, result.rollout_time_ms, result.cost_time_ms,
+        result.safety_time_ms + recovery_ms, result.weights.size(), 0, 0.0,
+        std::min(safety.minimum_collision_clearance_m,
+                 safety.minimum_stopping_clearance_m),
+        conditioner_ms);
+    return true;
   }
 
   void PublishDiagnostic(double total_ms, double rollout_ms, double cost_ms,
@@ -989,6 +1135,8 @@ private:
                  std::to_string(cycle_diag_.distance_to_next_turn_m)),
         KeyValue("stopping_distance_m",
                  std::to_string(cycle_diag_.stopping_distance_m)),
+        KeyValue("reference_speed_cap_m_s",
+                 std::to_string(cycle_diag_.reference_speed_cap_m_s)),
         KeyValue("minimum_collision_clearance_m",
                  std::to_string(cycle_diag_.minimum_collision_clearance_m)),
         KeyValue("minimum_stopping_clearance_m",
@@ -1046,7 +1194,18 @@ private:
                  cycle_diag_.first_solve_on_active_path ? "true" : "false"),
         KeyValue("first_safe_command_on_active_path",
                  cycle_diag_.first_safe_command_on_active_path ? "true"
-                                                              : "false")};
+                                                              : "false"),
+        KeyValue("stopping_recovery",
+                 stopping_recovery_tracker_.active() ? "true" : "false"),
+        KeyValue("stopping_recovery_entries",
+                 std::to_string(stopping_recovery_tracker_.entries())),
+        KeyValue("stopping_recovery_exits",
+                 std::to_string(stopping_recovery_tracker_.exits())),
+        KeyValue("stopping_recovery_cycles",
+                 std::to_string(stopping_recovery_tracker_.cycles())),
+        KeyValue("stopping_recovery_episode_cycles",
+                 std::to_string(
+                     stopping_recovery_tracker_.episode_cycles()))};
     message.status.push_back(std::move(status));
     diagnostics_publisher_->publish(message);
   }
@@ -1164,6 +1323,19 @@ private:
       last_proposal_stats_{};
   double stopping_delay_s_{0.25};
   double braking_accel_m_s2_{3.0};
+  bool speed_shaping_enabled_{false};
+  double speed_shaping_nominal_speed_m_s_{10.0};
+  double speed_shaping_turn_speed_m_s_{3.0};
+  double speed_shaping_min_speed_m_s_{0.5};
+  double speed_shaping_lateral_accel_m_s2_{2.0};
+  double speed_shaping_braking_accel_m_s2_{3.0};
+  double speed_shaping_reaction_delay_s_{0.25};
+  double speed_shaping_turn_angle_rad_{kTurnAngle};
+  double speed_shaping_lookahead_m_{2.0};
+  bool stopping_recovery_enabled_{false};
+  double stopping_recovery_deceleration_m_s2_{3.0};
+  core::SpeedShapingConfig speed_shaping_config_{};
+  core::StoppingRecoveryTracker stopping_recovery_tracker_{};
   SteadyTime previous_cycle_start_{};
   bool have_previous_cycle_{false};
   std::uint64_t cycle_counter_{0};

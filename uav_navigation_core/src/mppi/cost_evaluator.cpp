@@ -79,6 +79,8 @@ void ValidateContext(const CostContext &context) {
   for (const auto &velocity : context.reference_velocities)
     if (!Finite(velocity))
       throw std::invalid_argument("MPPI velocity references must be finite");
+  if (!(context.reference_speed_limit_m_s > 0.0))
+    throw std::invalid_argument("MPPI reference speed limit must be positive");
 }
 } // namespace
 
@@ -141,6 +143,8 @@ CostEvaluator::EvaluateTrajectory(const MppiTrajectory &trajectory,
     throw std::invalid_argument("MPPI time reference needs velocity samples");
 
   CostBreakdown result;
+  const double speed_cap =
+      std::min(config_.vmax_m_s, context.reference_speed_limit_m_s);
   std::vector<Control> feasible_actions;
   feasible_actions.reserve(requested_actions.size());
   for (std::size_t t = 0; t < requested_actions.size(); ++t) {
@@ -222,7 +226,7 @@ CostEvaluator::EvaluateTrajectory(const MppiTrajectory &trajectory,
     }
     if (config_.path_progress_objective) {
       const double speed_xy = std::hypot(velocity.x, velocity.y);
-      const double excess = std::max(speed_xy - config_.vmax_m_s, 0.0);
+      const double excess = std::max(speed_xy - speed_cap, 0.0);
       result.speed_limit += config_.w_speed_limit * excess * excess;
     }
   }
