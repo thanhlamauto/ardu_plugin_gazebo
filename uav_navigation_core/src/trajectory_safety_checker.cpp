@@ -61,7 +61,116 @@ SafetyResult Invalid(const char *reason) {
   return {false, -std::numeric_limits<double>::infinity(),
           -std::numeric_limits<double>::infinity(), reason};
 }
+double Component(const Vec3 &p, int axis) {
+  return axis == 0 ? p.x : (axis == 1 ? p.y : p.z);
+}
+int WidestAxis(const Vec3 &minimum, const Vec3 &maximum) {
+  const double dx = maximum.x - minimum.x;
+  const double dy = maximum.y - minimum.y;
+  const double dz = maximum.z - minimum.z;
+  if (dx >= dy && dx >= dz)
+    return 0;
+  return dy >= dz ? 1 : 2;
+}
+double BoundsLowerBoundSquared(const Vec3 &a, const Vec3 &b, const Vec3 &lo,
+                               const Vec3 &hi) {
+  const Vec3 seg_lo{std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z)};
+  const Vec3 seg_hi{std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z)};
+  double total = 0.0;
+  const double axes[3][4] = {{seg_lo.x, seg_hi.x, lo.x, hi.x},
+                             {seg_lo.y, seg_hi.y, lo.y, hi.y},
+                             {seg_lo.z, seg_hi.z, lo.z, hi.z}};
+  for (const auto &axis : axes) {
+    const double gap = std::max({0.0, axis[2] - axis[1], axis[0] - axis[3]});
+    total += gap * gap;
+  }
+  return total;
+}
 } // namespace
+
+// KD-tree over the filtered cloud. NearestSegmentDistance returns the exact
+// minimum point-to-segment distance, identical to a linear scan but pruned by
+// axis-aligned bounding boxes.
+class CloudIndex {
+public:
+  explicit CloudIndex(const std::vector<Vec3> &points) : points_(points) {
+    if (points_.empty())
+      return;
+    order_.resize(points_.size());
+    for (std::size_t i = 0; i < order_.size(); ++i)
+      order_[i] = i;
+    root_ = Build(0, order_.size());
+  }
+
+  double NearestSegmentDistance(const Vec3 &a, const Vec3 &b) const {
+    if (nodes_.empty())
+      return std::numeric_limits<double>::infinity();
+    double best = std::numeric_limits<double>::infinity();
+    Query(root_, a, b, best);
+    return best;
+  }
+
+private:
+  struct Node {
+    std::size_t index{0};
+    int left{-1};
+    int right{-1};
+    Vec3 minimum{};
+    Vec3 maximum{};
+  };
+
+  int Build(std::size_t begin, std::size_t end) {
+    if (begin >= end)
+      return -1;
+    Vec3 minimum = points_[order_[begin]];
+    Vec3 maximum = minimum;
+    for (std::size_t i = begin + 1; i < end; ++i) {
+      const Vec3 &p = points_[order_[i]];
+      minimum.x = std::min(minimum.x, p.x);
+      minimum.y = std::min(minimum.y, p.y);
+      minimum.z = std::min(minimum.z, p.z);
+      maximum.x = std::max(maximum.x, p.x);
+      maximum.y = std::max(maximum.y, p.y);
+      maximum.z = std::max(maximum.z, p.z);
+    }
+    const int node_index = static_cast<int>(nodes_.size());
+    nodes_.push_back(Node{});
+    const int axis = WidestAxis(minimum, maximum);
+    const std::size_t middle = begin + (end - begin) / 2;
+    std::nth_element(order_.begin() + static_cast<std::ptrdiff_t>(begin),
+                     order_.begin() + static_cast<std::ptrdiff_t>(middle),
+                     order_.begin() + static_cast<std::ptrdiff_t>(end),
+                     [this, axis](std::size_t lhs, std::size_t rhs) {
+                       return Component(points_[lhs], axis) <
+                              Component(points_[rhs], axis);
+                     });
+    nodes_[node_index].index = order_[middle];
+    nodes_[node_index].minimum = minimum;
+    nodes_[node_index].maximum = maximum;
+    nodes_[node_index].left = Build(begin, middle);
+    nodes_[node_index].right = Build(middle + 1, end);
+    return node_index;
+  }
+
+  void Query(int node, const Vec3 &a, const Vec3 &b, double &best) const {
+    if (node < 0)
+      return;
+    const Node &current = nodes_[static_cast<std::size_t>(node)];
+    if (BoundsLowerBoundSquared(a, b, current.minimum, current.maximum) >=
+        best * best)
+      return;
+    const double distance = PointSegmentDistance(points_[current.index], a, b);
+    if (distance < best)
+      best = distance;
+    Query(current.left, a, b, best);
+    Query(current.right, a, b, best);
+  }
+
+  std::vector<Vec3> points_;
+  std::vector<std::size_t> order_;
+  std::vector<Node> nodes_;
+  int root_{-1};
+};
 
 TrajectorySafetyChecker::TrajectorySafetyChecker(
     TrajectorySafetyConfig config,
@@ -84,10 +193,48 @@ TrajectorySafetyChecker::TrajectorySafetyChecker(
     throw std::invalid_argument("invalid safety parameter");
 }
 
-SafetyResult
-TrajectorySafetyChecker::Evaluate(const State &initial_state,
-                                  const Trajectory &trajectory,
-                                  const ObstacleMap &obstacles) const {
+PreparedCollisionEnvironment
+TrajectorySafetyChecker::Prepare(const ObstacleMap &obstacles) const {
+  PreparedCollisionEnvironment prepared;
+  for (const auto &point : obstacles.points_enu_m) {
+    if (!Finite(point)) {
+      prepared.valid = false;
+      prepared.invalid_reason = "invalid_obstacle_map";
+      return prepared;
+    }
+  }
+  try {
+    prepared.cloud_present =
+        obstacles.observation_valid || !obstacles.points_enu_m.empty();
+    prepared.cloud.reserve(obstacles.points_enu_m.size());
+    for (const auto &point : obstacles.points_enu_m) {
+      if (environment_) {
+        const double residual = environment_->Clearance(point);
+        if (!Finite(residual) || residual < 0.0) {
+          prepared.valid = false;
+          prepared.invalid_reason = "invalid_collision_environment";
+          return prepared;
+        }
+        if (residual <= config_.cloud_map_tolerance_m) {
+          prepared.map_expansion_m =
+              std::max(prepared.map_expansion_m, residual);
+          continue;
+        }
+      }
+      prepared.cloud.push_back(point);
+    }
+    prepared.index = std::make_shared<const CloudIndex>(prepared.cloud);
+  } catch (...) {
+    prepared.valid = false;
+    prepared.invalid_reason = "invalid_collision_environment";
+    return prepared;
+  }
+  return prepared;
+}
+
+SafetyResult TrajectorySafetyChecker::Evaluate(
+    const State &initial_state, const Trajectory &trajectory,
+    const PreparedCollisionEnvironment &prepared) const {
   if (!Finite(initial_state) || trajectory.points.size() < 2)
     return Invalid("invalid_trajectory");
   double previous_time = -std::numeric_limits<double>::infinity();
@@ -98,28 +245,17 @@ TrajectorySafetyChecker::Evaluate(const State &initial_state,
       return Invalid("invalid_trajectory");
     previous_time = point.time_from_start_s;
   }
-  for (const auto &point : obstacles.points_enu_m)
-    if (!Finite(point))
-      return Invalid("invalid_obstacle_map");
+  if (!prepared.valid)
+    return Invalid(prepared.invalid_reason.c_str());
 
   try {
-    const bool cloud_present =
-        obstacles.observation_valid || !obstacles.points_enu_m.empty();
-    double map_expansion = 0.0;
-    std::vector<Vec3> cloud;
-    cloud.reserve(obstacles.points_enu_m.size());
-    for (const auto &point : obstacles.points_enu_m) {
-      if (environment_) {
-        const double residual = environment_->Clearance(point);
-        if (!Finite(residual) || residual < 0.0)
-          return Invalid("invalid_collision_environment");
-        if (residual <= config_.cloud_map_tolerance_m) {
-          map_expansion = std::max(map_expansion, residual);
-          continue;
-        }
-      }
-      cloud.push_back(point);
-    }
+    const bool cloud_present = prepared.cloud_present;
+    const double map_expansion = prepared.map_expansion_m;
+    const auto cloud_segment_clearance = [&prepared](const Vec3 &a,
+                                                      const Vec3 &b) {
+      return prepared.index ? prepared.index->NearestSegmentDistance(a, b)
+                            : CloudSegmentClearance(a, b, prepared.cloud);
+    };
 
     double cloud_collision = cloud_present
                                  ? std::numeric_limits<double>::infinity()
@@ -130,7 +266,7 @@ TrajectorySafetyChecker::Evaluate(const State &initial_state,
       const auto &a = trajectory.points[i - 1].state.position_enu_m;
       const auto &b = trajectory.points[i].state.position_enu_m;
       cloud_collision =
-          std::min(cloud_collision, CloudSegmentClearance(a, b, cloud));
+          std::min(cloud_collision, cloud_segment_clearance(a, b));
       if (environment_) {
         map_safe =
             map_safe && environment_->SegmentSafe(
@@ -157,7 +293,7 @@ TrajectorySafetyChecker::Evaluate(const State &initial_state,
       const Vec3 stop_end =
           speed > 1e-9 ? Add(p, Scale(velocity, stop_length / speed)) : p;
       cloud_stop =
-          std::min(cloud_stop, CloudSegmentClearance(p, stop_end, cloud));
+          std::min(cloud_stop, cloud_segment_clearance(p, stop_end));
       if (environment_) {
         stop_map_safe =
             stop_map_safe && environment_->SegmentSafe(
@@ -183,5 +319,12 @@ TrajectorySafetyChecker::Evaluate(const State &initial_state,
   } catch (...) {
     return Invalid("invalid_collision_environment");
   }
+}
+
+SafetyResult
+TrajectorySafetyChecker::Evaluate(const State &initial_state,
+                                  const Trajectory &trajectory,
+                                  const ObstacleMap &obstacles) const {
+  return Evaluate(initial_state, trajectory, Prepare(obstacles));
 }
 } // namespace uav_navigation_core

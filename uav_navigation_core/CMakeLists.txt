@@ -41,6 +41,10 @@ if(BUILD_TESTING)
     UAV_NAVIGATION_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures")
   add_test(NAME trajectory_safety_tests COMMAND test_trajectory_safety)
 
+  add_executable(test_safety_prepared test/test_safety_prepared.cpp)
+  target_link_libraries(test_safety_prepared PRIVATE ${PROJECT_NAME})
+  add_test(NAME safety_prepared_tests COMMAND test_safety_prepared)
+
   add_executable(test_mppi_dynamics test/test_mppi_dynamics.cpp)
   target_link_libraries(test_mppi_dynamics PRIVATE ${PROJECT_NAME})
   target_compile_definitions(test_mppi_dynamics PRIVATE

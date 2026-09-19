@@ -236,6 +236,18 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
   result.safe.assign(result.trajectories.size(), true);
   result.rejection_reasons.assign(result.trajectories.size(),
                                   RejectionReason::kSafe);
+  // The obstacle cloud and known-geometry filtering are independent of any one
+  // candidate trajectory, so they are prepared once for the whole solve. This
+  // is semantically identical to the per-trajectory preparation it replaces.
+  std::optional<PreparedCollisionEnvironment> prepared_environment;
+  if (safety_checker) {
+    const auto prepare_started = std::chrono::steady_clock::now();
+    prepared_environment = safety_checker->Prepare(*safety_obstacles);
+    result.safety_time_ms +=
+        std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - prepare_started)
+            .count();
+  }
   for (std::size_t sample = 0; sample < result.trajectories.size(); ++sample) {
     const auto breakdown = cost_evaluator.EvaluateTrajectory(
         result.trajectories[sample], result.perturbed_actions[sample],
@@ -256,7 +268,8 @@ MppiOptimizationResult MppiOptimizer::OptimizeInjected(
       const auto safety_started = std::chrono::steady_clock::now();
       const auto safety = safety_checker->Evaluate(
           ToSafetyState(initial_state),
-          ToSafetyTrajectory(result.trajectories[sample]), *safety_obstacles);
+          ToSafetyTrajectory(result.trajectories[sample]),
+          *prepared_environment);
       result.safe[sample] = safety.safe;
       const auto reason = ClassifyRejection(safety);
       result.rejection_reasons[sample] = reason;
