@@ -25,6 +25,17 @@ SUMMARY_FIELDS = [
     "late_command_accepted", "stale_command_violations",
     "setpoint_while_disarmed", "setpoint_in_wrong_mode",
     "replan_latency_ms", "replan_to_command_ms",
+    # M7.3 root-cause instrumentation. Missing values stay empty so historical
+    # M7.1/M7.2 runs remain analyzable with the same script.
+    "max_scheduling_delay_ms", "p99_scheduling_delay_ms", "max_wall_cycle_ms",
+    "planner_timeout_cycles", "no_safe_cycles",
+    "reject_non_finite_total", "reject_swept_collision_total",
+    "reject_static_collision_total", "reject_dynamic_collision_total",
+    "reject_stopping_distance_total", "reject_other_total",
+    "min_collision_clearance_m", "min_stopping_clearance_m",
+    "min_gaussian_safe", "min_reference_safe", "min_braking_safe",
+    "min_recovery_safe", "min_specific_safe",
+    "active_path_id_max", "solves_on_active_path_max",
 ]
 
 
@@ -111,6 +122,35 @@ def summarize_run(path: Path) -> dict[str, Any]:
     ess = _finite(row.get("controller", {}).get("ess") for row in planner_cycles)
     feasible_costs = _finite(
         row.get("controller", {}).get("best_feasible_cost") for row in planner_cycles)
+    scheduling = _finite(
+        row.get("controller", {}).get("t_scheduling_delay_ms") for row in planner_cycles)
+    wall_cycle = _finite(
+        row.get("controller", {}).get("t_wall_cycle_ms") for row in planner_cycles)
+
+    def controller_total(key: str) -> int:
+        return int(sum(_finite(
+            row.get("controller", {}).get(key) for row in planner_cycles)))
+
+    def controller_min(key: str) -> float:
+        return min(_finite(
+            row.get("controller", {}).get(key) for row in planner_cycles),
+            default=math.nan)
+
+    def controller_max(key: str) -> float:
+        return max(_finite(
+            row.get("controller", {}).get(key) for row in planner_cycles),
+            default=math.nan)
+
+    def no_safe(row: dict[str, Any]) -> bool:
+        controller = row.get("controller", {})
+        count = controller.get("N_safe", controller.get("safe_samples"))
+        parsed = _finite([count])
+        return bool(parsed) and parsed[0] <= 0.0
+
+    no_safe_cycles = sum(1 for row in planner_cycles if no_safe(row))
+    planner_timeout_cycles = sum(
+        row.get("controller", {}).get("mode") == "PLANNER_TIMEOUT"
+        for row in cycles)
     local_modes = [row.get("controller", {}).get("mode") for row in cycles]
     global_statuses = [row.get("global_planner", {}).get("status") for row in run_rows]
     adapter_states = [row.get("adapter", {}).get("adapter_state") for row in run_rows]
@@ -240,6 +280,26 @@ def summarize_run(path: Path) -> dict[str, Any]:
         "setpoint_in_wrong_mode": setpoint_in_wrong_mode,
         "replan_latency_ms": replan_latency_ms,
         "replan_to_command_ms": replan_to_command_ms,
+        "max_scheduling_delay_ms": max(scheduling, default=math.nan),
+        "p99_scheduling_delay_ms": percentile(scheduling, 99) if scheduling else math.nan,
+        "max_wall_cycle_ms": max(wall_cycle, default=math.nan),
+        "planner_timeout_cycles": planner_timeout_cycles,
+        "no_safe_cycles": no_safe_cycles,
+        "reject_non_finite_total": controller_total("reject_non_finite"),
+        "reject_swept_collision_total": controller_total("reject_swept_collision"),
+        "reject_static_collision_total": controller_total("reject_static_collision"),
+        "reject_dynamic_collision_total": controller_total("reject_dynamic_collision"),
+        "reject_stopping_distance_total": controller_total("reject_stopping_distance"),
+        "reject_other_total": controller_total("reject_other"),
+        "min_collision_clearance_m": controller_min("minimum_collision_clearance_m"),
+        "min_stopping_clearance_m": controller_min("minimum_stopping_clearance_m"),
+        "min_gaussian_safe": controller_min("gaussian_safe"),
+        "min_reference_safe": controller_min("reference_safe"),
+        "min_braking_safe": controller_min("braking_safe"),
+        "min_recovery_safe": controller_min("recovery_safe"),
+        "min_specific_safe": controller_min("specific_safe"),
+        "active_path_id_max": controller_max("local_active_path_id"),
+        "solves_on_active_path_max": controller_max("solves_on_active_path"),
     }
 
 
