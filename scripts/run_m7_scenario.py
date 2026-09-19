@@ -70,6 +70,19 @@ def git_commit() -> str:
     return result.stdout.strip() or "unknown"
 
 
+def configure_rmw_environment(environment: dict[str, str] | None = None) -> dict[str, str]:
+    """Disable the Fast DDS shared-memory transport unless the caller sets it.
+
+    On this harness the shared-memory transport intermittently fails to
+    initialize ("mutex lock failed"), which kills the ros_gz parameter_bridge
+    processes during startup and leaves odometry/obstacles unobservable. UDPv4
+    avoids the crash; an explicit caller value is preserved.
+    """
+    target = os.environ if environment is None else environment
+    target.setdefault("FASTDDS_BUILTIN_TRANSPORTS", "UDPv4")
+    return target
+
+
 def process_ids(pattern: str) -> list[int]:
     result = subprocess.run(["pgrep", "-f", pattern], text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -398,6 +411,7 @@ def main() -> int:
     parser.add_argument("--allow-process-faults", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    configure_rmw_environment()
     scenario_path = args.scenario.resolve()
     config_path = args.config.resolve()
     scenario = load_scenario(scenario_path)
@@ -462,7 +476,9 @@ def main() -> int:
         "environment": {"platform": platform.platform(),
                         "python": sys.version.split()[0],
                         "ros_distro": os.environ.get("ROS_DISTRO", "unknown"),
-                        "rmw_implementation": os.environ.get("RMW_IMPLEMENTATION", "default")},
+                        "rmw_implementation": os.environ.get("RMW_IMPLEMENTATION", "default"),
+                        "fastdds_builtin_transports": os.environ.get(
+                            "FASTDDS_BUILTIN_TRANSPORTS", "UDPv4")},
     }
     (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     launch = None

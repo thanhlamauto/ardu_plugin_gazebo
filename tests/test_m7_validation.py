@@ -83,6 +83,16 @@ def test_m7_cleanup_stops_children_after_launch_leader_exits(monkeypatch):
     assert any(group_signal == 0 for _, group_signal in sent)
 
 
+def test_runner_disables_fastdds_shared_memory_by_default():
+    runner = load_script("run_m7_scenario")
+    env = {}
+    assert runner.configure_rmw_environment(env)[
+        "FASTDDS_BUILTIN_TRANSPORTS"] == "UDPv4"
+    env = {"FASTDDS_BUILTIN_TRANSPORTS": "SHM"}
+    assert runner.configure_rmw_environment(env)[
+        "FASTDDS_BUILTIN_TRANSPORTS"] == "SHM"
+
+
 def test_m7_stable_hover_gate_resets_when_speed_rises(monkeypatch):
     runner = load_script("run_m7_scenario")
     recorder = runner.M7Recorder.__new__(runner.M7Recorder)
