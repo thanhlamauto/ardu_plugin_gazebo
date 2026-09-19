@@ -205,6 +205,18 @@ def extract_run_metrics(run_dir: Path, rows: list[dict[str, Any]],
         "max_compute_ms": max(compute, default=math.nan),
         "p99_compute_ms": percentile(compute, 99) if compute else math.nan,
         "planner_timeout_cycles": sum(mode == "PLANNER_TIMEOUT" for mode in local_modes),
+        "stopping_recovery_entries": max(
+            finite(controller_value(row, "stopping_recovery_entries")
+                   for row in cycles), default=math.nan),
+        "stopping_recovery_exits": max(
+            finite(controller_value(row, "stopping_recovery_exits")
+                   for row in cycles), default=math.nan),
+        "stopping_recovery_cycles": max(
+            finite(controller_value(row, "stopping_recovery_cycles")
+                   for row in cycles), default=math.nan),
+        "min_reference_speed_cap_m_s": min(
+            finite(controller_value(row, "reference_speed_cap_m_s")
+                   for row in solved), default=math.nan),
         "active_path_id_max": max(finite(controller_value(row, "local_active_path_id")
                                          for row in solved), default=math.nan),
         "solves_on_active_path_max": max(finite(controller_value(row, "solves_on_active_path")
@@ -374,7 +386,9 @@ RUN_METRIC_FIELDS = [
     "min_recovery_safe", "min_specific_safe", "apex_speed_xy_m_s",
     "apex_heading_error_rad", "apex_curvature_per_m",
     "max_abs_heading_error_rad", "max_scheduling_delay_ms", "max_compute_ms",
-    "p99_compute_ms", "planner_timeout_cycles", "active_path_id_max",
+    "p99_compute_ms", "planner_timeout_cycles", "stopping_recovery_entries",
+    "stopping_recovery_exits", "stopping_recovery_cycles",
+    "min_reference_speed_cap_m_s", "active_path_id_max",
     "solves_on_active_path_max", "run_dir",
 ]
 
