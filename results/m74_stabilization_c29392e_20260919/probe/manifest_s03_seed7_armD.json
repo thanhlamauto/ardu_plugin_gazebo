@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "scenario": "S03",
+  "scenario_name": "turn_90deg",
+  "run": 1,
+  "seed": 7,
+  "variant": null,
+  "git_commit": "c29392e",
+  "harness_commit": "b13d53d9e72ee1aac6d9ea3489abd069a83c78ca",
+  "scenario_file": "tests/scenarios/s03_turn90.yaml",
+  "scenario_sha256": "78d88c05d53b81b548bbcad740ad9abbd2865549660beeaa1a42003bc0340434",
+  "config_file": "uav_navigation_bringup/config/m7_4_stabilization.yaml",
+  "config_sha256": "1031ad9da0daaac921b7b08d3ea6f08af5b50c63b7e3cf3e843005724ced19f0",
+  "world_file": "worlds/iris_mppi_right_angle.sdf",
+  "world_sha256": "3f90f04cc5e98930db3989141d62ec0cb94e08b333fcc8433b18bc429fe4f0c7",
+  "performance_mode": true,
+  "visualization": false,
+  "timestamp_utc": "2026-09-19T13:37:38.639842+00:00",
+  "expected_terminal_modes": [
+    "GOAL_REACHED"
+  ],
+  "expected_global_status": null,
+  "expected_adapter_states": [],
+  "readiness": {
+    "minimum_altitude_m": 4.0,
+    "maximum_speed_m_s": 0.3,
+    "stable_duration_s": 2.0
+  },
+  "launch_command": [
+    "ros2",
+    "launch",
+    "uav_navigation_bringup",
+    "sim.launch.xml",
+    "params_file:=/Users/nguyenthanhlam/Projects/ardupilot_gazebo/uav_navigation_bringup/config/m7_4_stabilization.yaml",
+    "world_file:=/Users/nguyenthanhlam/Projects/ardupilot_gazebo/worlds/iris_mppi_right_angle.sdf",
+    "gazebo_resource_path:=/Users/nguyenthanhlam/Projects/ardupilot_gazebo/models:/Users/nguyenthanhlam/Projects/ardupilot_gazebo/worlds",
+    "robot_description_file:=/Users/nguyenthanhlam/Projects/ardupilot_gazebo/config/iris_sensor_suite.urdf",
+    "mppi_seed:=7",
+    "enable_autopilot_adapter:=true",
+    "enable_gazebo_gui:=false",
+    "enable_rviz:=false"
+  ],
+  "environment": {
+    "platform": "macOS-26.1-arm64-arm-64bit",
+    "python": "3.12.14",
+    "ros_distro": "jazzy",
+    "rmw_implementation": "rmw_fastrtps_cpp",
+    "fastdds_builtin_transports": "UDPv4"
+  }
+}
