@@ -564,11 +564,16 @@ private:
     selected_trajectory_.reset();
   }
 
-  void Hold(Mode mode, const std::string &reason) {
+  // A deadline hold still reports the partial compute time that missed the
+  // deadline, so timing attribution can separate scheduler latency from MPPI
+  // computation overrun. Other holds report zeros.
+  void Hold(Mode mode, const std::string &reason, double total_ms = 0.0,
+            double rollout_ms = 0.0, double cost_ms = 0.0,
+            double safety_ms = 0.0) {
     mode_ = mode;
     reason_ = reason;
     ResetController();
-    PublishDiagnostic(0.0, 0.0, 0.0, 0.0, 0, 0, 0.0,
+    PublishDiagnostic(total_ms, rollout_ms, cost_ms, safety_ms, 0, 0, 0.0,
                       std::numeric_limits<double>::infinity());
   }
 
@@ -692,7 +697,9 @@ private:
             std::chrono::steady_clock::now() - cycle_started)
             .count();
     if (planner_ms > max_compute_time_ms_) {
-      Hold(Mode::kPlannerTimeout, "MPPI output exceeded control deadline");
+      Hold(Mode::kPlannerTimeout, "MPPI output exceeded control deadline",
+           planner_ms, result.rollout_time_ms, result.cost_time_ms,
+           result.safety_time_ms);
       return;
     }
 
@@ -771,7 +778,9 @@ private:
             std::chrono::steady_clock::now() - cycle_started)
             .count();
     if (total_ms > max_compute_time_ms_) {
-      Hold(Mode::kPlannerTimeout, "safe command became late before publish");
+      Hold(Mode::kPlannerTimeout, "safe command became late before publish",
+           total_ms, result.rollout_time_ms, result.cost_time_ms,
+           result.safety_time_ms + final_safety_ms);
       return;
     }
 
