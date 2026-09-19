@@ -1,0 +1,2 @@
+timeout_id,scenario,variant,seed,cycle,elapsed_s,mode,reason,scheduling_delay_ms,input_snapshot_ms,path_reference_ms,sampling_ms,rollout_ms,cost_ms,safety_ms,optimizer_update_ms,conditioner_ms,publish_ms,diagnostics_ms,total_ms,wall_cycle_ms,classification
+1,S03,base,27,7,0.843748,PLANNER_TIMEOUT,MPPI output exceeded control deadline,-0.1995,0.004625,0.030333,4.57742,0.722042,14.3847,105.693,0.086833,0,0,0.059791,125.499,99.8005,C_safety

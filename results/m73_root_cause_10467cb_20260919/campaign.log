@@ -1,0 +1,447 @@
+RUN_START scenario=s03_turn90.yaml variant=base run=1 seed=7 rep=1 domain=150 utc=2026-09-19T11:28:30Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=1 seed=7 rep=1 rc=0 utc=2026-09-19T11:29:24Z
+RUN_START scenario=s03_turn90.yaml variant=base run=2 seed=7 rep=2 domain=151 utc=2026-09-19T11:29:27Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=2 seed=7 rep=2 rc=2 utc=2026-09-19T11:31:11Z
+RUN_START scenario=s03_turn90.yaml variant=base run=3 seed=7 rep=3 domain=152 utc=2026-09-19T11:31:15Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=3 seed=7 rep=3 rc=2 utc=2026-09-19T11:33:00Z
+RUN_START scenario=s03_turn90.yaml variant=base run=4 seed=17 rep=1 domain=153 utc=2026-09-19T11:33:03Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=4 seed=17 rep=1 rc=0 utc=2026-09-19T11:33:59Z
+RUN_START scenario=s03_turn90.yaml variant=base run=5 seed=17 rep=2 domain=154 utc=2026-09-19T11:34:02Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=5 seed=17 rep=2 rc=0 utc=2026-09-19T11:35:02Z
+RUN_START scenario=s03_turn90.yaml variant=base run=6 seed=17 rep=3 domain=155 utc=2026-09-19T11:35:06Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=6 seed=17 rep=3 rc=0 utc=2026-09-19T11:36:01Z
+RUN_START scenario=s03_turn90.yaml variant=base run=7 seed=27 rep=1 domain=156 utc=2026-09-19T11:36:04Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=7 seed=27 rep=1 rc=2 utc=2026-09-19T11:37:49Z
+RUN_START scenario=s03_turn90.yaml variant=base run=8 seed=27 rep=2 domain=157 utc=2026-09-19T11:37:53Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+FCU connection timeout
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+Traceback (most recent call last):
+  File "/Users/nguyenthanhlam/Projects/ardupilot_gazebo/scripts/run_m7_scenario.py", line 509, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/Users/nguyenthanhlam/Projects/ardupilot_gazebo/scripts/run_m7_scenario.py", line 492, in main
+    rclpy.spin_once(node, timeout_sec=0.1)
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/__init__.py", line 226, in spin_once
+    executor.spin_once(timeout_sec=timeout_sec)
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+    handler, entity, node = self.wait_for_ready_callbacks(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+    return next(self._cb_iter)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 757, in _wait_for_ready_callbacks
+    wait_set = _rclpy.WaitSet(
+               ^^^^^^^^^^^^^^^
+rclpy._rclpy_pybind11.RCLError: failed to initialize wait set: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at /Users/runner/conda-bld/bld/rattler-build_ros-jazzy-rcl_1782305854/work/ros-jazzy-rcl/src/work/src/rcl/wait.c:132
+RUN_END scenario=s03_turn90.yaml variant=base run=8 seed=27 rep=2 rc=2 utc=2026-09-19T11:39:40Z
+RUN_START scenario=s03_turn90.yaml variant=base run=9 seed=27 rep=3 domain=158 utc=2026-09-19T11:39:44Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=9 seed=27 rep=3 rc=2 utc=2026-09-19T11:41:32Z
+RUN_START scenario=s03_turn90.yaml variant=base run=10 seed=37 rep=1 domain=159 utc=2026-09-19T11:41:35Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=10 seed=37 rep=1 rc=2 utc=2026-09-19T11:43:19Z
+RUN_START scenario=s03_turn90.yaml variant=base run=11 seed=37 rep=2 domain=160 utc=2026-09-19T11:43:23Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=11 seed=37 rep=2 rc=0 utc=2026-09-19T11:44:19Z
+RUN_START scenario=s03_turn90.yaml variant=base run=12 seed=37 rep=3 domain=161 utc=2026-09-19T11:44:23Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=12 seed=37 rep=3 rc=2 utc=2026-09-19T11:46:07Z
+RUN_START scenario=s03_turn90.yaml variant=base run=13 seed=47 rep=1 domain=162 utc=2026-09-19T11:46:10Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=13 seed=47 rep=1 rc=0 utc=2026-09-19T11:47:06Z
+RUN_START scenario=s03_turn90.yaml variant=base run=14 seed=47 rep=2 domain=163 utc=2026-09-19T11:47:09Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=14 seed=47 rep=2 rc=0 utc=2026-09-19T11:48:09Z
+RUN_START scenario=s03_turn90.yaml variant=base run=15 seed=47 rep=3 domain=164 utc=2026-09-19T11:48:12Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=15 seed=47 rep=3 rc=2 utc=2026-09-19T11:49:57Z
+RUN_START scenario=s03_turn90.yaml variant=base run=16 seed=57 rep=1 domain=165 utc=2026-09-19T11:50:00Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=16 seed=57 rep=1 rc=2 utc=2026-09-19T11:51:44Z
+RUN_START scenario=s03_turn90.yaml variant=base run=17 seed=57 rep=2 domain=166 utc=2026-09-19T11:51:47Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=17 seed=57 rep=2 rc=2 utc=2026-09-19T11:53:32Z
+RUN_START scenario=s03_turn90.yaml variant=base run=18 seed=57 rep=3 domain=167 utc=2026-09-19T11:53:35Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=18 seed=57 rep=3 rc=0 utc=2026-09-19T11:54:37Z
+RUN_START scenario=s03_turn90.yaml variant=base run=19 seed=67 rep=1 domain=168 utc=2026-09-19T11:54:40Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=19 seed=67 rep=1 rc=0 utc=2026-09-19T11:55:35Z
+RUN_START scenario=s03_turn90.yaml variant=base run=20 seed=67 rep=2 domain=169 utc=2026-09-19T11:55:38Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=20 seed=67 rep=2 rc=0 utc=2026-09-19T11:56:38Z
+RUN_START scenario=s03_turn90.yaml variant=base run=21 seed=67 rep=3 domain=170 utc=2026-09-19T11:56:41Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=21 seed=67 rep=3 rc=0 utc=2026-09-19T11:57:35Z
+RUN_START scenario=s03_turn90.yaml variant=base run=22 seed=77 rep=1 domain=171 utc=2026-09-19T11:57:39Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=22 seed=77 rep=1 rc=2 utc=2026-09-19T11:59:23Z
+RUN_START scenario=s03_turn90.yaml variant=base run=23 seed=77 rep=2 domain=172 utc=2026-09-19T11:59:26Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=23 seed=77 rep=2 rc=0 utc=2026-09-19T12:00:19Z
+RUN_START scenario=s03_turn90.yaml variant=base run=24 seed=77 rep=3 domain=173 utc=2026-09-19T12:00:22Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=24 seed=77 rep=3 rc=2 utc=2026-09-19T12:02:07Z
+RUN_START scenario=s03_turn90.yaml variant=base run=25 seed=87 rep=1 domain=174 utc=2026-09-19T12:02:10Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=25 seed=87 rep=1 rc=0 utc=2026-09-19T12:03:06Z
+RUN_START scenario=s03_turn90.yaml variant=base run=26 seed=87 rep=2 domain=175 utc=2026-09-19T12:03:09Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=26 seed=87 rep=2 rc=0 utc=2026-09-19T12:04:03Z
+RUN_START scenario=s03_turn90.yaml variant=base run=27 seed=87 rep=3 domain=176 utc=2026-09-19T12:04:06Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=27 seed=87 rep=3 rc=2 utc=2026-09-19T12:05:50Z
+RUN_START scenario=s03_turn90.yaml variant=base run=28 seed=97 rep=1 domain=177 utc=2026-09-19T12:05:54Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S03: observed local mode GOAL_REACHED
+RUN_END scenario=s03_turn90.yaml variant=base run=28 seed=97 rep=1 rc=0 utc=2026-09-19T12:06:55Z
+RUN_START scenario=s03_turn90.yaml variant=base run=29 seed=97 rep=2 domain=178 utc=2026-09-19T12:06:58Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=29 seed=97 rep=2 rc=2 utc=2026-09-19T12:08:42Z
+RUN_START scenario=s03_turn90.yaml variant=base run=30 seed=97 rep=3 domain=179 utc=2026-09-19T12:08:46Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S03: scenario timeout
+RUN_END scenario=s03_turn90.yaml variant=base run=30 seed=97 rep=3 rc=2 utc=2026-09-19T12:10:43Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=1 seed=7 rep=1 domain=180 utc=2026-09-19T12:10:46Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=1 seed=7 rep=1 rc=0 utc=2026-09-19T12:11:44Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=2 seed=17 rep=1 domain=181 utc=2026-09-19T12:11:47Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=2 seed=17 rep=1 rc=0 utc=2026-09-19T12:12:44Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=3 seed=27 rep=1 domain=182 utc=2026-09-19T12:12:47Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S05: scenario timeout
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=3 seed=27 rep=1 rc=2 utc=2026-09-19T12:14:47Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=4 seed=37 rep=1 domain=183 utc=2026-09-19T12:14:50Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=True connected=False
+waiting for FCU state: received=True connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=4 seed=37 rep=1 rc=0 utc=2026-09-19T12:15:53Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=5 seed=47 rep=1 domain=184 utc=2026-09-19T12:15:56Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=5 seed=47 rep=1 rc=0 utc=2026-09-19T12:16:55Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=6 seed=57 rep=1 domain=185 utc=2026-09-19T12:16:58Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=6 seed=57 rep=1 rc=0 utc=2026-09-19T12:17:53Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=7 seed=67 rep=1 domain=186 utc=2026-09-19T12:17:56Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=7 seed=67 rep=1 rc=0 utc=2026-09-19T12:18:53Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=8 seed=77 rep=1 domain=187 utc=2026-09-19T12:18:56Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=8 seed=77 rep=1 rc=0 utc=2026-09-19T12:19:54Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=9 seed=87 rep=1 domain=188 utc=2026-09-19T12:19:58Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+FAIL S05: scenario timeout
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=9 seed=87 rep=1 rc=2 utc=2026-09-19T12:21:57Z
+RUN_START scenario=s05_narrow_passage.yaml variant=base run=10 seed=97 rep=1 domain=189 utc=2026-09-19T12:22:00Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S05: observed local mode GOAL_REACHED
+RUN_END scenario=s05_narrow_passage.yaml variant=base run=10 seed=97 rep=1 rc=0 utc=2026-09-19T12:22:57Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=1 seed=7 rep=1 domain=190 utc=2026-09-19T12:23:00Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=1 seed=7 rep=1 rc=0 utc=2026-09-19T12:24:06Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=2 seed=17 rep=1 domain=191 utc=2026-09-19T12:24:09Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=2 seed=17 rep=1 rc=0 utc=2026-09-19T12:25:51Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=3 seed=27 rep=1 domain=192 utc=2026-09-19T12:25:54Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=3 seed=27 rep=1 rc=0 utc=2026-09-19T12:27:02Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=4 seed=37 rep=1 domain=193 utc=2026-09-19T12:27:05Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=4 seed=37 rep=1 rc=0 utc=2026-09-19T12:28:03Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=5 seed=47 rep=1 domain=194 utc=2026-09-19T12:28:06Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=5 seed=47 rep=1 rc=0 utc=2026-09-19T12:29:04Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=6 seed=57 rep=1 domain=195 utc=2026-09-19T12:29:07Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=6 seed=57 rep=1 rc=0 utc=2026-09-19T12:30:08Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=7 seed=67 rep=1 domain=196 utc=2026-09-19T12:30:11Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=7 seed=67 rep=1 rc=0 utc=2026-09-19T12:31:13Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=8 seed=77 rep=1 domain=197 utc=2026-09-19T12:31:16Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+arm timeout mode=STABILIZE armed=False
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+Traceback (most recent call last):
+  File "/Users/nguyenthanhlam/Projects/ardupilot_gazebo/scripts/run_m7_scenario.py", line 509, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/Users/nguyenthanhlam/Projects/ardupilot_gazebo/scripts/run_m7_scenario.py", line 492, in main
+    rclpy.spin_once(node, timeout_sec=0.1)
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/__init__.py", line 226, in spin_once
+    executor.spin_once(timeout_sec=timeout_sec)
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+    handler, entity, node = self.wait_for_ready_callbacks(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+    return next(self._cb_iter)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/opt/miniconda3/envs/ardupilot-rviz/lib/python3.12/site-packages/rclpy/executors.py", line 785, in _wait_for_ready_callbacks
+    raise ExternalShutdownException()
+rclpy.executors.ExternalShutdownException
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=8 seed=77 rep=1 rc=3 utc=2026-09-19T12:33:06Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=9 seed=87 rep=1 domain=198 utc=2026-09-19T12:33:09Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=9 seed=87 rep=1 rc=0 utc=2026-09-19T12:34:09Z
+RUN_START scenario=s08_replan_while_moving.yaml variant=base run=10 seed=97 rep=1 domain=199 utc=2026-09-19T12:34:12Z
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+waiting for FCU state: received=False connected=False
+armed GUIDED; takeoff accepted
+waiting up to 180 s for odometry, GUIDED, armed, altitude >= 4 m, speed <= 0.3 m/s for 2 s
+PASS S08: observed local mode GOAL_REACHED
+RUN_END scenario=s08_replan_while_moving.yaml variant=base run=10 seed=97 rep=1 rc=0 utc=2026-09-19T12:35:39Z
+wrote /tmp/m73_root_cause_10467cb_20260919/summary.csv and /tmp/m73_root_cause_10467cb_20260919/REPORT.md (50 runs)
+wrote run_metrics.csv (50), planner_timeouts.csv (1), s08_handoff.csv (56) and m73_summary.md into /tmp/m73_root_cause_10467cb_20260919
+CAMPAIGN_COMPLETE utc=2026-09-19T12:35:47Z
