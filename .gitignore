@@ -105,9 +105,11 @@ cmake-build-debug
 .DS_Store
 eeprom.bin
 logs/
+*.BIN
 tmp/
 terrain/
-scripts/__pycache__/
+__pycache__/
+.pytest_cache/
 output/video/
 output/log/
 /output/benchmark/
