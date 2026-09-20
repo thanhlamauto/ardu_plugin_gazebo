@@ -21,10 +21,18 @@ from pathlib import Path
 from typing import Any
 
 
+# Any of these means the plugin lost part of the FDM stream.
 FDM_LOSS_MARKERS = (
     "Broken ArduPilot connection",
     "Duplicate input frame",
     "input frames",
+    "ArduPilot controller has reset",
+    "Incorrect protocol magic",
+)
+# A severe marker latches the run as SIM_INFRA_FAILURE immediately instead of
+# racing the unhealthy-window timeout. The stream is gone for good, not jittery.
+FDM_SEVERE_MARKERS = (
+    "Broken ArduPilot connection",
     "ArduPilot controller has reset",
     "Incorrect protocol magic",
 )
@@ -43,11 +51,13 @@ class HealthStatus:
 class SimHealthMonitor:
     def __init__(self, odom_timeout_s: float = 1.0,
                  clock_timeout_s: float = 1.0,
+                 adapter_timeout_s: float = 1.0,
                  fdm_loss_grace_s: float = 3.0,
                  min_rtf: float = 0.05, max_rtf: float = 10.0,
                  min_sim_advance_s: float = 0.05):
         self.odom_timeout_s = odom_timeout_s
         self.clock_timeout_s = clock_timeout_s
+        self.adapter_timeout_s = adapter_timeout_s
         self.fdm_loss_grace_s = fdm_loss_grace_s
         self.min_rtf = min_rtf
         self.max_rtf = max_rtf
@@ -66,6 +76,8 @@ class SimHealthMonitor:
         self.adapter_wall: float | None = None
 
         self.fdm_loss_events = 0
+        self.severe_fdm_loss_events = 0
+        self.severe_fdm_loss = False
         self.last_fdm_loss_wall: float | None = None
         self.fdm_connected = False
         self._log_handle: Any = None
@@ -111,6 +123,11 @@ class SimHealthMonitor:
             if count:
                 self.fdm_loss_events += count
                 self.last_fdm_loss_wall = wall_s
+        for marker in FDM_SEVERE_MARKERS:
+            count = text.count(marker)
+            if count:
+                self.severe_fdm_loss_events += count
+                self.severe_fdm_loss = True
         if FDM_CONNECT_MARKER in text:
             self.fdm_connected = True
 
@@ -124,11 +141,15 @@ class SimHealthMonitor:
         self.observe_log_text(new, wall_s)
 
     def evaluate(self, wall_s: float) -> HealthStatus:
+        adapter_age = (wall_s - self.adapter_wall
+                       if self.adapter_wall is not None else None)
         diagnostics = {
             "rtf": self.rtf,
             "sim_time_s": self.sim_time_s,
             "fdm_connected": self.fdm_connected,
             "fdm_loss_events": self.fdm_loss_events,
+            "severe_fdm_loss_events": self.severe_fdm_loss_events,
+            "adapter_age_s": adapter_age,
             "connected": self.connected,
             "armed": self.armed,
             "mode": self.mode,
@@ -146,6 +167,15 @@ class SimHealthMonitor:
             return HealthStatus(False, "odometry stale", diagnostics)
         if self.adapter_wall is None:
             return HealthStatus(False, "no adapter status received", diagnostics)
+        if adapter_age is not None and adapter_age > self.adapter_timeout_s:
+            return HealthStatus(
+                False, f"adapter status stale ({adapter_age:.2f}s)",
+                diagnostics)
+        if self.severe_fdm_loss:
+            return HealthStatus(
+                False,
+                f"severe FDM loss latched ({self.severe_fdm_loss_events} events)",
+                diagnostics)
         if not self.connected:
             return HealthStatus(False, "MAVROS/FCU not connected", diagnostics)
         if not self.armed:
@@ -173,6 +203,26 @@ class SimHealthMonitor:
                 False, f"sim time {self.sim_time_s:.3f}s not advancing",
                 diagnostics)
         return HealthStatus(True, "healthy", diagnostics)
+
+
+def infra_failure_due(monitor: SimHealthMonitor,
+                      unhealthy_since: float | None, wall_s: float,
+                      timeout_s: float) -> tuple[bool, float | None, HealthStatus]:
+    """Advance the runner's mid-run infra-failure decision.
+
+    Returns (failure, new_unhealthy_since, status). A severe FDM loss latches
+    immediately, so it cannot race the sustained-unhealthy timeout.
+    """
+    status = monitor.evaluate(wall_s)
+    if status.ok:
+        return False, None, status
+    if monitor.severe_fdm_loss:
+        return True, unhealthy_since, status
+    if unhealthy_since is None:
+        return False, wall_s, status
+    if wall_s - unhealthy_since >= timeout_s:
+        return True, unhealthy_since, status
+    return False, unhealthy_since, status
 
 
 def classify_run_result(sim_infra_failure: bool, success: bool,

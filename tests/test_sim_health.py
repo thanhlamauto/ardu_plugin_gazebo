@@ -62,6 +62,47 @@ def test_clock_stall_and_stale_odometry():
     assert not status.ok and "odometry" in status.reason
 
 
+def test_severe_fdm_loss_latches_sim_infra_failure():
+    health = load("sim_health")
+    monitor = health.SimHealthMonitor(fdm_loss_grace_s=1.0)
+    fresh(monitor, 0.0)
+    monitor.observe_log_text(
+        "Broken ArduPilot connection, resetting motor control.\n", 0.0)
+    assert monitor.severe_fdm_loss and monitor.severe_fdm_loss_events == 1
+    status = monitor.evaluate(0.0)
+    assert not status.ok and "severe FDM loss" in status.reason
+    fresh(monitor, 30.0)  # far beyond the loss grace window
+    assert not monitor.evaluate(30.0).ok, "severe loss must stay latched"
+    failure, _, _ = health.infra_failure_due(monitor, None, 30.0, 3.0)
+    assert failure, "severe loss classifies immediately, no timeout race"
+    assert health.classify_run_result(failure, False, "x") == "SIM_INFRA_FAILURE"
+
+
+def test_infra_failure_due_requires_sustained_unhealth():
+    health = load("sim_health")
+    monitor = health.SimHealthMonitor(clock_timeout_s=1.0, odom_timeout_s=10.0)
+    fresh(monitor, 0.0)
+    failure, since, _ = health.infra_failure_due(monitor, None, 1.5, 3.0)
+    assert not failure and since == 1.5
+    failure, since, _ = health.infra_failure_due(monitor, since, 4.0, 3.0)
+    assert not failure and since == 1.5, "2.5 s of unhealth is below 3 s"
+    failure, since, _ = health.infra_failure_due(monitor, since, 4.6, 3.0)
+    assert failure, "3.1 s of unhealth crosses the classification timeout"
+
+
+def test_adapter_status_staleness_is_unhealthy():
+    health = load("sim_health")
+    monitor = health.SimHealthMonitor(odom_timeout_s=10.0, clock_timeout_s=10.0,
+                                      adapter_timeout_s=1.0)
+    monitor.observe_clock(0.0, 0.0)
+    monitor.observe_odometry(0.0)
+    monitor.observe_adapter(True, True, "GUIDED", 0.0)
+    monitor.observe_clock(2.0, 2.0)
+    monitor.observe_odometry(2.0)
+    status = monitor.evaluate(2.0)
+    assert not status.ok and "adapter status stale" in status.reason
+
+
 def test_rtf_window_and_loss_marker_counts():
     health = load("sim_health")
     monitor = health.SimHealthMonitor()

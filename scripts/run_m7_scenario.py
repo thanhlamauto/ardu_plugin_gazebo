@@ -32,6 +32,7 @@ from sim_health import (  # noqa: E402
     SIM_INFRA_FAILURE,
     SimHealthMonitor,
     classify_run_result,
+    infra_failure_due,
 )
 
 
@@ -128,7 +129,8 @@ class M7Recorder:
                  start_max_speed_m_s: float | None = None,
                  start_stable_s: float = 0.0,
                  launch_log_path: Path | None = None,
-                 sim_health_timeout_s: float = 3.0):
+                 sim_health_timeout_s: float = 3.0,
+                 soak_seconds: float = 0.0):
         from diagnostic_msgs.msg import DiagnosticArray
         from geometry_msgs.msg import PoseStamped, TwistStamped
         from nav_msgs.msg import Odometry
@@ -171,7 +173,12 @@ class M7Recorder:
         self.sim_failure_timeout_s = sim_health_timeout_s
         self.sim_infra_failure = False
         self.unhealthy_since: float | None = None
-        self.health = SimHealthMonitor(fdm_loss_grace_s=sim_health_timeout_s)
+        self.soak_seconds = soak_seconds
+        self.soak_started: float | None = None
+        # The unhealthy window must outlast the classification timeout so a
+        # loss event cannot fall back to healthy just as the threshold is hit.
+        self.health = SimHealthMonitor(
+            fdm_loss_grace_s=sim_health_timeout_s + 1.0)
         if self.monitor_health:
             self.health.open_launch_log(launch_log_path)
         self.goal_publisher = node.create_publisher(PoseStamped, "/goal_pose", 10)
@@ -385,33 +392,50 @@ class M7Recorder:
         self.fault_restored = True
         self.write("fault_restored", action="SIGCONT", pids=self.suspended_pids)
 
+    def _check_health(self, now: float) -> bool:
+        """Classify the run as SIM_INFRA_FAILURE when the platform is unhealthy.
+
+        Returns True when the run was ended by the simulator.
+        """
+        if not self.monitor_health:
+            return False
+        self.health.scan_launch_log(now)
+        failure, self.unhealthy_since, status = infra_failure_due(
+            self.health, self.unhealthy_since, now, self.sim_failure_timeout_s)
+        if not failure:
+            return False
+        self.sim_infra_failure = True
+        self.write("sim_infra_unhealthy", reason=status.reason,
+                   severe_fdm_loss=self.health.severe_fdm_loss,
+                   diagnostics=status.diagnostics)
+        self.finish(False, f"simulator unhealthy: {status.reason}")
+        return True
+
     def tick(self) -> None:
         if self.done:
             return
         if self.started is None:
+            now = time.monotonic()
+            if self.soak_started is not None and self._check_health(now):
+                return
             if self.ready():
-                self.started = time.monotonic()
+                if self.soak_seconds > 0.0 and self.soak_started is None:
+                    self.soak_started = now
+                    self.write("soak_started", duration_s=self.soak_seconds)
+                if (self.soak_started is not None and
+                        now - self.soak_started < self.soak_seconds):
+                    return
+                self.started = now
                 self.publish_goal(self.scenario["goal_enu_m"])
                 self.write("run_started")
-            elif time.monotonic() - self.created > self.readiness_timeout_s:
+            elif now - self.created > self.readiness_timeout_s:
                 self.finish(
                     False,
                     f"vehicle did not become flight-ready within {self.readiness_timeout_s:g} s")
             return
         now = time.monotonic()
-        if self.monitor_health:
-            self.health.scan_launch_log(now)
-            status = self.health.evaluate(now)
-            if status.ok:
-                self.unhealthy_since = None
-            elif self.unhealthy_since is None:
-                self.unhealthy_since = now
-            elif now - self.unhealthy_since >= self.sim_failure_timeout_s:
-                self.sim_infra_failure = True
-                self.write("sim_infra_unhealthy", reason=status.reason,
-                           diagnostics=status.diagnostics)
-                self.finish(False, f"simulator unhealthy: {status.reason}")
-                return
+        if self._check_health(now):
+            return
         for index, replan in enumerate(self.scenario.get("replans", [])):
             if index not in self.replans_sent and self.elapsed() >= float(replan["after_s"]):
                 self.publish_goal(replan["goal_enu_m"])
@@ -468,6 +492,10 @@ def main() -> int:
                         help="seconds of sustained simulator unhealth (FDM loss, "
                              "clock stall, stale odometry) that classifies a run "
                              "as SIM_INFRA_FAILURE")
+    parser.add_argument("--soak-seconds", type=float, default=0.0,
+                        help="hover in place for this many seconds after the "
+                             "health gate passes before publishing the goal; "
+                             "used for simulator reliability soak runs")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     configure_rmw_environment()
@@ -482,6 +510,8 @@ def main() -> int:
         parser.error("--start-stable must be nonnegative")
     if args.sim_health_timeout < 0.0:
         parser.error("--sim-health-timeout must be nonnegative")
+    if args.soak_seconds < 0.0:
+        parser.error("--soak-seconds must be nonnegative")
     variants = scenario.get("variants", {})
     variant_name = args.variant or scenario.get("default_variant")
     if variant_name:
@@ -533,7 +563,8 @@ def main() -> int:
         "readiness": {"minimum_altitude_m": scenario.get("start_min_altitude_m", 4.0),
                       "maximum_speed_m_s": args.start_max_speed,
                       "stable_duration_s": args.start_stable,
-                      "sim_health_timeout_s": args.sim_health_timeout},
+                      "sim_health_timeout_s": args.sim_health_timeout,
+                      "soak_seconds": args.soak_seconds},
         "launch_command": launch_command,
         "environment": {"platform": platform.platform(),
                         "python": sys.version.split()[0],
@@ -561,7 +592,8 @@ def main() -> int:
                                   args.readiness_timeout,
                                   args.start_max_speed, args.start_stable,
                                   run_dir / "launch.log",
-                                  args.sim_health_timeout)
+                                  args.sim_health_timeout,
+                                  args.soak_seconds)
             if not args.start_immediately:
                 speed_condition = ("" if args.start_max_speed is None else
                                    f", speed <= {args.start_max_speed:g} m/s for "

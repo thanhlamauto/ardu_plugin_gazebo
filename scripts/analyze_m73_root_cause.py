@@ -149,6 +149,20 @@ def extract_run_metrics(run_dir: Path, rows: list[dict[str, Any]],
 
     compute = finite(controller_value(row, "t_total_ms") for row in solved)
     scheduling = finite(controller_value(row, "t_scheduling_delay_ms") for row in solved)
+    altitudes = []
+    for row in cycles:
+        position = row.get("state", {}).get("position_enu_m", [])
+        if isinstance(position, list) and len(position) == 3:
+            value = number(position[2])
+            if math.isfinite(value):
+                altitudes.append(value)
+    infra_events = [row for row in rows if row.get("event") == "sim_infra_unhealthy"]
+    severe_fdm_loss_events = 0
+    for event in infra_events:
+        severe_fdm_loss_events = max(
+            severe_fdm_loss_events,
+            int(number(event.get("diagnostics", {}).get("severe_fdm_loss_events"),
+                    0.0)))
     return {
         "scenario": manifest.get("scenario", run_dir.parent.name),
         "variant": manifest.get("variant") or "base",
@@ -225,6 +239,11 @@ def extract_run_metrics(run_dir: Path, rows: list[dict[str, Any]],
                                          for row in solved), default=math.nan),
         "solves_on_active_path_max": max(finite(controller_value(row, "solves_on_active_path")
                                                 for row in solved), default=math.nan),
+        "min_altitude_m": min(altitudes, default=math.nan),
+        "sim_infra_unhealthy_events": len(infra_events),
+        "sim_infra_reason": (infra_events[-1].get("reason", "")
+                             if infra_events else ""),
+        "severe_fdm_loss_events": severe_fdm_loss_events,
         "run_dir": str(run_dir),
     }
 
@@ -394,7 +413,9 @@ RUN_METRIC_FIELDS = [
     "p99_compute_ms", "planner_timeout_cycles", "stopping_recovery_entries",
     "stopping_recovery_exits", "stopping_recovery_cycles",
     "min_reference_speed_cap_m_s", "active_path_id_max",
-    "solves_on_active_path_max", "run_dir",
+    "solves_on_active_path_max", "min_altitude_m",
+    "sim_infra_unhealthy_events", "sim_infra_reason", "severe_fdm_loss_events",
+    "run_dir",
 ]
 
 

@@ -60,6 +60,20 @@ def build_report(rows: list[dict[str, Any]]) -> str:
     lines = ["# M7.4 focused A/B stabilization summary", "",
              "Generated from instrumented runs. `A` is the frozen baseline, `B`",
              "speed shaping, `C` stopping recovery, `D` both.", ""]
+    lines.append("## Reliability denominator")
+    lines.append("")
+    lines.append("| Arm | Launched | Sim infra | Valid controller runs | "
+                 "Controller pass | Controller fail |")
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    for (arm,), group_rows in group(rows, "arm"):
+        infra = [row for row in group_rows if margin_label(row) == "sim_infra_failure"]
+        valid = [row for row in group_rows if margin_label(row) != "sim_infra_failure"]
+        passes = [row for row in valid if is_controller_outcome(row)]
+        lines.append(
+            f"| {arm} | {len(group_rows)} | {len(infra)} | {len(valid)} | "
+            f"{len(passes)} | {len(valid) - len(passes)} |")
+    lines.append("")
+
     lines.append("## Per-arm / scenario")
     lines.append("")
     lines.append("| Arm | Scenario | Runs | Pass | Clean pass | Margin concern | "
