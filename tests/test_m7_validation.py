@@ -96,6 +96,7 @@ def test_runner_disables_fastdds_shared_memory_by_default():
 def test_m7_stable_hover_gate_resets_when_speed_rises(monkeypatch):
     runner = load_script("run_m7_scenario")
     recorder = runner.M7Recorder.__new__(runner.M7Recorder)
+    recorder.monitor_health = False
     recorder.start_immediately = False
     recorder.scenario = {"start_min_altitude_m": 4.0}
     recorder.latest_state = {

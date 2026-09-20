@@ -27,6 +27,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / "uav_navigation_bringup/config/m7_baseline.yaml"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sim_health import (  # noqa: E402
+    SIM_INFRA_FAILURE,
+    SimHealthMonitor,
+    classify_run_result,
+)
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -119,10 +126,13 @@ class M7Recorder:
                  start_immediately: bool, allow_process_faults: bool,
                  readiness_timeout_s: float,
                  start_max_speed_m_s: float | None = None,
-                 start_stable_s: float = 0.0):
+                 start_stable_s: float = 0.0,
+                 launch_log_path: Path | None = None,
+                 sim_health_timeout_s: float = 3.0):
         from diagnostic_msgs.msg import DiagnosticArray
         from geometry_msgs.msg import PoseStamped, TwistStamped
         from nav_msgs.msg import Odometry
+        from rosgraph_msgs.msg import Clock
         from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
         self.node = node
@@ -154,10 +164,21 @@ class M7Recorder:
         self.fault_started = False
         self.fault_restored = False
         self.suspended_pids: list[int] = []
+        # M7.4b simulator health gate. Fault-injection variants intentionally
+        # break the FCU/mode, so reliability monitoring only applies to normal
+        # scenario runs.
+        self.monitor_health = launch_log_path is not None and not allow_process_faults
+        self.sim_failure_timeout_s = sim_health_timeout_s
+        self.sim_infra_failure = False
+        self.unhealthy_since: float | None = None
+        self.health = SimHealthMonitor(fdm_loss_grace_s=sim_health_timeout_s)
+        if self.monitor_health:
+            self.health.open_launch_log(launch_log_path)
         self.goal_publisher = node.create_publisher(PoseStamped, "/goal_pose", 10)
         sensor_qos = QoSProfile(depth=10)
         sensor_qos.reliability = ReliabilityPolicy.BEST_EFFORT
         node.create_subscription(Odometry, "/localization/odometry", self.on_odometry, sensor_qos)
+        node.create_subscription(Clock, "/clock", self.on_clock, sensor_qos)
         node.create_subscription(TwistStamped, "/control/raw_velocity_command", self.on_raw, 10)
         node.create_subscription(TwistStamped, "/control/safe_velocity_command", self.on_conditioned, 10)
         node.create_subscription(TwistStamped, "/mavros/setpoint_velocity/cmd_vel",
@@ -206,6 +227,13 @@ class M7Recorder:
         p, v = message.pose.pose.position, message.twist.twist.linear
         self.latest_state = {"position_enu_m": [p.x, p.y, p.z],
                              "velocity_enu_m_s": [v.x, v.y, v.z]}
+        if self.monitor_health:
+            self.health.observe_odometry(time.monotonic())
+
+    def on_clock(self, message: Any) -> None:
+        if self.monitor_health:
+            sim_time = message.clock.sec + message.clock.nanosec * 1e-9
+            self.health.observe_clock(sim_time, time.monotonic())
 
     def on_raw(self, message: Any) -> None:
         self.latest_raw = self.vector(message)
@@ -237,6 +265,10 @@ class M7Recorder:
                 self.latest_adapter = values
                 self.latest_adapter["message"] = status.message
                 now = time.monotonic()
+                if self.monitor_health:
+                    self.health.observe_adapter(
+                        values.get("connected"), values.get("armed"),
+                        values.get("mode"), now)
                 self.write(
                     "adapter", adapter=self.latest_adapter,
                     mavros_setpoint_sequence=self.mavros_setpoint_sequence,
@@ -274,6 +306,12 @@ class M7Recorder:
         if not basic_ready or not speed_ready:
             self.ready_since = None
             return False
+        if self.monitor_health:
+            self.health.scan_launch_log(time.monotonic())
+            health = self.health.evaluate(time.monotonic())
+            if not health.ok:
+                self.ready_since = None
+                return False
         now = time.monotonic()
         if self.ready_since is None:
             self.ready_since = now
@@ -360,6 +398,20 @@ class M7Recorder:
                     False,
                     f"vehicle did not become flight-ready within {self.readiness_timeout_s:g} s")
             return
+        now = time.monotonic()
+        if self.monitor_health:
+            self.health.scan_launch_log(now)
+            status = self.health.evaluate(now)
+            if status.ok:
+                self.unhealthy_since = None
+            elif self.unhealthy_since is None:
+                self.unhealthy_since = now
+            elif now - self.unhealthy_since >= self.sim_failure_timeout_s:
+                self.sim_infra_failure = True
+                self.write("sim_infra_unhealthy", reason=status.reason,
+                           diagnostics=status.diagnostics)
+                self.finish(False, f"simulator unhealthy: {status.reason}")
+                return
         for index, replan in enumerate(self.scenario.get("replans", [])):
             if index not in self.replans_sent and self.elapsed() >= float(replan["after_s"]):
                 self.publish_goal(replan["goal_enu_m"])
@@ -380,7 +432,10 @@ class M7Recorder:
             return
         self.restore_all()
         self.success, self.reason, self.done = success, reason, True
-        self.write("run_result", success=success, reason=reason)
+        self.write("run_result", success=success, reason=reason,
+                   sim_infra_failure=self.sim_infra_failure,
+                   classification=classify_run_result(
+                       self.sim_infra_failure, success, reason))
 
     def restore_all(self) -> None:
         for pid in self.suspended_pids:
@@ -409,6 +464,10 @@ def main() -> int:
     parser.add_argument("--start-stable", type=float, default=2.0,
                         help="seconds that all readiness conditions must remain true")
     parser.add_argument("--allow-process-faults", action="store_true")
+    parser.add_argument("--sim-health-timeout", type=float, default=3.0,
+                        help="seconds of sustained simulator unhealth (FDM loss, "
+                             "clock stall, stale odometry) that classifies a run "
+                             "as SIM_INFRA_FAILURE")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     configure_rmw_environment()
@@ -421,6 +480,8 @@ def main() -> int:
         parser.error("--start-max-speed must be nonnegative")
     if args.start_stable < 0.0:
         parser.error("--start-stable must be nonnegative")
+    if args.sim_health_timeout < 0.0:
+        parser.error("--sim-health-timeout must be nonnegative")
     variants = scenario.get("variants", {})
     variant_name = args.variant or scenario.get("default_variant")
     if variant_name:
@@ -471,7 +532,8 @@ def main() -> int:
         "expected_adapter_states": scenario.get("expected_adapter_states", []),
         "readiness": {"minimum_altitude_m": scenario.get("start_min_altitude_m", 4.0),
                       "maximum_speed_m_s": args.start_max_speed,
-                      "stable_duration_s": args.start_stable},
+                      "stable_duration_s": args.start_stable,
+                      "sim_health_timeout_s": args.sim_health_timeout},
         "launch_command": launch_command,
         "environment": {"platform": platform.platform(),
                         "python": sys.version.split()[0],
@@ -497,7 +559,9 @@ def main() -> int:
             recorder = M7Recorder(node, scenario, stream, args.start_immediately,
                                   args.allow_process_faults,
                                   args.readiness_timeout,
-                                  args.start_max_speed, args.start_stable)
+                                  args.start_max_speed, args.start_stable,
+                                  run_dir / "launch.log",
+                                  args.sim_health_timeout)
             if not args.start_immediately:
                 speed_condition = ("" if args.start_max_speed is None else
                                    f", speed <= {args.start_max_speed:g} m/s for "

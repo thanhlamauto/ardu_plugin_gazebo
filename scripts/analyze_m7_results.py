@@ -25,6 +25,7 @@ SUMMARY_FIELDS = [
     "late_command_accepted", "stale_command_violations",
     "setpoint_while_disarmed", "setpoint_in_wrong_mode",
     "replan_latency_ms", "replan_to_command_ms",
+    "sim_infra_failure", "run_classification",
     # M7.3 root-cause instrumentation. Missing values stay empty so historical
     # M7.1/M7.2 runs remain analyzable with the same script.
     "max_scheduling_delay_ms", "p99_scheduling_delay_ms", "max_wall_cycle_ms",
@@ -169,6 +170,13 @@ def summarize_run(path: Path) -> dict[str, Any]:
     else:
         terminal_reason = "missing run_result"
         success = False
+    if result_events:
+        sim_infra_failure = bool(result_events[-1].get("sim_infra_failure", False))
+        run_classification = result_events[-1].get(
+            "classification", "PASS" if success else "FAIL")
+    else:
+        sim_infra_failure = False
+        run_classification = "FAIL"
     goal_times = [float(row["elapsed_s"]) for row in cycles
                   if row.get("controller", {}).get("mode") == "GOAL_REACHED"]
     deadline_misses = sum(
@@ -280,6 +288,8 @@ def summarize_run(path: Path) -> dict[str, Any]:
         "setpoint_in_wrong_mode": setpoint_in_wrong_mode,
         "replan_latency_ms": replan_latency_ms,
         "replan_to_command_ms": replan_to_command_ms,
+        "sim_infra_failure": sim_infra_failure,
+        "run_classification": run_classification,
         "max_scheduling_delay_ms": max(scheduling, default=math.nan),
         "p99_scheduling_delay_ms": percentile(scheduling, 99) if scheduling else math.nan,
         "max_wall_cycle_ms": max(wall_cycle, default=math.nan),

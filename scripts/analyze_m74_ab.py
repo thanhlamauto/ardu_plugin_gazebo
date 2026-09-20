@@ -43,10 +43,17 @@ def group(rows: list[dict[str, Any]], *keys: str):
 
 
 def margin_label(row: dict[str, Any]) -> str:
+    if row.get("sim_infra_failure"):
+        return "sim_infra_failure"
     if not row["success"]:
         return "fail"
     return "clean_pass" if float(row["no_safe_cycles"] or 0) == 0 \
         else "functional_pass_margin_concern"
+
+
+def is_controller_outcome(row: dict[str, Any]) -> bool:
+    """Only valid runs count as controller outcomes; infra failures do not."""
+    return margin_label(row) in ("clean_pass", "functional_pass_margin_concern")
 
 
 def build_report(rows: list[dict[str, Any]]) -> str:
@@ -56,16 +63,17 @@ def build_report(rows: list[dict[str, Any]]) -> str:
     lines.append("## Per-arm / scenario")
     lines.append("")
     lines.append("| Arm | Scenario | Runs | Pass | Clean pass | Margin concern | "
-                 "Median peak speed | Median no-safe cycles | Min collision clearance | "
+                 "Sim infra | Median peak speed | Median no-safe cycles | Min collision clearance | "
                  "Min stopping clearance | Recovery entries | Median p99 compute |")
-    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for (arm, scenario), group_rows in group(rows, "arm", "scenario"):
-        passes = [row for row in group_rows if margin_label(row) != "fail"]
+        passes = [row for row in group_rows if is_controller_outcome(row)]
         clean = [row for row in group_rows if margin_label(row) == "clean_pass"]
         concern = [row for row in group_rows if margin_label(row) == "functional_pass_margin_concern"]
+        infra = [row for row in group_rows if margin_label(row) == "sim_infra_failure"]
         lines.append(
             f"| {arm} | {scenario} | {len(group_rows)} | {len(passes)} | {len(clean)} | "
-            f"{len(concern)} | "
+            f"{len(concern)} | {len(infra)} | "
             f"{format_value(median([float(r['peak_xy_speed_m_s'] or 'nan') for r in group_rows]))} | "
             f"{format_value(median([float(r['no_safe_cycles'] or 'nan') for r in group_rows]))} | "
             f"{format_value(min(finite([r['min_collision_clearance_m'] for r in group_rows]), default=math.nan))} | "
@@ -87,7 +95,7 @@ def build_report(rows: list[dict[str, Any]]) -> str:
         dominant = ", ".join(f"{k}:{v}" for k, v in sorted(counts.items()))
         lines.append(
             f"| {arm} | {len(group_rows)} | "
-            f"{sum(1 for r in group_rows if margin_label(r) != 'fail')} | "
+            f"{sum(1 for r in group_rows if is_controller_outcome(r))} | "
             f"{format_value(median([float(r['speed_at_collapse_m_s'] or 'nan') for r in group_rows]))} | "
             f"{format_value(median([abs(float(r['heading_error_at_collapse_rad'] or 'nan')) for r in group_rows]))} | "
             f"{dominant} | "
@@ -100,7 +108,7 @@ def build_report(rows: list[dict[str, Any]]) -> str:
                  "Median no-safe cycles | Recovery entries |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
     for (arm,), group_rows in group([r for r in rows if r["scenario"] == "S05"], "arm"):
-        passes = [row for row in group_rows if margin_label(row) != "fail"]
+        passes = [row for row in group_rows if is_controller_outcome(row)]
         clean = [row for row in group_rows if margin_label(row) == "clean_pass"]
         concern = [row for row in group_rows if margin_label(row) == "functional_pass_margin_concern"]
         lines.append(

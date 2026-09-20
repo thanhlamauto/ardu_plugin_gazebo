@@ -155,6 +155,10 @@ def extract_run_metrics(run_dir: Path, rows: list[dict[str, Any]],
         "run": manifest.get("run", run_dir.name),
         "seed": manifest.get("seed", ""),
         "success": bool(result.get("success", False)),
+        "sim_infra_failure": bool(result.get("sim_infra_failure", False)),
+        "run_classification": result.get(
+            "classification",
+            "PASS" if result.get("success") else "FAIL"),
         "terminal_reason": result.get("reason", ""),
         "n_cycles": len(cycles),
         "n_planner_cycles": len(solved),
@@ -370,7 +374,8 @@ def collect_handoffs(root: Path) -> list[dict[str, Any]]:
 
 
 RUN_METRIC_FIELDS = [
-    "scenario", "variant", "run", "seed", "success", "terminal_reason",
+    "scenario", "variant", "run", "seed", "success", "sim_infra_failure",
+    "run_classification", "terminal_reason",
     "n_cycles", "n_planner_cycles", "time_to_goal_s", "peak_xy_speed_m_s",
     "min_N_safe", "no_safe_cycles", "first_no_safe_elapsed_s",
     "speed_at_collapse_m_s", "heading_error_at_collapse_rad",
