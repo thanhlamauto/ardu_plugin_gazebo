@@ -22,8 +22,10 @@
   <arg name="validation_collision_radius_m" default="-1.0"/>
   <arg name="enable_rviz" default="true"/>
 
+  <!-- -v 3 is required for the ArduPilotPlugin FDM health line
+       ([fdm_health] ...) to reach the console the M7 harness scans. -->
   <executable if="$(var enable_gazebo)"
-              cmd="gz_sim_entrypoint -s -r $(var world_file)"
+              cmd="gz_sim_entrypoint -v 3 -s -r $(var world_file)"
               name="gazebo_server" output="screen" on_exit="shutdown">
     <env name="GZ_SIM_RESOURCE_PATH"
          value="$(var gazebo_resource_path)"/>

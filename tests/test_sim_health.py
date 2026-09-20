@@ -103,6 +103,40 @@ def test_adapter_status_staleness_is_unhealthy():
     assert not status.ok and "adapter status stale" in status.reason
 
 
+def test_parse_fdm_health_line():
+    health = load("sim_health")
+    fields = health.parse_fdm_health_text(
+        "Warning [ArduPilotPlugin.cc:1] [fdm_health] model=iris online=1 "
+        "rx_hz=250 rx_total=1200 rx_age_s=0.004 missed=0 timeouts=0 sim_s=12.5\n")
+    assert fields["rx_hz"] == 250.0
+    assert fields["rx_total"] == 1200.0
+    assert fields["sim_s"] == 12.5
+    assert health.parse_fdm_health_text("no health here\n") is None
+
+
+def test_fdm_rx_staleness_and_telemetry_staleness():
+    health = load("sim_health")
+    monitor = health.SimHealthMonitor(fdm_rx_age_timeout_s=0.5,
+                                      min_fdm_rx_hz=5.0,
+                                      fdm_health_timeout_s=3.0)
+    monitor.observe_log_text(
+        "[fdm_health] rx_hz=250 rx_total=1 rx_age_s=0.01 missed=0 timeouts=0 sim_s=5\n",
+        1.0)
+    fresh(monitor, 1.0)
+    assert monitor.evaluate(1.0).ok
+
+    monitor.observe_log_text(
+        "[fdm_health] rx_hz=0 rx_total=1 rx_age_s=2.0 missed=3 timeouts=2 sim_s=6\n",
+        2.0)
+    fresh(monitor, 2.0)
+    status = monitor.evaluate(2.0)
+    assert not status.ok and "FDM RX" in status.reason
+
+    fresh(monitor, 7.0)  # no health line for 5 s
+    status = monitor.evaluate(7.0)
+    assert not status.ok and "telemetry stale" in status.reason
+
+
 def test_rtf_window_and_loss_marker_counts():
     health = load("sim_health")
     monitor = health.SimHealthMonitor()

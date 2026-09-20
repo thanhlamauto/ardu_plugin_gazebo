@@ -365,6 +365,16 @@ class gz::sim::systems::ArduPilotPluginPrivate
   /// \brief Last received frame count from the ArduPilot controller
   public: uint32_t fcu_frame_count = -1;
 
+  // M7.4b FDM stream diagnostics. Exposed once per simulated second through a
+  // machine-readable log line so the harness can distinguish a lost FDM stream
+  // from controller behaviour.
+  public: uint64_t servoPacketsReceived{0};
+  public: uint64_t missedFrames{0};
+  public: uint64_t timeoutEvents{0};
+  public: std::chrono::steady_clock::time_point lastServoPacketWall{};
+  public: double lastFdmHealthLogSimTime{0.0};
+  public: uint64_t lastFdmHealthCount{0};
+
   /// \brief Last sent JSON string, so we can resend if needed.
   public: std::string json_str;
 
@@ -1249,6 +1259,37 @@ void gz::sim::systems::ArduPilotPlugin::PostUpdate(
         this->SendState();
         this->dataPtr->lastControllerUpdateTime = _info.simTime;
     }
+
+    // M7.4b: one machine-readable FDM stream health line per simulated second.
+    const double sim_s =
+        std::chrono::duration_cast<std::chrono::duration<double>>(
+            _info.simTime).count();
+    if (sim_s - this->dataPtr->lastFdmHealthLogSimTime >= 1.0)
+    {
+        const double window =
+            std::max(sim_s - this->dataPtr->lastFdmHealthLogSimTime, 1e-6);
+        const uint64_t count = this->dataPtr->servoPacketsReceived;
+        const double rx_hz =
+            static_cast<double>(count - this->dataPtr->lastFdmHealthCount) /
+            window;
+        double rx_age_s = -1.0;
+        if (count > 0)
+        {
+            rx_age_s = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() -
+                this->dataPtr->lastServoPacketWall).count();
+        }
+        gzwarn << "[fdm_health] model=" << this->dataPtr->modelName
+              << " online=" << this->dataPtr->arduPilotOnline
+              << " rx_hz=" << rx_hz
+              << " rx_total=" << count
+              << " rx_age_s=" << rx_age_s
+              << " missed=" << this->dataPtr->missedFrames
+              << " timeouts=" << this->dataPtr->timeoutEvents
+              << " sim_s=" << sim_s << std::endl;
+        this->dataPtr->lastFdmHealthLogSimTime = sim_s;
+        this->dataPtr->lastFdmHealthCount = count;
+    }
 }
 
 /////////////////////////////////////////////////
@@ -1524,6 +1565,7 @@ bool gz::sim::systems::ArduPilotPlugin::ReceiveServoPacket()
     {
         if (this->dataPtr->arduPilotOnline)
         {
+            ++this->dataPtr->timeoutEvents;
             if (++this->dataPtr->connectionTimeoutCount >
             this->dataPtr->connectionTimeoutMaxCount)
             {
@@ -1617,6 +1659,8 @@ bool gz::sim::systems::ArduPilotPlugin::ReceiveServoPacket()
     else if (pkt_frame_count != this->dataPtr->fcu_frame_count + 1
         && this->dataPtr->arduPilotOnline)
     {
+        this->dataPtr->missedFrames +=
+            pkt_frame_count - this->dataPtr->fcu_frame_count;
         gzwarn << "Missed "
             << pkt_frame_count - this->dataPtr->fcu_frame_count
             << " input frames\n";
@@ -1627,6 +1671,8 @@ bool gz::sim::systems::ArduPilotPlugin::ReceiveServoPacket()
 
     // reset the connection timeout so we don't accumulate
     this->dataPtr->connectionTimeoutCount = 0;
+    ++this->dataPtr->servoPacketsReceived;
+    this->dataPtr->lastServoPacketWall = std::chrono::steady_clock::now();
 
     this->UpdateMotorCommands(pkt_pwm);
 

@@ -178,7 +178,8 @@ class M7Recorder:
         # The unhealthy window must outlast the classification timeout so a
         # loss event cannot fall back to healthy just as the threshold is hit.
         self.health = SimHealthMonitor(
-            fdm_loss_grace_s=sim_health_timeout_s + 1.0)
+            fdm_loss_grace_s=sim_health_timeout_s + 1.0,
+            fdm_health_timeout_s=sim_health_timeout_s + 1.0)
         if self.monitor_health:
             self.health.open_launch_log(launch_log_path)
         self.goal_publisher = node.create_publisher(PoseStamped, "/goal_pose", 10)

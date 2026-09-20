@@ -16,6 +16,7 @@ monitor is unit-testable without ROS or Gazebo.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -37,8 +38,33 @@ FDM_SEVERE_MARKERS = (
     "Incorrect protocol magic",
 )
 FDM_CONNECT_MARKER = "Connected to ArduPilot controller"
+FDM_HEALTH_MARKER = "[fdm_health]"
+_FDM_HEALTH_KV = re.compile(r"(\w+)=([-\d.eE+]+)")
 
 SIM_INFRA_FAILURE = "SIM_INFRA_FAILURE"
+
+
+def parse_fdm_health_text(text: str) -> dict[str, float] | None:
+    """Return the last plugin fdm_health line's numeric fields, if any.
+
+    The plugin emits one line per simulated second, for example:
+    ``[fdm_health] model=iris online=1 rx_hz=250 rx_total=1 rx_age_s=0.01
+    missed=0 timeouts=0 sim_s=12``.
+    """
+    latest = None
+    for line in text.splitlines():
+        if FDM_HEALTH_MARKER not in line:
+            continue
+        body = line.split(FDM_HEALTH_MARKER, 1)[1]
+        fields = {}
+        for key, value in _FDM_HEALTH_KV.findall(body):
+            try:
+                fields[key] = float(value)
+            except ValueError:
+                continue
+        if fields:
+            latest = fields
+    return latest
 
 
 @dataclass
@@ -53,12 +79,18 @@ class SimHealthMonitor:
                  clock_timeout_s: float = 1.0,
                  adapter_timeout_s: float = 1.0,
                  fdm_loss_grace_s: float = 3.0,
+                 fdm_health_timeout_s: float = 3.0,
+                 fdm_rx_age_timeout_s: float = 1.0,
+                 min_fdm_rx_hz: float = 1.0,
                  min_rtf: float = 0.05, max_rtf: float = 10.0,
                  min_sim_advance_s: float = 0.05):
         self.odom_timeout_s = odom_timeout_s
         self.clock_timeout_s = clock_timeout_s
         self.adapter_timeout_s = adapter_timeout_s
         self.fdm_loss_grace_s = fdm_loss_grace_s
+        self.fdm_health_timeout_s = fdm_health_timeout_s
+        self.fdm_rx_age_timeout_s = fdm_rx_age_timeout_s
+        self.min_fdm_rx_hz = min_fdm_rx_hz
         self.min_rtf = min_rtf
         self.max_rtf = max_rtf
         self.min_sim_advance_s = min_sim_advance_s
@@ -80,6 +112,12 @@ class SimHealthMonitor:
         self.severe_fdm_loss = False
         self.last_fdm_loss_wall: float | None = None
         self.fdm_connected = False
+        self.fdm_rx_hz: float | None = None
+        self.fdm_rx_age_s: float | None = None
+        self.fdm_missed: float | None = None
+        self.fdm_timeouts: float | None = None
+        self.fdm_sim_s: float | None = None
+        self.last_fdm_health_wall: float | None = None
         self._log_handle: Any = None
         self._log_buffer = ""
 
@@ -130,6 +168,16 @@ class SimHealthMonitor:
                 self.severe_fdm_loss = True
         if FDM_CONNECT_MARKER in text:
             self.fdm_connected = True
+        if FDM_HEALTH_MARKER in text:
+            haystack = self._log_buffer[-4096:] if self._log_buffer else text
+            fields = parse_fdm_health_text(haystack)
+            if fields:
+                self.fdm_rx_hz = fields.get("rx_hz")
+                self.fdm_rx_age_s = fields.get("rx_age_s")
+                self.fdm_missed = fields.get("missed")
+                self.fdm_timeouts = fields.get("timeouts")
+                self.fdm_sim_s = fields.get("sim_s")
+                self.last_fdm_health_wall = wall_s
 
     def scan_launch_log(self, wall_s: float) -> None:
         if self._log_handle is None:
@@ -149,6 +197,10 @@ class SimHealthMonitor:
             "fdm_connected": self.fdm_connected,
             "fdm_loss_events": self.fdm_loss_events,
             "severe_fdm_loss_events": self.severe_fdm_loss_events,
+            "fdm_rx_hz": self.fdm_rx_hz,
+            "fdm_rx_age_s": self.fdm_rx_age_s,
+            "fdm_missed": self.fdm_missed,
+            "fdm_timeouts": self.fdm_timeouts,
             "adapter_age_s": adapter_age,
             "connected": self.connected,
             "armed": self.armed,
@@ -176,6 +228,20 @@ class SimHealthMonitor:
                 False,
                 f"severe FDM loss latched ({self.severe_fdm_loss_events} events)",
                 diagnostics)
+        if self.last_fdm_health_wall is not None:
+            if wall_s - self.last_fdm_health_wall > self.fdm_health_timeout_s:
+                return HealthStatus(False, "FDM health telemetry stale",
+                                    diagnostics)
+            if (self.fdm_rx_age_s is not None and
+                    self.fdm_rx_age_s > self.fdm_rx_age_timeout_s):
+                return HealthStatus(
+                    False, f"FDM RX stale ({self.fdm_rx_age_s:.2f}s)",
+                    diagnostics)
+            if (self.fdm_rx_hz is not None and
+                    self.fdm_rx_hz < self.min_fdm_rx_hz):
+                return HealthStatus(
+                    False, f"FDM RX rate {self.fdm_rx_hz:.2f} Hz",
+                    diagnostics)
         if not self.connected:
             return HealthStatus(False, "MAVROS/FCU not connected", diagnostics)
         if not self.armed:
