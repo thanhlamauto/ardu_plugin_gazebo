@@ -1,0 +1,156 @@
+{
+  "status": "DEPTH_BENCHMARK_COMPLETE",
+  "predictor": "monocular RGB only",
+  "lidar_role": "offline ground truth only",
+  "evaluator_sha256": "d8f4896fa6d5c487951d12c3f0b25fb0946efe7c190ff2e059b4b031730de846",
+  "predicted_frames": 276,
+  "lidar_scans": 365,
+  "matched_frames": 131,
+  "matched_points": 279280,
+  "synchronized_stamp_error_ms": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0
+  },
+  "inference_ms": {
+    "p50": 66.44770799903199,
+    "p95": 78.78879149939166,
+    "p99": 82.89504619897342
+  },
+  "receive_to_publish_ms": {
+    "p50": 73.66599999659229,
+    "p95": 91.60170799441403,
+    "p99": 152.89785799977827
+  },
+  "image_age_at_output_simclock_ms": {
+    "p50": 80.00000000000185,
+    "p95": 102.00000000000031,
+    "p99": 141.5999999999991
+  },
+  "dropped_rgb_frames": 6,
+  "all_visible_returns": {
+    "samples": 279280,
+    "mae_m": 1.4453073656693503,
+    "median_abs_error_m": 0.9923933405219723,
+    "rmse_m": 2.199596819117177,
+    "bias_m": -0.30910226877924096,
+    "abs_rel": 0.1865845042045688,
+    "delta1": 0.6509059008879977,
+    "within_0_5_m": 0.20560727585219135,
+    "within_1_m": 0.503791893440275
+  },
+  "central_returns": {
+    "samples": 160676,
+    "mae_m": 1.1585158233231265,
+    "median_abs_error_m": 0.9770105247213099,
+    "rmse_m": 1.4073697886311392,
+    "bias_m": -0.5266756158688204,
+    "abs_rel": 0.20454275379486472,
+    "delta1": 0.5737571261420499,
+    "within_0_5_m": 0.1813338644228136,
+    "within_1_m": 0.5127337001170057
+  },
+  "center_patch_frames": 131,
+  "center_patch_frame_medians": {
+    "samples": 131,
+    "mae_m": 1.213742550240873,
+    "median_abs_error_m": 1.020763200060891,
+    "rmse_m": 1.4057352055527066,
+    "bias_m": -0.6366078063201577,
+    "abs_rel": 0.21473578748038266,
+    "delta1": 0.5114503816793893,
+    "within_0_5_m": 0.15267175572519084,
+    "within_1_m": 0.4732824427480916
+  },
+  "center_patch_by_range": {
+    "3-5m": {
+      "samples": 54,
+      "mae_m": 0.7614611679178525,
+      "median_abs_error_m": 0.7205421754110164,
+      "rmse_m": 0.8696824671827931,
+      "bias_m": 0.6386249701120311,
+      "abs_rel": 0.1861039813299087,
+      "delta1": 0.7222222222222222,
+      "within_0_5_m": 0.25925925925925924,
+      "within_1_m": 0.7222222222222222
+    },
+    "5-7m": {
+      "samples": 77,
+      "mae_m": 1.5309268962855886,
+      "median_abs_error_m": 1.5179017822790843,
+      "rmse_m": 1.68270504342493,
+      "bias_m": -1.5309268962855886,
+      "abs_rel": 0.2348152359495462,
+      "delta1": 0.36363636363636365,
+      "within_0_5_m": 0.07792207792207792,
+      "within_1_m": 0.2987012987012987
+    },
+    "7-10m": null
+  },
+  "by_range": {
+    "0.3-5m": {
+      "samples": 98272,
+      "mae_m": 0.7646656088330982,
+      "median_abs_error_m": 0.7470932039305405,
+      "rmse_m": 0.8854267046237911,
+      "bias_m": 0.6374038156348029,
+      "abs_rel": 0.18685512657651746,
+      "delta1": 0.7525134321068055,
+      "within_0_5_m": 0.27830918267665256,
+      "within_1_m": 0.7525948388147183
+    },
+    "5-10m": {
+      "samples": 125080,
+      "mae_m": 1.253577141258801,
+      "median_abs_error_m": 1.1394802744252068,
+      "rmse_m": 1.4735840955663908,
+      "bias_m": -1.101780658945739,
+      "abs_rel": 0.1867823943520375,
+      "delta1": 0.554972817396866,
+      "within_0_5_m": 0.20024784138151583,
+      "within_1_m": 0.42813399424368404
+    },
+    "10-20m": {
+      "samples": 46673,
+      "mae_m": 2.4208298923306297,
+      "median_abs_error_m": 1.9069016037434352,
+      "rmse_m": 3.138899903894367,
+      "bias_m": -0.021054636200378958,
+      "abs_rel": 0.16613694330960554,
+      "delta1": 0.736185803355259,
+      "within_0_5_m": 0.09718681036145095,
+      "within_1_m": 0.2611574143509095
+    },
+    "20-25m": {
+      "samples": 9255,
+      "mae_m": 6.344181521284877,
+      "median_abs_error_m": 6.10451371526279,
+      "rmse_m": 7.657701132060004,
+      "bias_m": -1.0990406848640133,
+      "abs_rel": 0.28415363529793375,
+      "delta1": 0.4384656942193409,
+      "within_0_5_m": 0.052836304700162075,
+      "within_1_m": 0.10804970286331712
+    }
+  },
+  "detection_5m": {
+    "threshold_m": 5.0,
+    "samples": 160676,
+    "true_positive": 54455,
+    "false_positive": 67008,
+    "false_negative": 15955,
+    "precision": 0.44832582761828704,
+    "recall": 0.7733986649623633
+  },
+  "detection_10m": {
+    "threshold_m": 10.0,
+    "samples": 160676,
+    "true_positive": 158878,
+    "false_positive": 195,
+    "false_negative": 85,
+    "precision": 0.9987741477183432,
+    "recall": 0.9994652843743512
+  },
+  "pose_source": "ArduPilot EKF/MAVLink flight state; depth comparison is in the co-located sensor frame",
+  "note": "Sparse LiDAR-return evaluation only; no claim about pixels without LiDAR returns or unknown-space free coverage."
+}

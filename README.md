@@ -10,6 +10,71 @@ cua trong bãi container rồi tăng tốc lại.
 MPPI chạy trên companion side, gửi velocity/yaw-rate setpoint cho ArduPilot;
 ArduPilot điều khiển UAV trong Gazebo.
 
+## Bắt đầu với benchmark depth cho mentor
+
+Benchmark này cho UAV hover, tiến khoảng 2,56 m ở lệnh 0,5 m/s rồi hover
+trong Gazebo. `scripts/monocular_depth_gz.py` nhận **chỉ ảnh RGB** và chạy
+Depth Anything V2 Metric Outdoor Small. `scripts/log_lidar_gt_gz.py` ghi
+LiDAR 3D ở tiến trình riêng để chấm sau chuyến bay. ArduPilot EKF cung cấp
+pose bay; benchmark này không chạy OpenVINS hay MPPI. Đọc
+[báo cáo đầy đủ](docs/MONOCULAR_MENTOR_DEPTH_BENCHMARK_VI.md) và
+[video demo](artifacts/depth_demo.mp4) trước khi sửa thuật toán.
+
+**Kết quả hiện có:** MAE depth trên các LiDAR return nhìn thấy là 1,445 m và
+1,472 m ở hai lượt cùng scene. Vùng 50×50 px giữa ảnh có MAE 1,214 m và
+1,240 m. Camera/LiDAR được cấu hình 10 Hz; đoạn chấm lượt 1 đạt khoảng
+9,63 frame/s (131 frame trong 13,5 s, 6 RGB frame bị bỏ qua). Inference p95
+78,8 ms, nhận ảnh → publish p95 91,6 ms. `--max-hz 15` là trần xử lý, **chưa
+phải 15 Hz đo được**. Chu kỳ 15 Hz là 66,7 ms; cần đo lại throughput, frame
+drop, độ trễ và sai số sau mọi thay đổi.
+
+**Mã cần đọc:**
+
+| Tệp | Vai trò |
+| --- | --- |
+| [`scripts/run_monocular_sim.py`](scripts/run_monocular_sim.py) | Khởi động Gazebo/SITL, pha bay và các tiến trình benchmark (`--mentor-depth-benchmark`) |
+| [`scripts/monocular_depth_gz.py`](scripts/monocular_depth_gz.py) | Nhận RGB, suy luận depth, ghi timestamp và latency |
+| [`scripts/log_lidar_gt_gz.py`](scripts/log_lidar_gt_gz.py) | Ghi LiDAR chỉ để đánh giá |
+| [`scripts/evaluate_monocular_lidar_depth.py`](scripts/evaluate_monocular_lidar_depth.py) | So depth với các LiDAR return đã chiếu lên ảnh |
+| [`scripts/evaluate_multiframe_ekf_lidar.py`](scripts/evaluate_multiframe_ekf_lidar.py) | Replay nhánh landmark RGB + EKF, chấm sparse depth |
+| [`scripts/audit_mentor_depth_benchmark.py`](scripts/audit_mentor_depth_benchmark.py) | Kiểm tra cách ly predictor và log |
+| [`models/iris_with_monocular_camera_lidar_gt/model.sdf`](models/iris_with_monocular_camera_lidar_gt/model.sdf) | Độ phân giải và `update_rate` của RGB/LiDAR |
+
+**Chạy từ gốc repo trên macOS arm64:** cần Gazebo Harmonic với Python
+bindings, ArduPilot SITL, plugin Gazebo đã build vào `build/` (lệnh build ở
+[phần dưới](#legacy-python-validated-baseline--gazebo-3d-bằng-5-terminal)),
+và môi trường Python 3.12 có các dependency trong
+[`config/monocular_geometry_requirements.txt`](config/monocular_geometry_requirements.txt).
+Checkpoint Hugging Face được tải ở lần chạy đầu. Thay đường dẫn Python/SITL
+cho máy của mentor; trên Linux chọn `--depth-device cuda` hoặc `cpu`.
+
+```bash
+export ARDUCOPTER_BIN="$HOME/Projects/ardupilot/build/sitl/bin/arducopter"
+export GZ_SIM_SYSTEM_PLUGIN_PATH="$PWD/build"
+PYTHON=python3
+OUT=results/monocular_research/mentor_depth_new_trial
+
+"$PYTHON" -m pip install -r config/monocular_geometry_requirements.txt
+"$PYTHON" scripts/run_monocular_sim.py \
+  --output "$OUT" \
+  --world worlds/iris_monocular_lidar_gt_benchmark.sdf \
+  --config config/monocular_speed_visual_0.5.yaml \
+  --eval-scene config/monocular_scene_visual_ground_pilot.json \
+  --goal 12 0 3 --duration 35 --mentor-depth-benchmark --depth-device mps
+"$PYTHON" scripts/evaluate_monocular_lidar_depth.py "$OUT"
+"$PYTHON" scripts/evaluate_multiframe_ekf_lidar.py "$OUT"
+"$PYTHON" scripts/audit_mentor_depth_benchmark.py "$OUT"
+```
+
+`OUT` phải là thư mục chưa tồn tại. Xem `perception/summary.json`,
+`lidar_depth_analysis.json`, `multiframe_ekf_lidar_analysis.json` và
+`mentor_benchmark_audit.json` trong đó. [Kết quả tóm tắt của hai lượt đã đo](docs/mentor_depth_evidence/)
+được giữ trong repo; raw log và `source_snapshot/` ở thư mục `results/` cục
+bộ. Sau khi đổi tốc độ sensor
+từ 10 lên 15 Hz trong SDF, chạy output mới rồi tính throughput từ timestamp
+trong `perception/frames.jsonl`; so thêm `dropped_rgb`, p95 latency và MAE.
+Chưa dùng kết quả này để bay tránh vật cản tự động.
+
 ## Kiến trúc hệ thống
 
 **Trạng thái: M7.2 failure triage.** A*, trajectory safety, command

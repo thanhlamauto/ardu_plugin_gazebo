@@ -1,0 +1,57 @@
+{
+  "status": "DEPTH_BENCHMARK_COMPLETE",
+  "source": "RGB multi-frame landmarks + ArduPilot EKF pose",
+  "lidar_role": "offline ground truth only",
+  "evaluator_sha256": "057ee4f431404e51d83fe3fc3d438911d66a871c42a59f3f3dce2c6299312a6c",
+  "replayed_frames": 136,
+  "frames_with_depth": 62,
+  "frames_with_lidar_matched_landmarks": 62,
+  "unique_lidar_matched_landmarks": 241,
+  "first_depth_sim_s": 29.5,
+  "forward_motion_before_first_depth_m": 1.4437983765069289,
+  "processing_ms": {
+    "p50": 14.66208350029774,
+    "p95": 54.834708498674445,
+    "p99": 79.28001020627575
+  },
+  "pose_match_error_ms": {
+    "p50": 28.999999999999915,
+    "p95": 29.000000000003467,
+    "p99": 29.000000000003467
+  },
+  "ekf_position_error_against_truth_m": {
+    "p50": 0.010816195865171237,
+    "p95": 0.01668469691300541,
+    "p99": 0.018517827742044413
+  },
+  "ekf_orientation_error_against_truth_deg": {
+    "p50": 0.006066973354855563,
+    "p95": 0.12096390986143918,
+    "p99": 0.2837409237135507
+  },
+  "depth_error": {
+    "samples": 241,
+    "mae_m": 0.10091372027965693,
+    "median_abs_error_m": 0.07207638072516342,
+    "rmse_m": 0.15332396250962776,
+    "bias_m": -0.04755971985839907,
+    "abs_rel": 0.020626322736648252,
+    "delta1": 1.0,
+    "within_0_5_m": 0.975103734439834,
+    "within_1_m": 1.0
+  },
+  "target_3_to_10m_error": {
+    "samples": 241,
+    "mae_m": 0.10091372027965693,
+    "median_abs_error_m": 0.07207638072516342,
+    "rmse_m": 0.15332396250962776,
+    "bias_m": -0.04755971985839907,
+    "abs_rel": 0.020626322736648252,
+    "delta1": 1.0,
+    "within_0_5_m": 0.975103734439834,
+    "within_1_m": 1.0
+  },
+  "fraction_absolute_error_within_reported_sigma": 0.995850622406639,
+  "lidar_association": "8 nearest projected returns within 12 px, nearest <=6 px, at least 3 returns, axial range spread <=0.75 m",
+  "note": "EKF uses MAVLink time_boot_ms; Gazebo truth is not passed to the tracker. Sparse LiDAR returns near an image feature remain an approximate depth reference."
+}

@@ -116,6 +116,13 @@ output/log/
 /output/plots/
 *.mp4
 *.pcap
+# Keep the short mentor demo in the repository; trial recordings stay local.
+!artifacts/depth_demo.mp4
+/artifacts/*.zip
+/artifacts/*.png
+/results/monocular_baseline*/
+/results/monocular_only_*/
+/results/monocular_research/
 output/pdf/*.log
 output/pdf/*.aux
 output/pdf/*.bbl

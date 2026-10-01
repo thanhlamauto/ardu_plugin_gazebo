@@ -1,0 +1,17 @@
+{
+  "checks": {
+    "completed": true,
+    "rgb_predictor_only": true,
+    "lidar_logger_separate": true,
+    "lidar_evaluator_only": true,
+    "no_openvins_or_planner": true,
+    "gps_fix_3d": true,
+    "ekf_motion_matches_truth": true,
+    "synchronized_pairs": true
+  },
+  "all_checks_pass": true,
+  "truth_forward_motion_m": 2.557528004235318,
+  "ekf_forward_motion_m": 2.56000760383904,
+  "depth_accuracy_gate_pass": false,
+  "depth_accuracy_gate_note": "No acceptance threshold was declared; report raw errors, not a safety pass."
+}

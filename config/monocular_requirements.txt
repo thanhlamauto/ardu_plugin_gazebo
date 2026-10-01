@@ -1,0 +1,6 @@
+# Tested on macOS arm64 / Python 3.12. Gazebo bindings come from Gazebo install.
+torch==2.14.0
+transformers==4.57.6
+numpy==2.5.3
+pillow==12.3.0
+protobuf==6.31.1

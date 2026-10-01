@@ -1,0 +1,25 @@
+{
+  "model": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf",
+  "revision": "2fd93bd764b15eea94dcf7763bba7ddc25007d0f",
+  "device": "mps",
+  "frames": 307,
+  "published_frames": 306,
+  "inference_ms": {
+    "p50": 61.62025000958238,
+    "p95": 67.4688748025801,
+    "p99": 73.15307551791193
+  },
+  "receive_to_publish_ms": {
+    "p50": 68.38016700930893,
+    "p95": 118.69850350194609,
+    "p99": 151.10293056088267
+  },
+  "latency_note": "Receive-to-publish uses host monotonic clock; simulation_age_s uses acquisition and /clock. Warmup included.",
+  "coverage": "Forward camera only; unknown space is not certified free; unknown space requires a separate coverage policy.",
+  "warmup_excluded_frames": 2,
+  "steady_receive_to_publish_ms": {
+    "p50": 68.33466699754354,
+    "p95": 112.0771002053516,
+    "p99": 146.38384897320054
+  }
+}

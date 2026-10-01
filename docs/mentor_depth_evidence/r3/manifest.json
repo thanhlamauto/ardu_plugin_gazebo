@@ -1,0 +1,97 @@
+{
+  "perception": "RGB monocular only",
+  "perception_backend": "learned",
+  "lidar_present": true,
+  "lidar_role": "offline ground truth only",
+  "depth_camera_present": false,
+  "known_geometry_input": false,
+  "localization": "ArduPilot EKF GPS/IMU flight state; RGB-only depth predictor",
+  "openvins_bridge_sha256": null,
+  "openvins_zupt_after_motion": false,
+  "vio_only_motion_stop": false,
+  "vio_only_translation_m": 1.0,
+  "multiframe_depth_probe": false,
+  "mentor_depth_benchmark": true,
+  "partition": "monocular_only_62021",
+  "duration_wall_s": 35.0,
+  "seed": 7,
+  "eval_box_center": [
+    8,
+    0,
+    3
+  ],
+  "eval_box_size": [
+    2,
+    3,
+    6
+  ],
+  "eval_boxes": [
+    {
+      "name": "obstacle_0",
+      "center": [
+        8,
+        0,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    }
+  ],
+  "goal_enu": [
+    12.0,
+    0.0,
+    3.0
+  ],
+  "evaluation": "Box surface distance from ground-truth vehicle center, 0.5 m proxy radius. Not contact telemetry.",
+  "files": {
+    "worlds/iris_monocular_lidar_gt_benchmark.sdf": "8e41d40996009829b246749da0e8fc902144ae7c9ad8df1a23b7b841dd19a248",
+    "config/monocular_speed_visual_0.5.yaml": "f3b5581913276b56b09540837514c063307f4c56f7814f53a61de033acc7fd2c",
+    "config/mppi_velocity.parm": "5a7c2d9330d1587584e3e79a1af2c64ec0a2c7b418141befb8c5e78da79c99e6",
+    "models/iris_with_monocular_camera/model.sdf": "e38f20de70b6f18b1b2d0ade92892a902c8c0fb4bb6a6c413d4584b79242ca98",
+    "scripts/monocular_depth_gz.py": "38ecb72ac6ef5b904f6cea6f03036bf8246b35e0a07fe19b812f2a9f67f850b6",
+    "mppi_ardupilot/monocular_depth.py": "94518a8f3f7b8c4950a2c5e79b03770b7d640cd0d3d960c57c216f2a9e89ea0e",
+    "mppi_ardupilot/camera_local_map.py": "8dcba447c9adccabfa233ea1ca2d31d36c8d8f192c8539efe87aece500585eb4",
+    "scripts/run_monocular_sim.py": "e07294e63ba097a68810b690655a53a938cb7eec23026beca59bf81b44c58ed2",
+    "mppi_ardupilot/mppi_controller.py": "661a1f216810d379c0c9794df42ed674e695bd5b6dc4b56836fbb00551e111f7",
+    "mppi_ardupilot/mppi_local_planner_node.py": "c6a719385b6b1f8f6bb1c83e486a8c213abd6ee8618462ba0825086a9c857b47",
+    "mppi_ardupilot/camera_motion_primitives.py": "1311017727d239424911db2de7eab3b507e8e3f7bae505ebf32bc93000d76058",
+    "mppi_ardupilot/trajectory_safety.py": "ef6d069df4e1ea47339839328c578b1228b0743efca8a7daadde284645fc76dd",
+    "mppi_ardupilot/trajectory_validation.py": "f162c7e8a0ec8cd321ca69f2ac33aedd05bb8325759b637bcdb2b368bee5a990",
+    "mppi_ardupilot/mavlink_interface.py": "57b23c7233e857cdffe9d22e636eceb6841a73a87064f16548c85dab387c3530",
+    "mppi_ardupilot/lidar_preprocess.py": "d65e62c098fff0a410382310c3d8aee84257622a9ffcb0dc267db19dc2535420",
+    "scripts/mppi_velocity_avoidance.py": "24a43cd27b38b8e453a3c73af2fb190b23fd9a4d2fd8a5468b54918834c82dd3",
+    "models/iris_with_gimbal/model.sdf": "9071f778f924de31f754abc2b701fc66d3e8c98fb8fa2958430083d9c1f160ee",
+    "models/iris_with_standoffs/model.sdf": "2c4e8ccf4385f329af905cce1cbceff96656da4ace9353c0ec6ca09df3c442d0",
+    "models/gimbal_small_3d/model.sdf": "fe3ce1c87d28ea1136dc86df9a0f0606cb2e63e8d57e8e32e6db456ab8acb06c",
+    "models/iris_with_gimbal_monocular/model.sdf": "efcb83192074d21d6d912144f98ec50e9913c61e31bbb033e278847236cd9d8a",
+    "models/gimbal_small_3d_monocular/model.sdf": "bd484b1fd0e887730f960cff525f59d6c41e10d5e6695d4dc28f085cb7716bcc",
+    "mppi_ardupilot/monocular_evaluation.py": "4975dc360b5cce822abe380999647dc1b54578c3a1c85c5e6c1333075e73a50b",
+    "scripts/log_lidar_gt_gz.py": "6565721de3a2e09be356c6fb65075fdef3740c8aebb52af2c526b53411456630",
+    "scripts/evaluate_monocular_lidar_depth.py": "1b9bab5fddb004cbe085df1b0f598fd35c326df26f232ca782d65458f8e164b6",
+    "models/iris_with_monocular_camera_lidar_gt/model.sdf": "51588bacc929b9f761381a755a3b4b53c842f2a6631e0a338b3903e11cfead23",
+    "models/iris_with_monocular_camera_lidar_gt/model.config": "b0d347130fa37e3c9cbd12f3036e055775e0f0a6489a3ca1b9d1117e9e5e95ff",
+    "config/monocular_scene_visual_ground_pilot.json": "b1fad32b66ab7686261837547f722028218321b0fed5041fd46f497b6ffde139",
+    "mppi_ardupilot/pa_mppi_controller.py": "d7e8ba61a9ab724640792c7f080dd89331eec2d19308409813e4b17fc717c924",
+    "mppi_ardupilot/occupancy_grid.py": "97dc6cdbc97792d22672f88cc1a31133cc0f839189835ddb8434908b6d1946bb",
+    "mppi_ardupilot/global_planner.py": "ddf3f12396506a614a0ff63946cbf3bcba07bdc2384427ce804f049d330314d7",
+    "mppi_ardupilot/braking.py": "1c3eda883193da6b67be2b8c78404851d464a7af310259d40ee17d2acb1eb403",
+    "mppi_ardupilot/known_geometry.py": "d9bae3882ccaefe4051b5e601e91cb7e0edf74967fcb2984ea8de7d4f338272a",
+    "mppi_ardupilot/__init__.py": "2df8dd1f8d7d531a2c3c081f6600ffc1ad21335b2fe5dfbab076445ec297778e",
+    "mppi_ardupilot/monocular_ground_odometry.py": "889d3b81de005687e2ee74ba1b0cdeea3d66a4893e18fa43507896e35df89cf8",
+    "mppi_ardupilot/monocular_scale_tracker.py": "05ad2cdb6711b76272b973971a8f393ff7479fedfadb8f871e48a7a0e43f3c9b",
+    "mppi_ardupilot/monocular_multiframe_depth.py": "45dae0db16879685794093c99417241b52c1420261074feb5c6182f7899c0731",
+    "mppi_ardupilot/monocular_point_tracker.py": "36880ed3fef19fcdbd38b7573d3fcdd4875809ca968757e15773aadf0a79104c",
+    "mppi_ardupilot/rigid_body_pa_mppi.py": "b81d39e3de2c171e67ae41de2cbed15a07c99545069de26fe83649415d740c90",
+    "mppi_ardupilot/monocular_triangulation.py": "be2e1c052e53ab23bb79ca0db7f1040c3f11a7b89ae1ce81792ea23cbb8fee65",
+    "scripts/lidar_to_mavlink_avoidance.py": "120ef346fb6aaad7ec2894afb43af6fb67617a8a721dcc237ce169687afc2373",
+    "scripts/run_monocular_speed_suite.py": "30d76fb2122d2e0a8ddbfa66b71098ceab270fae824c5cfafe0c5afae632dca2",
+    "scripts/analyze_monocular_sim.py": "7ae339b41ff72cd717f1513cabdaab452bd7ba7e9eec5dae87d994a0482a1395",
+    "scripts/report_monocular_latency.py": "ad3db94155c7cdd0bf897d32720535e0e6ce02901f4468a6877a3e8289e1cd57",
+    "scripts/audit_monocular_calibration.py": "e6d8cb47fb05cc5a57a7d0f7a2c1cf8df87ac5980769fa5de499398540be711e",
+    "scripts/analyze_vio_motion_stop.py": "ff540a617ac1c7f48affed64172e2886a879b426198661b06d9a98190559bc1a"
+  }
+}

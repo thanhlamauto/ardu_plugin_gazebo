@@ -1,0 +1,8 @@
+# Optional temporal RGB geometry backend; Python 3.12 on macOS arm64
+-r monocular_requirements.txt
+opencv-python-headless==4.13.0.92
+pymavlink==2.4.50
+pytorch-mppi==0.9.1
+PyYAML==6.0.3
+matplotlib==3.11.2
+scipy==1.18.1

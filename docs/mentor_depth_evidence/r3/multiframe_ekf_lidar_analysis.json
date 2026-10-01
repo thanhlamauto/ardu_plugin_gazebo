@@ -1,0 +1,57 @@
+{
+  "status": "DEPTH_BENCHMARK_COMPLETE",
+  "source": "RGB multi-frame landmarks + ArduPilot EKF pose",
+  "lidar_role": "offline ground truth only",
+  "evaluator_sha256": "057ee4f431404e51d83fe3fc3d438911d66a871c42a59f3f3dce2c6299312a6c",
+  "replayed_frames": 131,
+  "frames_with_depth": 63,
+  "frames_with_lidar_matched_landmarks": 63,
+  "unique_lidar_matched_landmarks": 256,
+  "first_depth_sim_s": 29.3,
+  "forward_motion_before_first_depth_m": 1.4457543454244004,
+  "processing_ms": {
+    "p50": 14.696833008201793,
+    "p95": 53.5560210046242,
+    "p99": 78.17832149739816
+  },
+  "pose_match_error_ms": {
+    "p50": 28.999999999999915,
+    "p95": 29.000000000003467,
+    "p99": 29.000000000003467
+  },
+  "ekf_position_error_against_truth_m": {
+    "p50": 0.010533087256554522,
+    "p95": 0.015979162525799482,
+    "p99": 0.018898851261445273
+  },
+  "ekf_orientation_error_against_truth_deg": {
+    "p50": 0.005355385968166244,
+    "p95": 0.14998638080345816,
+    "p99": 0.32857106566950883
+  },
+  "depth_error": {
+    "samples": 256,
+    "mae_m": 0.11450364037954955,
+    "median_abs_error_m": 0.07105858174633584,
+    "rmse_m": 0.18471515886439102,
+    "bias_m": -0.029855097510047203,
+    "abs_rel": 0.023841314272644333,
+    "delta1": 0.9921875,
+    "within_0_5_m": 0.9609375,
+    "within_1_m": 1.0
+  },
+  "target_3_to_10m_error": {
+    "samples": 256,
+    "mae_m": 0.11450364037954955,
+    "median_abs_error_m": 0.07105858174633584,
+    "rmse_m": 0.18471515886439102,
+    "bias_m": -0.029855097510047203,
+    "abs_rel": 0.023841314272644333,
+    "delta1": 0.9921875,
+    "within_0_5_m": 0.9609375,
+    "within_1_m": 1.0
+  },
+  "fraction_absolute_error_within_reported_sigma": 0.98046875,
+  "lidar_association": "8 nearest projected returns within 12 px, nearest <=6 px, at least 3 returns, axial range spread <=0.75 m",
+  "note": "EKF uses MAVLink time_boot_ms; Gazebo truth is not passed to the tracker. Sparse LiDAR returns near an image feature remain an approximate depth reference."
+}
