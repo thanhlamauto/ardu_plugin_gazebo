@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-06",
+  "host": "MacBook Air M2, macOS arm64",
+  "runtime": "C++ OpenCV DNN CPU, one OpenCV thread",
+  "model_sha256": "1a7cb9d9c31d60afc9cbe96c6a401ac27c8cebcfce78cfc4ca1c2587691dc4a8",
+  "input": "640x360 RGB frame 0 from mentor_lidar_depth_benchmark_r3_20260930",
+  "warmup_frames": 1,
+  "timed_repeats": 20,
+  "p50_ms": 790.635,
+  "p95_ms": 804.289,
+  "throughput_fps": 1.26632,
+  "cpu_percent_one_logical_core": 99.963,
+  "scope": "preprocessing, ONNX inference, and depth upsampling; excludes ROS transport and cloud creation",
+  "command": "depth_anything_onnx_probe model.onnx input.rgb output.float32 20"
+}

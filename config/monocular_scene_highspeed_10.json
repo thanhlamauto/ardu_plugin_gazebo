@@ -1,0 +1,66 @@
+{
+  "boxes": [
+    {
+      "name": "obstacle_0",
+      "center": [
+        8,
+        4,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "obstacle_1",
+      "center": [
+        30,
+        6,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "obstacle_2",
+      "center": [
+        50,
+        6,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "obstacle_3",
+      "center": [
+        70,
+        6,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    }
+  ],
+  "goal": [
+    100,
+    0,
+    3
+  ],
+  "world": "worlds/iris_monocular_highspeed_10.sdf"
+}

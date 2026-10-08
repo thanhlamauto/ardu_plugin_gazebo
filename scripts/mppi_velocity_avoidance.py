@@ -89,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
                         "mav: MAVLink LOCAL_POSITION_NED+ATTITUDE (edge computer thật)")
     p.add_argument("--topic", default=None, help="topic LiDAR GZ")
     p.add_argument("--odom-topic", default=None, help="topic odometry GZ")
+    p.add_argument("--start-gate-file", default=None,
+                   help="subscribe first, then wait for this file before sending any commands")
+    p.add_argument("--ready-file", default=None,
+                   help="write after subscriptions are installed")
     p.add_argument("--hz", type=float, default=None,
                    help="tần số vòng điều khiển, giữ >= 5 để không vượt GUID_TIMEOUT")
     p.add_argument("--config", default=None, help="file yaml ghi đè mặc định (xem mppi_ardupilot/config.yaml)")
@@ -138,6 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--goal-approach-gain", type=float, default=None,
                    help="gain đổi sai số goal thành speed cap [1/s]")
     p.add_argument("--max-points", type=int, default=None, help="obstacle tối đa mỗi scan")
+    p.add_argument('--min-obstacle-points', type=int, default=None,
+                   help='hold when fewer finite obstacle points are available; 0 disables this floor')
     p.add_argument("--max-raw-points", type=int, default=None, help="giới hạn điểm đọc mỗi PointCloudPacked")
     p.add_argument("--sensor-offset-body-frd", nargs=3, type=float,
                    metavar=("X", "Y", "Z"), default=None,
@@ -219,6 +225,7 @@ _RUNTIME_DEFAULTS = {
     "goal_radius": ("goal_radius", 0.25),
     "wp_radius": ("wp_radius", 2.5),
     "max_points": ("max_points", 200),
+    "min_obstacle_points": ("min_obstacle_points", 0),
     "max_raw_points": ("max_raw_points", 25000),
     "sensor_offset_body_frd": ("sensor_offset_body_frd", (0.08, 0.0, -0.16)),
     "hard_brake_m": ("hard_brake_m", 1.0),
@@ -272,6 +279,9 @@ def main() -> None:
     args = build_parser().parse_args()
     raw_cfg = load_config(args.config) if args.config else {}
     apply_runtime_config(args, raw_cfg)
+    if (not isinstance(args.min_obstacle_points, int) or isinstance(args.min_obstacle_points, bool)
+            or not 0 <= args.min_obstacle_points <= args.max_points):
+        raise SystemExit('[error] min_obstacle_points must be an integer in [0,max_points]')
     if args.hz <= 0:
         raise SystemExit("[error] --hz phải lớn hơn 0")
     try:

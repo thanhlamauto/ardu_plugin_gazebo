@@ -10,6 +10,14 @@ cua trong bãi container rồi tăng tốc lại.
 MPPI chạy trên companion side, gửi velocity/yaw-rate setpoint cho ArduPilot;
 ArduPilot điều khiển UAV trong Gazebo.
 
+Nhánh thử **một camera RGB, không LiDAR/depth camera** có [kết quả Gazebo/SITL ở mức đặt 5 và 10 m/s](docs/MONOCULAR_SPEED_5_10_VI.md). Đây là thử nghiệm Python riêng với pose lấy từ Gazebo odometry, chưa phải runtime C++/ROS 2 chính hoặc định vị chỉ bằng camera. Lượt thực sự đạt khoảng 5 m/s đã thất bại tránh vật cản; lượt gần 10 m/s chỉ bay giữa các vật thể hai bên, nên hai mức này chưa được xác nhận an toàn cho vật cản chắn đầu.
+
+[Thử nghiệm mới với RGB + IMU và ô nền có kích thước biết trước](docs/MONOCULAR_VISUAL_ODOMETRY_VI.md) đã ngắt Gazebo odometry khỏi perception và MPPI. Một lượt 0,5 m/s tới đích; các lượt đặt 5/10 m/s đều thất bại vì ước lượng chuyển động từ ảnh mất bám hoặc không đủ điểm vật cản. Runner chỉ dùng Gazebo odometry để khởi tạo/giám sát/chấm điểm thí nghiệm; ArduPilot SITL vẫn dùng cảm biến điều hướng nội bộ mô phỏng.
+
+[Lượt đối chiếu bằng OpenVINS (RGB + IMU)](docs/MONOCULAR_OPENVINS_VI.md) đã thay bộ ước lượng chuyển động tự viết trong nhánh mô phỏng. Sau khi kiểm tra đồng bộ camera–IMU, thử ZUPT và ghép cloud nhiều frame, lượt giới hạn planner 0,5 m/s đã phát 5 chu kỳ lệnh rồi giữ vận tốc 0 vì cloud hết hạn; tiếp đó VIO trôi 1,52 m và runner dừng. Chưa xác nhận bay tránh vật cản an toàn với OpenVINS ở tốc độ nào. [Lượt đo độ trễ](docs/MONOCULAR_LATENCY_VI.md) đã bay mở vòng gần 5 và 10 m/s, xuất cloud camera và đo riêng độ trễ của OpenVINS/perception.
+
+[Đối chiếu góp ý mentor bằng bài VIO-only](docs/MONOCULAR_VIO_MENTOR_FOLLOWUP_VI.md) đã phát hiện bridge trước đây che toàn bộ ảnh OpenVINS và publish orientation Gazebo cùng position VIO. Sau khi sửa bridge và khớp noise model IMU, 2/2 lượt đứng–dịch 1 m–đứng đạt tiêu chí VIO. Lượt closed-loop tiếp theo vẫn `TIMEOUT`: planner phát 9 chu kỳ rồi hold vì cloud hết hạn, chưa tới đích. Chưa xác nhận vận tốc bay tránh vật cản an toàn.
+
 ## Bắt đầu với benchmark depth cho mentor
 
 Benchmark này cho UAV hover, tiến khoảng 2,56 m ở lệnh 0,5 m/s rồi hover
@@ -28,12 +36,44 @@ pose bay; benchmark này không chạy OpenVINS hay MPPI. Đọc
 phải 15 Hz đo được**. Chu kỳ 15 Hz là 66,7 ms; cần đo lại throughput, frame
 drop, độ trễ và sai số sau mọi thay đổi.
 
+**Mốc CPU trước khi đưa lên Jetson Nano:** phát lại ảnh RGB ở 10 Hz trên
+MacBook Air M2 cho riêng model depth, tiến trình dùng 21–24% của một lõi CPU
+khi chạy MPS (2,6–2,9% nếu chia cho cả 8 lõi); hai lượt đều theo kịp 10 Hz.
+Chạy chỉ CPU với một luồng dùng gần 100% một lõi nhưng chỉ đạt 4 ảnh/s.
+Đây chưa phải số đo trên Jetson hay tải của toàn bộ stack. Xem
+[phương pháp, biểu đồ và lệnh đo lại](docs/MONOCULAR_MENTOR_DEPTH_BENCHMARK_VI.md).
+
+**Đường deploy C++ đang được chuẩn bị:** MPPI, kiểm tra quỹ đạo và adapter
+ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV DNN.
+[Cách build, xuất model và kết quả đối chiếu Python–C++](docs/JETSON_CPP_RUNTIME_VI.md)
+được ghi riêng. Phép đo trên Mac cho thấy OpenCV DNN CPU vẫn quá chậm để
+theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Nano chưa được kiểm tra.
+[Hướng dẫn chạy C++ ngắn cho mentor](docs/MENTOR_CPP_QUICKSTART_VI.md).
+
+**Code C++ ở đâu?**
+
+| Thành phần | Mã nguồn |
+| --- | --- |
+| MPPI: rollout, dynamics, cost, optimizer | [`uav_navigation_core/src/mppi/`](uav_navigation_core/src/mppi/) |
+| Tiền xử lý RGB và tạo điểm 3D từ depth | [`uav_navigation_core/src/metric_depth.cpp`](uav_navigation_core/src/metric_depth.cpp) |
+| Suy luận Depth Anything ONNX và node camera ROS 2 | [`depth_anything_onnx.cpp`](uav_navigation_ros/src/depth_anything_onnx.cpp), [`monocular_depth_node.cpp`](uav_navigation_ros/src/monocular_depth_node.cpp) |
+| Node MPPI ROS 2 và adapter ArduPilot | [`local_navigation_node.cpp`](uav_navigation_ros/src/local_navigation_node.cpp), [`autopilot_adapter_node.cpp`](uav_navigation_ros/src/autopilot_adapter_node.cpp) |
+| Cấu hình và launch thử monocular | [`monocular.yaml`](uav_navigation_bringup/config/monocular.yaml), [`monocular_sim.launch.xml`](uav_navigation_bringup/launch/monocular_sim.launch.xml) |
+
+`scripts/` và `mppi_ardupilot/*.py` vẫn giữ các thí nghiệm, xuất model và
+đánh giá offline. Đường ROS 2 dự kiến chạy trên UAV dùng các thành phần C++ ở
+trên; nó chưa được xác nhận chạy closed-loop trên Jetson Nano. Xem
+[tình trạng thay thế từng phần Python](docs/JETSON_CPP_RUNTIME_VI.md#tình-trạng-thay-thế-python)
+trước khi xóa runner cũ.
+
 **Mã cần đọc:**
 
 | Tệp | Vai trò |
 | --- | --- |
 | [`scripts/run_monocular_sim.py`](scripts/run_monocular_sim.py) | Khởi động Gazebo/SITL, pha bay và các tiến trình benchmark (`--mentor-depth-benchmark`) |
 | [`scripts/monocular_depth_gz.py`](scripts/monocular_depth_gz.py) | Nhận RGB, suy luận depth, ghi timestamp và latency |
+| [`uav_navigation_ros/src/monocular_depth_node.cpp`](uav_navigation_ros/src/monocular_depth_node.cpp) | Node C++ suy luận depth cho đường ROS 2, giữ cloud lại khi trễ |
+| [`scripts/benchmark_monocular_cpu.py`](scripts/benchmark_monocular_cpu.py) | Đo CPU, RAM, độ trễ và thông lượng model trên RGB đã lưu |
 | [`scripts/log_lidar_gt_gz.py`](scripts/log_lidar_gt_gz.py) | Ghi LiDAR chỉ để đánh giá |
 | [`scripts/evaluate_monocular_lidar_depth.py`](scripts/evaluate_monocular_lidar_depth.py) | So depth với các LiDAR return đã chiếu lên ảnh |
 | [`scripts/evaluate_multiframe_ekf_lidar.py`](scripts/evaluate_multiframe_ekf_lidar.py) | Replay nhánh landmark RGB + EKF, chấm sparse depth |
@@ -640,6 +680,13 @@ lsof -nP -iUDP:9002
 ```
 
 ## Bản đồ repository
+
+Thử nghiệm perception monocular nhiều frame (RGB + OpenVINS/IMU, độc lập với
+MPPI) và các gate chưa đạt được ghi trong
+[`docs/MONOCULAR_MULTIFRAME_DEPTH_VI.md`](docs/MONOCULAR_MULTIFRAME_DEPTH_VI.md).
+Benchmark theo góp ý mentor dùng EKF/GPS của ArduPilot, so depth monocular với
+LiDAR 3D mô phỏng chỉ để chấm điểm và đo latency trong
+[`docs/MONOCULAR_MENTOR_DEPTH_BENCHMARK_VI.md`](docs/MONOCULAR_MENTOR_DEPTH_BENCHMARK_VI.md).
 
 | Đường dẫn | Nội dung |
 |---|---|

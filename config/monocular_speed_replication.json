@@ -1,0 +1,511 @@
+{
+  "phase": "speed_suite",
+  "duration": 180,
+  "perception_config": "config/monocular_geometry_perception.json",
+  "trials": [
+    {
+      "name": "centered_v0.5_seed23",
+      "scenario": "centered",
+      "speed": 0.5,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "centered_v1.0_seed23",
+      "scenario": "centered",
+      "speed": 1.0,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "centered_v1.5_seed23",
+      "scenario": "centered",
+      "speed": 1.5,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "shifted_v0.5_seed23",
+      "scenario": "shifted",
+      "speed": 0.5,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "shifted_v1.0_seed23",
+      "scenario": "shifted",
+      "speed": 1.0,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "shifted_v1.5_seed23",
+      "scenario": "shifted",
+      "speed": 1.5,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "slalom_v0.5_seed23",
+      "scenario": "slalom",
+      "speed": 0.5,
+      "seed": 23,
+      "goal": [
+        17,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_slalom.sdf",
+      "eval_scene": "config/monocular_scene_slalom.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "slalom_v1.0_seed23",
+      "scenario": "slalom",
+      "speed": 1.0,
+      "seed": 23,
+      "goal": [
+        17,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_slalom.sdf",
+      "eval_scene": "config/monocular_scene_slalom.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "slalom_v1.5_seed23",
+      "scenario": "slalom",
+      "speed": 1.5,
+      "seed": 23,
+      "goal": [
+        17,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_slalom.sdf",
+      "eval_scene": "config/monocular_scene_slalom.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "gate_v0.5_seed23",
+      "scenario": "gate",
+      "speed": 0.5,
+      "seed": 23,
+      "goal": [
+        14,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_gate.sdf",
+      "eval_scene": "config/monocular_scene_gate.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "gate_v1.0_seed23",
+      "scenario": "gate",
+      "speed": 1.0,
+      "seed": 23,
+      "goal": [
+        14,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_gate.sdf",
+      "eval_scene": "config/monocular_scene_gate.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "gate_v1.5_seed23",
+      "scenario": "gate",
+      "speed": 1.5,
+      "seed": 23,
+      "goal": [
+        14,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_gate.sdf",
+      "eval_scene": "config/monocular_scene_gate.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "diagonal_v0.5_seed23",
+      "scenario": "diagonal",
+      "speed": 0.5,
+      "seed": 23,
+      "goal": [
+        14,
+        4,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_diagonal.sdf",
+      "eval_scene": "config/monocular_scene_diagonal.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "diagonal_v1.0_seed23",
+      "scenario": "diagonal",
+      "speed": 1.0,
+      "seed": 23,
+      "goal": [
+        14,
+        4,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_diagonal.sdf",
+      "eval_scene": "config/monocular_scene_diagonal.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "diagonal_v1.5_seed23",
+      "scenario": "diagonal",
+      "speed": 1.5,
+      "seed": 23,
+      "goal": [
+        14,
+        4,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_diagonal.sdf",
+      "eval_scene": "config/monocular_scene_diagonal.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "low_texture_v0.5_seed23",
+      "scenario": "low_texture",
+      "speed": 0.5,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_low_texture.sdf",
+      "eval_scene": "config/monocular_scene_low_texture.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "low_texture_v1.0_seed23",
+      "scenario": "low_texture",
+      "speed": 1.0,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_low_texture.sdf",
+      "eval_scene": "config/monocular_scene_low_texture.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "low_texture_v1.5_seed23",
+      "scenario": "low_texture",
+      "speed": 1.5,
+      "seed": 23,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_low_texture.sdf",
+      "eval_scene": "config/monocular_scene_low_texture.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "centered_v0.5_seed31",
+      "scenario": "centered",
+      "speed": 0.5,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "centered_v1.0_seed31",
+      "scenario": "centered",
+      "speed": 1.0,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "centered_v1.5_seed31",
+      "scenario": "centered",
+      "speed": 1.5,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "shifted_v0.5_seed31",
+      "scenario": "shifted",
+      "speed": 0.5,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "shifted_v1.0_seed31",
+      "scenario": "shifted",
+      "speed": 1.0,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "shifted_v1.5_seed31",
+      "scenario": "shifted",
+      "speed": 1.5,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "slalom_v0.5_seed31",
+      "scenario": "slalom",
+      "speed": 0.5,
+      "seed": 31,
+      "goal": [
+        17,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_slalom.sdf",
+      "eval_scene": "config/monocular_scene_slalom.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "slalom_v1.0_seed31",
+      "scenario": "slalom",
+      "speed": 1.0,
+      "seed": 31,
+      "goal": [
+        17,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_slalom.sdf",
+      "eval_scene": "config/monocular_scene_slalom.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "slalom_v1.5_seed31",
+      "scenario": "slalom",
+      "speed": 1.5,
+      "seed": 31,
+      "goal": [
+        17,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_slalom.sdf",
+      "eval_scene": "config/monocular_scene_slalom.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "gate_v0.5_seed31",
+      "scenario": "gate",
+      "speed": 0.5,
+      "seed": 31,
+      "goal": [
+        14,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_gate.sdf",
+      "eval_scene": "config/monocular_scene_gate.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "gate_v1.0_seed31",
+      "scenario": "gate",
+      "speed": 1.0,
+      "seed": 31,
+      "goal": [
+        14,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_gate.sdf",
+      "eval_scene": "config/monocular_scene_gate.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "gate_v1.5_seed31",
+      "scenario": "gate",
+      "speed": 1.5,
+      "seed": 31,
+      "goal": [
+        14,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_gate.sdf",
+      "eval_scene": "config/monocular_scene_gate.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "diagonal_v0.5_seed31",
+      "scenario": "diagonal",
+      "speed": 0.5,
+      "seed": 31,
+      "goal": [
+        14,
+        4,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_diagonal.sdf",
+      "eval_scene": "config/monocular_scene_diagonal.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "diagonal_v1.0_seed31",
+      "scenario": "diagonal",
+      "speed": 1.0,
+      "seed": 31,
+      "goal": [
+        14,
+        4,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_diagonal.sdf",
+      "eval_scene": "config/monocular_scene_diagonal.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "diagonal_v1.5_seed31",
+      "scenario": "diagonal",
+      "speed": 1.5,
+      "seed": 31,
+      "goal": [
+        14,
+        4,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_diagonal.sdf",
+      "eval_scene": "config/monocular_scene_diagonal.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    },
+    {
+      "name": "low_texture_v0.5_seed31",
+      "scenario": "low_texture",
+      "speed": 0.5,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_low_texture.sdf",
+      "eval_scene": "config/monocular_scene_low_texture.json",
+      "config": "config/monocular_speed_0.5.yaml"
+    },
+    {
+      "name": "low_texture_v1.0_seed31",
+      "scenario": "low_texture",
+      "speed": 1.0,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_low_texture.sdf",
+      "eval_scene": "config/monocular_scene_low_texture.json",
+      "config": "config/monocular_speed_1.0.yaml"
+    },
+    {
+      "name": "low_texture_v1.5_seed31",
+      "scenario": "low_texture",
+      "speed": 1.5,
+      "seed": 31,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_low_texture.sdf",
+      "eval_scene": "config/monocular_scene_low_texture.json",
+      "config": "config/monocular_speed_1.5.yaml"
+    }
+  ]
+}

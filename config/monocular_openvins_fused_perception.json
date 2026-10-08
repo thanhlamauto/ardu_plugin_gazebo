@@ -1,0 +1,11 @@
+{
+  "backend": "geometry",
+  "pose_source": "openvins",
+  "initial_height_m": 3.0,
+  "min_tracker_baseline_m": 0.4,
+  "max_hz": 10,
+  "map_lifetime": 3.0,
+  "map_publish_age": 1.5,
+  "map_fusion_radius": 0.3,
+  "save_every": 25
+}

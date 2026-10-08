@@ -1,0 +1,56 @@
+{
+  "workload": "saved RGB replay, paced, no Gazebo/SITL/planner",
+  "included": "image processor, model inference, depth resize, depth_to_points",
+  "excluded": "model load/warmup, PNG decode, Gazebo image decode/transport, cloud publish, planner",
+  "host": {
+    "platform": "macOS-26.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "logical_cpu_count": 8,
+    "python": "3.12.14",
+    "torch": "2.14.0",
+    "transformers": "4.57.6",
+    "psutil": "7.2.2"
+  },
+  "model": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf",
+  "revision": "2fd93bd764b15eea94dcf7763bba7ddc25007d0f",
+  "device": "cpu",
+  "device_name": "cpu",
+  "input_size": 518,
+  "camera_image_size": [
+    640,
+    360
+  ],
+  "threads": 1,
+  "target_rate_hz": 10.0,
+  "warmup_frames": 5,
+  "frames": 100,
+  "elapsed_s": 24.747708541995962,
+  "achieved_rate_hz": 4.040778152462222,
+  "cpu_time_s": 24.722309312,
+  "cpu_percent_one_core": 99.89736734634296,
+  "cpu_percent_all_logical_cores": 12.48717091829287,
+  "sampled_cpu_percent_one_core": {
+    "p50": 100.01985307194002,
+    "p95": 101.274225119525,
+    "p99": 101.78111512393892
+  },
+  "rss_mb": {
+    "start": 876.691456,
+    "peak": 1085.423616
+  },
+  "pipeline_latency_ms": {
+    "p50": 242.60781300108647,
+    "p95": 265.9681722499954,
+    "p99": 302.14699750591564
+  },
+  "frames_over_period": 100,
+  "starts_over_one_period_late": 99,
+  "points_per_frame": {
+    "p50": 1887.0,
+    "p95": 1887.0,
+    "p99": 1887.0
+  },
+  "sample_interval_s": 0.2,
+  "image_source": "saved RGB frames from mentor_lidar_depth_benchmark_r3_20260930",
+  "measurement_note": "100% process CPU means one logical CPU fully busy; all-cores percentage divides by logical CPU count. Apple MPS/CUDA GPU work is not counted as CPU time."
+}

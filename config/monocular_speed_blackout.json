@@ -1,0 +1,143 @@
+{
+  "phase": "speed_suite",
+  "duration": 180,
+  "perception_config": "config/monocular_geometry_perception.json",
+  "trials": [
+    {
+      "name": "centered_v1.0_seed41_blackout",
+      "scenario": "centered",
+      "speed": 1.0,
+      "seed": 41,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.0.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "centered_v1.5_seed41_blackout",
+      "scenario": "centered",
+      "speed": 1.5,
+      "seed": 41,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.5.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "centered_v1.0_seed43_blackout",
+      "scenario": "centered",
+      "speed": 1.0,
+      "seed": 43,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.0.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "centered_v1.5_seed43_blackout",
+      "scenario": "centered",
+      "speed": 1.5,
+      "seed": 43,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_centered.sdf",
+      "eval_scene": "config/monocular_scene_centered.json",
+      "config": "config/monocular_speed_1.5.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "shifted_v1.0_seed41_blackout",
+      "scenario": "shifted",
+      "speed": 1.0,
+      "seed": 41,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.0.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "shifted_v1.5_seed41_blackout",
+      "scenario": "shifted",
+      "speed": 1.5,
+      "seed": 41,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.5.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "shifted_v1.0_seed43_blackout",
+      "scenario": "shifted",
+      "speed": 1.0,
+      "seed": 43,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.0.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    },
+    {
+      "name": "shifted_v1.5_seed43_blackout",
+      "scenario": "shifted",
+      "speed": 1.5,
+      "seed": 43,
+      "goal": [
+        12,
+        0,
+        3
+      ],
+      "world": "worlds/iris_monocular_suite_shifted.sdf",
+      "eval_scene": "config/monocular_scene_shifted.json",
+      "config": "config/monocular_speed_1.5.yaml",
+      "blackout": true,
+      "blackout_at_x": 2,
+      "blackout_seconds": 5
+    }
+  ]
+}

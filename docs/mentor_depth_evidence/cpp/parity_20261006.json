@@ -1,0 +1,33 @@
+{
+  "model_sha256": "1a7cb9d9c31d60afc9cbe96c6a401ac27c8cebcfce78cfc4ca1c2587691dc4a8",
+  "comparison": "C++ OpenCV ONNX output versus saved Python MPS depth",
+  "trial": "mentor_lidar_depth_benchmark_r3_20260930",
+  "frames": [
+    {
+      "frame": 0,
+      "mae_m": 2.5258093955926597e-05,
+      "p95_absolute_error_m": 7.62939453125e-05,
+      "maximum_absolute_error_m": 0.00080108642578125,
+      "center_median_difference_m": 2.47955322265625e-05,
+      "probe_stdout": "depth 640x360, frames 1, p50_ms 780.756, p95_ms 780.756, fps 1.28079, cpu_one_core_percent 100"
+    },
+    {
+      "frame": 120,
+      "mae_m": 1.894661909318529e-05,
+      "p95_absolute_error_m": 6.4849853515625e-05,
+      "maximum_absolute_error_m": 0.000823974609375,
+      "center_median_difference_m": 2.288818359375e-05,
+      "probe_stdout": "depth 640x360, frames 1, p50_ms 786.169, p95_ms 786.169, fps 1.27199, cpu_one_core_percent 99.9667"
+    },
+    {
+      "frame": 240,
+      "mae_m": 5.521436833078042e-06,
+      "p95_absolute_error_m": 1.430511474609375e-05,
+      "maximum_absolute_error_m": 0.00017452239990234375,
+      "center_median_difference_m": 1.430511474609375e-06,
+      "probe_stdout": "depth 640x360, frames 1, p50_ms 781.848, p95_ms 781.848, fps 1.27902, cpu_one_core_percent 100"
+    }
+  ],
+  "mean_frame_mae_m": 1.657538329406331e-05,
+  "maximum_pixel_error_m": 0.000823974609375
+}

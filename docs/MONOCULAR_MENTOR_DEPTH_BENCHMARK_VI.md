@@ -15,6 +15,12 @@ nhiều ảnh liên tiếp với pose EKF: các điểm theo dõi đủ tốt c�
 tiên và cách này chưa nhìn đủ mọi vùng phía trước. Vì vậy hiện em mới có kết
 quả đo độ sâu, **chưa chứng minh được khả năng tránh vật cản tự động**.
 
+Để chuẩn bị cho Jetson Nano, ngày 02/10 em đo thêm tải CPU của chính model
+này trên MacBook Air M2. Khi dùng GPU MPS, tiến trình dùng khoảng **21–24%
+của một lõi CPU** và theo kịp 10 ảnh/giây. Khi chỉ dùng CPU với một luồng,
+nó gần **100% một lõi** nhưng còn khoảng 4 ảnh/giây. Đây là mốc để đối
+chiếu sau này, **không phải số đo hay dự báo hiệu năng trên Jetson Nano**.
+
 ## Bối cảnh và cách chạy thử
 
 Theo góp ý của mentor, lần này em tập trung trả lời câu hỏi:
@@ -102,6 +108,62 @@ Số liệu đầy đủ: [learned-depth lượt 1](mentor_depth_evidence/r3/lid
 [multi-frame lượt 1](mentor_depth_evidence/r3/multiframe_ekf_lidar_analysis.json),
 [multi-frame lượt lặp](mentor_depth_evidence/repeat/multiframe_ekf_lidar_analysis.json),
 và [đồ thị hai lượt](mentor_depth_evidence/comparison.png).
+
+## Tải CPU của model monocular — mốc trước khi chuyển sang Jetson Nano
+
+Em phát lại ảnh RGB đã lưu từ hai chuyến bay ở nhịp 10 Hz trên MacBook Air
+M2 (8 lõi CPU, RAM 16 GB). Phép đo chạy đúng checkpoint Depth Anything ở
+trên, input 518×518, một luồng Torch, rồi chuyển depth thành các điểm 3D
+như predictor hiện tại. Ảnh được đọc sẵn vào RAM trước khi bấm giờ; năm
+frame đầu chỉ để khởi động model. CPU% là thời gian CPU của **riêng tiến
+trình xử lý depth** chia cho thời gian thực. Theo cách hiển thị này,
+**100% nghĩa là dùng trọn một lõi CPU**; cột "toàn bộ 8 lõi" lấy số đó chia
+cho 8. Phép đo không tính tải GPU.
+
+| Cách chạy trên Mac M2 | Frame đo | CPU / 1 lõi | CPU / cả 8 lõi | Độ trễ pipeline p95 | Frame quá 100 ms | Tốc độ thực | RSS cao nhất |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| MPS, lượt 1 | 200 | 21,0% | 2,6% | 80,0 ms | 2/200 | 10,0 ảnh/s | 429 MB |
+| MPS, lượt lặp | 200 | 23,5% | 2,9% | 78,8 ms | 0/200 | 10,0 ảnh/s | 755 MB |
+| Chỉ CPU, một luồng | 100 | 99,9% | 12,5% | 266,0 ms | 100/100 | 4,0 ảnh/s | 1.085 MB |
+
+![So sánh CPU, độ trễ và tốc độ](mentor_depth_evidence/cpu/mentor_cpu_reference_20261002.png)
+
+Số liệu máy đọc được: [MPS lượt 1](mentor_depth_evidence/cpu/mentor_cpu_depth_mps_20261002.json),
+[MPS lượt lặp](mentor_depth_evidence/cpu/mentor_cpu_depth_mps_repeat_20261002.json),
+[chỉ CPU](mentor_depth_evidence/cpu/mentor_cpu_depth_cpu_20261002.json).
+MPS thực hiện phần tính toán model trên GPU; CPU% thấp **không có nghĩa toàn
+hệ thống chỉ tốn từng ấy tài nguyên**. RSS ở bảng bao gồm cả 100–200 ảnh
+đọc sẵn vào RAM và bộ nhớ do runtime/GPU giữ lại, nên chưa phải mức RAM
+sẽ dùng trên Jetson. Phép phát lại này không tính tải Gazebo, camera
+transport, đóng gói cloud, EKF, planner hay thuật toán landmark nhiều frame.
+Các số độ trễ ở bảng này là từ ảnh RGB đã giải mã tới điểm 3D, nên không
+thay thế độ trễ nhận ảnh → publish đo ở chuyến bay phía trên.
+
+Để có số so sánh thật sau khi triển khai, chép cùng tập ảnh RGB sang Jetson
+và chạy [`benchmark_monocular_cpu.py`](../scripts/benchmark_monocular_cpu.py)
+với cùng checkpoint, kích thước ảnh, 10 Hz và `--threads 1`. Chọn
+`--device cuda` khi môi trường PyTorch trên Jetson nhận GPU, hoặc
+`--device cpu` để đo đường chạy CPU. Ghi cả CPU%, RAM, p95, số ảnh/giây và
+phiên bản PyTorch/Transformers; sau đó mới đo tiếp toàn bộ pipeline camera
+thật. Ví dụ trên Jetson, từ thư mục repo sau khi đã chép ảnh vào
+`data/mentor_rgb/perception/`:
+
+```bash
+python3 scripts/benchmark_monocular_cpu.py \
+  --image-dir data/mentor_rgb/perception \
+  --output results/jetson_monocular_cpu.json \
+  --device cuda --frames 200 --rate-hz 10 --threads 1
+```
+
+Chỉ so sánh CPU% cùng với độ trễ và tốc độ đạt được: hai thiết bị có CPU,
+GPU, bộ nhớ và môi trường phần mềm khác nhau nên không thể lấy 21–24% trên
+Mac làm dự báo CPU% hay khả năng chạy 10 Hz của Jetson Nano.
+
+**Cập nhật 06/10/2026:** đường ROS 2 monocular đã có bản C++ cho node depth
+ONNX, nối tới MPPI và adapter C++ vốn có. Kết quả đối chiếu depth Python–C++
+và giới hạn hiệu năng CPU được ghi trong
+[báo cáo chuẩn bị Jetson](JETSON_CPP_RUNTIME_VI.md). Đây chưa phải kết quả
+bay tránh vật hay benchmark trên Jetson Nano.
 
 Một kiểm tra hình học độc lập tại tâm ảnh: khi UAV ở x≈0, mặt trước hộp dự
 kiến cách camera ~6,84 m, LiDAR đo 6,84 m nhưng mô hình RGB cho ~5,07 m.

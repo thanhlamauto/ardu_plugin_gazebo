@@ -17,6 +17,8 @@ Implemented core components:
   profiles, with a component-level `CostBreakdown`;
 - injected-noise MPPI updates, bounded effective-noise accounting, native C++
   Gaussian sampling, M2 feasible-sample weighting and recovery proposals.
+- Depth Anything RGB preprocessing and metric-depth-to-3D point conversion in
+  `src/metric_depth.cpp` for the C++ monocular ROS node.
 
 `ICollisionEnvironment` is the only static-geometry contract. Simulation can
 adapt an SDF and hardware can adapt an ESDF or voxel map without either

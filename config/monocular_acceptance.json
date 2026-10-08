@@ -1,0 +1,131 @@
+{
+  "phase": "batch",
+  "duration": 180,
+  "required_successes": 8,
+  "trials": [
+    {
+      "name": "centered_seed7",
+      "layout": "centered",
+      "world": "worlds/iris_monocular_textured.sdf",
+      "eval_box_center": [
+        8,
+        0,
+        3
+      ],
+      "seed": 7
+    },
+    {
+      "name": "centered_seed8",
+      "layout": "centered",
+      "world": "worlds/iris_monocular_textured.sdf",
+      "eval_box_center": [
+        8,
+        0,
+        3
+      ],
+      "seed": 8
+    },
+    {
+      "name": "centered_seed9",
+      "layout": "centered",
+      "world": "worlds/iris_monocular_textured.sdf",
+      "eval_box_center": [
+        8,
+        0,
+        3
+      ],
+      "seed": 9
+    },
+    {
+      "name": "centered_seed10",
+      "layout": "centered",
+      "world": "worlds/iris_monocular_textured.sdf",
+      "eval_box_center": [
+        8,
+        0,
+        3
+      ],
+      "seed": 10
+    },
+    {
+      "name": "centered_seed11",
+      "layout": "centered",
+      "world": "worlds/iris_monocular_textured.sdf",
+      "eval_box_center": [
+        8,
+        0,
+        3
+      ],
+      "seed": 11
+    },
+    {
+      "name": "shifted_seed7",
+      "layout": "shifted",
+      "world": "worlds/iris_monocular_textured_shifted.sdf",
+      "eval_box_center": [
+        8,
+        1,
+        3
+      ],
+      "seed": 7
+    },
+    {
+      "name": "shifted_seed8",
+      "layout": "shifted",
+      "world": "worlds/iris_monocular_textured_shifted.sdf",
+      "eval_box_center": [
+        8,
+        1,
+        3
+      ],
+      "seed": 8
+    },
+    {
+      "name": "shifted_seed9",
+      "layout": "shifted",
+      "world": "worlds/iris_monocular_textured_shifted.sdf",
+      "eval_box_center": [
+        8,
+        1,
+        3
+      ],
+      "seed": 9
+    },
+    {
+      "name": "shifted_seed10",
+      "layout": "shifted",
+      "world": "worlds/iris_monocular_textured_shifted.sdf",
+      "eval_box_center": [
+        8,
+        1,
+        3
+      ],
+      "seed": 10
+    },
+    {
+      "name": "shifted_seed11",
+      "layout": "shifted",
+      "world": "worlds/iris_monocular_textured_shifted.sdf",
+      "eval_box_center": [
+        8,
+        1,
+        3
+      ],
+      "seed": 11
+    },
+    {
+      "name": "camera_blackout_seed12",
+      "layout": "centered",
+      "world": "worlds/iris_monocular_textured.sdf",
+      "eval_box_center": [
+        8,
+        0,
+        3
+      ],
+      "seed": 12,
+      "blackout": true
+    }
+  ],
+  "config": "config/monocular_geometry_mppi.yaml",
+  "perception_config": "config/monocular_geometry_perception.json"
+}

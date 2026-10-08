@@ -14,6 +14,16 @@ find_package(mavros_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
 find_package(tinyxml2 REQUIRED CONFIG)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn)
+
+add_library(depth_anything_onnx STATIC src/depth_anything_onnx.cpp)
+target_compile_features(depth_anything_onnx PUBLIC cxx_std_17)
+target_include_directories(depth_anything_onnx PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(depth_anything_onnx PUBLIC
+  uav_navigation_core::uav_navigation_core ${OpenCV_LIBS})
 
 add_library(sdf_static_map_loader STATIC src/sdf_static_map_loader.cpp)
 target_compile_features(sdf_static_map_loader PUBLIC cxx_std_17)
@@ -39,6 +49,13 @@ ament_target_dependencies(local_navigation_node
   rclcpp geometry_msgs nav_msgs sensor_msgs visualization_msgs diagnostic_msgs tf2_ros)
 set_target_properties(local_navigation_node PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+add_executable(monocular_depth_node src/monocular_depth_node.cpp)
+target_compile_features(monocular_depth_node PRIVATE cxx_std_17)
+target_link_libraries(monocular_depth_node depth_anything_onnx)
+ament_target_dependencies(monocular_depth_node
+  rclcpp sensor_msgs diagnostic_msgs)
+set_target_properties(monocular_depth_node PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 add_library(autopilot_adapter_logic STATIC src/autopilot_adapter.cpp)
 target_compile_features(autopilot_adapter_logic PUBLIC cxx_std_17)
 target_include_directories(autopilot_adapter_logic PUBLIC
@@ -58,10 +75,16 @@ if(APPLE)
   find_library(ROS_PYTHON_RUNTIME NAMES python3.12 PATH_SUFFIXES lib REQUIRED)
   target_link_libraries(global_planner_node ${ROS_PYTHON_RUNTIME})
   target_link_libraries(local_navigation_node ${ROS_PYTHON_RUNTIME})
+  target_link_libraries(monocular_depth_node ${ROS_PYTHON_RUNTIME})
   target_link_libraries(autopilot_adapter_node ${ROS_PYTHON_RUNTIME})
 endif()
 
 if(BUILD_TESTING)
+  add_executable(depth_anything_onnx_probe test/depth_anything_onnx_probe.cpp)
+  target_link_libraries(depth_anything_onnx_probe depth_anything_onnx)
+  set_target_properties(depth_anything_onnx_probe PROPERTIES
+    BUILD_RPATH_USE_ORIGIN TRUE INSTALL_RPATH_USE_LINK_PATH TRUE)
+
   add_executable(test_sdf_static_map_loader test/test_sdf_static_map_loader.cpp)
   target_link_libraries(test_sdf_static_map_loader PRIVATE sdf_static_map_loader)
   if(APPLE)
@@ -79,8 +102,8 @@ if(BUILD_TESTING)
 endif()
 
 install(DIRECTORY include/ DESTINATION include)
-install(TARGETS sdf_static_map_loader autopilot_adapter_logic
-  global_planner_node local_navigation_node autopilot_adapter_node
+install(TARGETS sdf_static_map_loader autopilot_adapter_logic depth_anything_onnx
+  global_planner_node local_navigation_node monocular_depth_node autopilot_adapter_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})

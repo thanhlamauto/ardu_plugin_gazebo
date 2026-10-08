@@ -174,6 +174,8 @@ public:
     control_rate_hz_ = declare_parameter<double>("control_rate_hz", 10.0);
     state_timeout_s_ = declare_parameter<double>("state_timeout_s", 1.0);
     obstacle_timeout_s_ = declare_parameter<double>("obstacle_timeout_s", 1.0);
+    max_obstacle_source_age_s_ =
+        declare_parameter<double>("max_obstacle_source_age_s", 0.0);
     max_compute_time_ms_ =
         declare_parameter<double>("max_compute_time_ms", 80.0);
     const double validation_deadline_override = declare_parameter<double>(
@@ -185,6 +187,8 @@ public:
         declare_parameter<double>("goal_speed_tolerance_m_s", 0.5);
     const auto obstacle_max_points =
         declare_parameter<int64_t>("obstacle_max_points", 800);
+    const auto min_obstacle_points =
+        declare_parameter<int64_t>("min_obstacle_points", 0);
     visualization_rate_hz_ =
         declare_parameter<double>("visualization.publish_rate_hz", 5.0);
     visualization_enabled_ =
@@ -218,8 +222,10 @@ public:
 
     if (planning_frame_.empty() || body_frame_.empty() ||
         control_rate_hz_ <= 0 || state_timeout_s_ <= 0 ||
-        obstacle_timeout_s_ <= 0 || max_compute_time_ms_ <= 0 || horizon <= 0 ||
-        samples <= 0 || obstacle_max_points <= 0 ||
+        obstacle_timeout_s_ <= 0 || max_obstacle_source_age_s_ < 0 ||
+        max_compute_time_ms_ <= 0 || horizon <= 0 ||
+        samples <= 0 || obstacle_max_points <= 0 || min_obstacle_points < 0 ||
+        min_obstacle_points > obstacle_max_points ||
         visualization_rate_hz_ <= 0 || visualization_max_samples < 0)
       throw std::invalid_argument(
           "invalid local-navigation timing or size parameter");
@@ -227,6 +233,7 @@ public:
     horizon_ = static_cast<std::size_t>(horizon);
     samples_ = static_cast<std::size_t>(samples);
     obstacle_max_points_ = static_cast<std::size_t>(obstacle_max_points);
+    min_obstacle_points_ = static_cast<std::size_t>(min_obstacle_points);
     visualization_max_samples_ =
         static_cast<std::size_t>(visualization_max_samples);
 
@@ -681,6 +688,22 @@ private:
       Hold(Mode::kHoldStale, "odometry or obstacle observation is stale");
       return;
     }
+    if (max_obstacle_source_age_s_ > 0.0) {
+      const double obstacle_source_age_s =
+          static_cast<double>(now().nanoseconds() - obstacles_.stamp_ns) * 1e-9;
+      if (obstacles_.stamp_ns <= 0 || obstacle_source_age_s < -0.05 ||
+          obstacle_source_age_s > max_obstacle_source_age_s_) {
+        Hold(Mode::kHoldStale, "obstacle source timestamp is stale or invalid");
+        return;
+      }
+    }
+    if (obstacles_.points_enu_m.size() < min_obstacle_points_) {
+      Hold(Mode::kWaitingForObstacles,
+           "only " + std::to_string(obstacles_.points_enu_m.size()) +
+               " finite obstacle points; require " +
+               std::to_string(min_obstacle_points_));
+      return;
+    }
     if (Distance(state_.position_enu_m, goal_) <= goal_tolerance_m_ &&
         Norm(state_.velocity_enu_m_s) <= goal_speed_tolerance_m_s_) {
       Hold(Mode::kGoalReached, "terminal position and speed reached");
@@ -1106,6 +1129,9 @@ private:
         KeyValue("t_diagnostics_ms", std::to_string(diagnostics_ms)),
         KeyValue("samples", std::to_string(samples)),
         KeyValue("safe_samples", std::to_string(safe_samples)),
+        KeyValue("obstacle_points",
+                 std::to_string(obstacles_.points_enu_m.size())),
+        KeyValue("min_obstacle_points", std::to_string(min_obstacle_points_)),
         KeyValue("ess", std::to_string(ess)),
         KeyValue("minimum_clearance_m", std::to_string(clearance)),
         KeyValue("best_feasible_cost", std::to_string(best_feasible_cost)),
@@ -1284,6 +1310,7 @@ private:
   double dt_s_{0.1};
   double state_timeout_s_{1.0};
   double obstacle_timeout_s_{1.0};
+  double max_obstacle_source_age_s_{0.0};
   double max_compute_time_ms_{80.0};
   double goal_tolerance_m_{0.5};
   double goal_speed_tolerance_m_s_{0.5};
@@ -1291,6 +1318,7 @@ private:
   std::size_t horizon_{30};
   std::size_t samples_{80};
   std::size_t obstacle_max_points_{800};
+  std::size_t min_obstacle_points_{0};
   std::size_t visualization_max_samples_{80};
   bool proactive_proposals_{true};
   bool visualization_enabled_{true};

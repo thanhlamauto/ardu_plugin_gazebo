@@ -41,7 +41,7 @@ from .trajectory_safety import single_safety_diagnostics
 DEFAULT_GOAL = "16,10,20;30,0,20"
 SAFE_HOLD_EVENTS = frozenset(
     ("hold-stale", "hold-brake", "hold-timeout", "hold-invalid-trajectory",
-     "hold-invalid-stopping-trajectory", "hold-await-goal", "reached")
+     "hold-invalid-stopping-trajectory", "hold-insufficient-cloud", "hold-await-goal", "reached")
 )
 
 
@@ -91,9 +91,9 @@ class VelocityCommandConditioner:
         if self.u_min is not None and (
             self.u_min.shape != (4,) or self.u_max.shape != (4,)
             or not np.isfinite(self.u_min).all() or not np.isfinite(self.u_max).all()
-            or np.any(self.u_min >= self.u_max)
+            or np.any(self.u_min > self.u_max)
         ):
-            raise ValueError("command bounds must be finite four-vectors with min < max")
+            raise ValueError("command bounds must be finite four-vectors with min <= max")
         self.previous: Optional[np.ndarray] = None
 
     def reset(self) -> None:
@@ -149,6 +149,7 @@ class LocalPlannerNode:
         goal_slowdown_radius: Optional[float] = None,
         goal_approach_gain: float = 0.5,
         goal_min_speed: float = 0.1,
+        min_obstacle_points: int = 0,
     ) -> None:
         if not waypoints:
             raise ValueError("cần ít nhất 1 waypoint")
@@ -179,6 +180,10 @@ class LocalPlannerNode:
         self.goal_slowdown_radius = goal_slowdown_radius
         self.goal_approach_gain = goal_approach_gain
         self.goal_min_speed = goal_min_speed
+        if (not isinstance(min_obstacle_points, (int, np.integer))
+                or isinstance(min_obstacle_points, bool) or min_obstacle_points < 0):
+            raise ValueError('min_obstacle_points must be a nonnegative integer')
+        self.min_obstacle_points = int(min_obstacle_points)
         self.wp_index = 0
         self.reached = False
         self.recovery_active = False
@@ -239,6 +244,20 @@ class LocalPlannerNode:
             if self.command_conditioner is not None:
                 self.command_conditioner.reset()
             return PlannerStep(np.zeros(4), float("inf"), float("inf"), "hold-stale")
+        if self.min_obstacle_points:
+            cloud = np.asarray([] if obstacles is None else obstacles, dtype=float).reshape(-1, 3)
+            valid = np.isfinite(cloud).all(axis=1)
+            count = int(valid.sum())
+            if count < self.min_obstacle_points:
+                if self.command_conditioner is not None:
+                    self.command_conditioner.reset()
+                if hasattr(self.planner, 'reject_nominal'):
+                    self.planner.reject_nominal()
+                return PlannerStep(np.zeros(4), float('inf'),
+                    float(np.linalg.norm(state.pos-self.waypoints[self.wp_index])),
+                    'hold-insufficient-cloud', dict(reason='insufficient finite obstacle points',
+                        finite_points=count, required_points=self.min_obstacle_points))
+            obstacles = cloud[valid]
         if hasattr(self.planner, 'observe_motion'):
             self.planner.observe_motion(state.vel, state.simulation_timestamp_s)
         if hasattr(self.planner, "update_occupancy"):
@@ -495,7 +514,7 @@ def config_from_dict(d: dict) -> MPPIConfig:
         "reference_corner_radius_m", "reference_corner_samples",
         "reference_warm_start", "brake_swept_path",
         "validate_final_trajectory", "validate_stopping_trajectory",
-        "feasible_sample_weighting", "stopping_guard_uncertainty_m",
+        "feasible_sample_weighting", "stopping_guard_uncertainty_m", "camera_primitives", "safety_chunk_size",
         "cost_profile", "w_collision", "collision_radius_m", "paper_r_u",
         "paper_r_delta_u",
         "command_alpha", "max_accel_xy", "max_accel_z", "max_yaw_accel",
@@ -875,6 +894,7 @@ def run(args) -> None:
         goal_slowdown_radius=(None if rigid_mode else cfg.goal_slowdown_radius),
         goal_approach_gain=cfg.goal_approach_gain,
         goal_min_speed=cfg.goal_min_speed,
+        min_obstacle_points=getattr(args, 'min_obstacle_points', 0),
     )
     traj_pub = None
     if args.rviz_traj_topic or args.rviz_samples_topic or args.rviz_goal_topic:
@@ -906,6 +926,12 @@ def run(args) -> None:
         if not gz_node.subscribe(odometry_pb2.Odometry, args.odom_topic,
                                  lambda msg: latest_odom.update(msg.SerializeToString())):
             raise SystemExit(f"[error] không subscribe được {args.odom_topic}")
+    if getattr(args, 'ready_file', None):
+        Path(args.ready_file).touch()
+    if getattr(args, 'start_gate_file', None):
+        print(f"[mppi] waiting for start gate {args.start_gate_file}", flush=True)
+        while not Path(args.start_gate_file).exists():
+            time.sleep(.02)
     route_text = (
         f"RViz dynamic via {args.rviz_goal_topic}"
         if args.rviz_goal_topic
@@ -1121,7 +1147,7 @@ def run(args) -> None:
                         "đã thay route và reset MPPI warm start"
                     )
 
-            # 2-3. LiDAR scan -> obstacle cloud trong frame làm việc
+            # 2-3. Obstacle cloud -> frame làm việc
             scan_payload, scan_age = latest_scan.get()
             obstacles = None
             lidar_ok = scan_payload is not None and scan_age <= args.stale_after_s
@@ -1129,7 +1155,20 @@ def run(args) -> None:
                 msg = pc_pb2.PointCloudPacked()
                 msg.ParseFromString(scan_payload)
                 raw_points = lidar_bridge._read_gz_points(msg, args.max_raw_points)
-                if use_odom:
+                cloud_frame = next((entry.value[0] for entry in msg.header.data
+                                    if entry.key == "frame_id" and entry.value), "")
+                if cloud_frame == "odom":
+                    if not use_odom:
+                        raise RuntimeError("odom cloud requires odometry state")
+                    # Reject delayed/replayed camera frames even if transport arrival is fresh.
+                    acquired=msg.header.stamp.sec+msg.header.stamp.nsec*1e-9
+                    source_age=float(odom_sample_stamp)-acquired
+                    if not -.06<=source_age<=args.stale_after_s:
+                        lidar_ok=False
+                    else:
+                        stride = max(1, (len(raw_points)+args.max_points-1)//args.max_points)
+                        obstacles = np.asarray(raw_points[::stride], dtype=np.float64).reshape(-1,3)
+                elif use_odom:
                     obstacles = scan_to_world_enu(
                         raw_points, pos_enu, rot, max_points=args.max_points,
                         sensor_offset_body_frd=tuple(args.sensor_offset_body_frd))
@@ -1147,7 +1186,7 @@ def run(args) -> None:
             just_reached = False
             if not lidar_ok:
                 out = PlannerStep(np.zeros(4), float("inf"), float("inf"), "hold-stale")
-                print(f"[mppi] lidar stale/khuyết (age={scan_age:.2f}s) -> zero velocity")
+                print(f"[mppi] obstacle cloud stale/missing (age={scan_age:.2f}s) -> zero velocity")
             elif awaiting_rviz_goal:
                 nearest = float("inf")
                 if obstacles is not None and len(obstacles) > 0:

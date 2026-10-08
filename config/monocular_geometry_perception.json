@@ -1,0 +1,6 @@
+{
+  "backend": "geometry",
+  "max_hz": 10,
+  "map_lifetime": 60,
+  "save_every": 50
+}

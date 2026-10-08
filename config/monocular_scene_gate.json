@@ -1,0 +1,38 @@
+{
+  "boxes": [
+    {
+      "name": "obstacle_0",
+      "center": [
+        8,
+        -3.2,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "obstacle_1",
+      "center": [
+        8,
+        3.2,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    }
+  ],
+  "goal": [
+    14,
+    0,
+    3
+  ],
+  "world": "worlds/iris_monocular_suite_gate.sdf"
+}

@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="model_file"/>
+  <arg name="depth_backend" default="cpu"/>
+  <arg name="max_image_age_s" default="0.25"/>
+  <arg name="max_inference_ms" default="100.0"/>
+  <arg name="max_processing_ms" default="100.0"/>
+  <arg name="params_file"
+       default="$(find-pkg-share uav_navigation_bringup)/config/monocular.yaml"/>
+  <arg name="enable_autopilot_adapter" default="false"/>
+  <arg name="enable_gazebo_gui" default="true"/>
+  <arg name="enable_rviz" default="true"/>
+  <include file="$(find-pkg-share uav_navigation_bringup)/launch/sim.launch.xml">
+    <arg name="world_file" value="$(find-pkg-share ardupilot_gazebo)/worlds/iris_monocular_obstacle.sdf"/>
+    <arg name="params_file" value="$(var params_file)"/>
+    <arg name="enable_lidar_bridge" value="false"/>
+    <!-- Known-world global planner is not a monocular perception experiment. -->
+    <arg name="enable_global_planner" value="false"/>
+    <arg name="enable_autopilot_adapter" value="$(var enable_autopilot_adapter)"/>
+    <arg name="enable_gazebo_gui" value="$(var enable_gazebo_gui)"/>
+    <arg name="enable_rviz" value="$(var enable_rviz)"/>
+  </include>
+  <node pkg="ros_gz_bridge" exec="parameter_bridge" name="monocular_rgb_bridge"
+        output="screen"
+        args="/sensor_suite/rgb@sensor_msgs/msg/Image[gz.msgs.Image"/>
+  <node pkg="uav_navigation_ros" exec="monocular_depth_node"
+        name="monocular_depth_cpp" output="screen">
+    <param from="$(var params_file)"/>
+    <param name="model_path" value="$(var model_file)"/>
+    <param name="backend" value="$(var depth_backend)"/>
+    <param name="max_image_age_s" value="$(var max_image_age_s)" type="float"/>
+    <param name="max_inference_ms" value="$(var max_inference_ms)" type="float"/>
+    <param name="max_processing_ms" value="$(var max_processing_ms)" type="float"/>
+    <param name="use_sim_time" value="true"/>
+  </node>
+</launch>

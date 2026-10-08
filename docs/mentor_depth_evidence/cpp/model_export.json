@@ -1,0 +1,24 @@
+{
+  "model": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf",
+  "revision": "2fd93bd764b15eea94dcf7763bba7ddc25007d0f",
+  "opset": 17,
+  "input_shape": [
+    1,
+    3,
+    294,
+    518
+  ],
+  "camera_shape": [
+    640,
+    360
+  ],
+  "output_shape": [
+    1,
+    294,
+    518
+  ],
+  "positional_interpolation": "precomputed bicubic for fixed camera resolution",
+  "sha256": "1a7cb9d9c31d60afc9cbe96c6a401ac27c8cebcfce78cfc4ca1c2587691dc4a8",
+  "size_bytes": 98112627,
+  "torch": "2.14.0"
+}

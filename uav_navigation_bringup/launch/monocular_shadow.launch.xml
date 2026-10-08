@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Run alongside sim.launch.xml. LiDAR remains the planner input. -->
+  <arg name="model_file"/>
+  <arg name="depth_backend" default="cpu"/>
+  <arg name="max_image_age_s" default="0.25"/>
+  <arg name="max_inference_ms" default="100.0"/>
+  <arg name="max_processing_ms" default="100.0"/>
+  <node pkg="ros_gz_bridge" exec="parameter_bridge" name="monocular_rgb_bridge"
+        output="screen"
+        args="/sensor_suite/rgb@sensor_msgs/msg/Image[gz.msgs.Image"/>
+  <node pkg="uav_navigation_ros" exec="monocular_depth_node"
+        name="monocular_depth_cpp" output="screen">
+    <param name="model_path" value="$(var model_file)"/>
+    <param name="backend" value="$(var depth_backend)"/>
+    <param name="max_image_age_s" value="$(var max_image_age_s)" type="float"/>
+    <param name="max_inference_ms" value="$(var max_inference_ms)" type="float"/>
+    <param name="max_processing_ms" value="$(var max_processing_ms)" type="float"/>
+    <param name="cloud_topic" value="/perception/monocular_shadow"/>
+    <param name="use_sim_time" value="true"/>
+  </node>
+</launch>

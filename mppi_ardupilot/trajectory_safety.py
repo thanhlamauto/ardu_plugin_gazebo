@@ -63,6 +63,8 @@ def evaluate_trajectory_safety_batch(states, points, geometry, *,
             or delay < 0 or stopping_clearance < 0 or uncertainty < 0
             or sample_spacing <= 0 or cloud_map_tolerance < 0):
         raise ValueError('invalid trajectory safety parameters')
+    if not isinstance(chunk_size, int) or isinstance(chunk_size, bool) or chunk_size <= 0:
+        raise ValueError("chunk_size must be a positive integer")
     cloud_np = np.asarray(points, dtype=float).reshape(-1, 3)
     cloud_present = bool(len(cloud_np))
     map_cloud_expansion = 0.0

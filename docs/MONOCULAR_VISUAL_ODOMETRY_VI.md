@@ -1,0 +1,22 @@
+# Thay Gazebo odometry bằng pose ước lượng từ RGB + IMU
+
+IMU (Inertial Measurement Unit) là cảm biến quán tính gồm gia tốc kế và con quay hồi chuyển; ở đây đọc trực tiếp **orientation trong topic IMU của Gazebo**. IMU thực cần bộ lọc attitude và không cung cấp vị trí chính xác lâu dài; orientation mô phỏng này chưa chứng minh chất lượng của bộ lọc trên UAV thật. Pipeline thử nghiệm mới theo dõi các ô nền màu cyan trong ảnh RGB, kết hợp hướng IMU và kích thước cạnh ô đã khai báo **0,42 m** để hiệu chuẩn độ cao/tỷ lệ mét lúc đứng yên. Sau đó optical flow ước lượng chuyển động ngang; chính pose này được dùng để tam giác hóa vật cản và làm state cho MPPI.
+
+Perception ở chế độ `pose_source=visual-ground` subscribe `/sensor_suite/rgb` và `/sensor_suite/imu`, rồi publish `/perception/visual_odometry` cùng cloud `/perception/obstacles_camera`. MPPI được khởi động với `--odom-topic /perception/visual_odometry`. **Không module nào trong hai module này subscribe `/iris/odometry` ở chế độ visual-ground.** Runner vẫn subscribe `/iris/odometry` để xác nhận hover trước khi khởi tạo estimator, chấm điểm khoảng hở/vị trí thực và dừng thí nghiệm khi vượt giới hạn; dữ liệu pose đó không được chuyển vào perception hay MPPI. Đây là một phụ thuộc của harness thí nghiệm, chưa phải quy trình khởi tạo hoàn toàn chỉ từ cảm biến trên UAV. [Audit cách ly nguồn](../results/monocular_research/speed_expansion/visual_pose_high_speed_audit.json) đối chiếu command, source snapshot, frame log và ground truth. LiDAR/depth camera không được sử dụng.
+
+| Cấu hình / run | Kết quả | Vận tốc thực p95 / p99 (m/s) | Khoảng hở nhỏ nhất (m) | Lý do |
+|---|---|---:|---:|---|
+| Ô nền thưa, 0,5 m/s, `9a6f7a25` | TIMEOUT | 0,44 / 0,50 | 2,22 | Mất điểm nền tại x≈4,36 m; MPPI giữ lệnh dừng |
+| Ô nền dày, 0,5 m/s, `b8158ca7` | PLANNER_EXIT | 0,64 / 0,71 | 1,33 | MPPI báo tới đích theo pose ảnh, sai số đích thực 0,552 m >0,5 m |
+| Tính lại độ cao mỗi ảnh, 0,5 m/s, `e94a7532` | TIMEOUT | 0,49 / 0,51 | 2,05 | Ước lượng độ cao dao động khi ô nền bị che, pose mất bám |
+| Hiệu chuẩn độ cao một lần, 0,5 m/s, `c07b7207` | **GOAL_REACHED** | 0,64 / 0,71 | 1,26 | Sai số đích thực 0,494 m; một seed, pose error p95 vẫn 1,05 m |
+| Visual odom, mức đặt 5 m/s, `0370575b` | TIMEOUT | 0,16 / 3,10 | 1,85 | Ô nền lặp gây ghép nhầm, pose nhảy ngược rồi mất bám |
+| Visual odom, mức đặt 10 m/s, `0370575b` | TIMEOUT | 0,55 / 2,56 | 1,82 | Mất bám; không đạt tốc độ đặt |
+| Dự đoán feature + kiểm tra vận tốc, mức đặt 5 m/s, `34137184` | SETUP_FAILED | — | 7,22 trong warmup | Cloud chỉ còn 3 điểm, dưới ngưỡng 12; từ chối an toàn trước planner |
+| Dự đoán feature + kiểm tra vận tốc, mức đặt 10 m/s, `34137184` | TIMEOUT | 0,16 / 1,51 | 3,30 | Pose mất bám, MPPI giữ lệnh dừng |
+
+Mỗi run là một node OpenResearch với source commit riêng, không thay source trong khi chạy. Bốn node chính: pilot `7787f7b` (`9a6f7a25...`), ô nền dày `643e267` (`b8158ca7...`), hiệu chuẩn động `ef04bab` (`e94a7532...`), hiệu chuẩn cố định `3ce7a48` (`c07b7207...`), tốc độ cao `cf4ff01` (`0370575b...`), kiểm tra chuyển động `38092d7` (`34137184...`). Tất cả outcome, kể cả setup failure, nằm trong [thư mục audit](../results/monocular_research/visual_odometry/); raw log và source snapshot ở `/Volumes/Extreme SSD/uav_monocular_research_live/<run-id>/artifacts/speed_screening/` khi SSD được mount.
+
+**Kết luận giới hạn:** pose từ ảnh đã thay Gazebo odometry trong perception và MPPI và đã bay tới đích một lượt 0,5 m/s. Ở mức đặt 5/10 m/s, chưa lượt nào hoàn thành; các con số 5/10 m/s trước đây dùng Gazebo odometry **không được chuyển thành bằng chứng cho pipeline mới**. Nền có ô vuông 0,42 m là mốc nhân tạo đã biết kích thước, không đại diện mọi môi trường thật. Sai số pose và sự mất bám còn quá lớn để chứng nhận tránh vật cản ở tốc độ cao.
+
+ArduPilot SITL vẫn dùng các cảm biến điều hướng nội bộ mô phỏng để ổn định và bám lệnh GUIDED; thí nghiệm này **chưa loại GPS/nguồn state trong autopilot**. Vì vậy chỉ khẳng định đã ngắt pose Gazebo khỏi **perception và MPPI**, đúng phạm vi thay đổi được audit, chưa khẳng định cả UAV vận hành bằng RGB+IMU duy nhất. Theo [tài liệu ExternalNav chính thức của ArduPilot](https://ardupilot.org/dev/docs/mavlink-nongps-position-estimation.html), bài thử không GPS ở cấp autopilot cần cấp MAVLink `ODOMETRY` ít nhất 4 Hz, chọn EKF3 ExternalNav và thiết lập EKF origin. Pose ảnh hiện mất bám ở 5/10 m/s, nên chưa đưa nó vào EKF; phải kiểm chứng lại arming, hover và failsafe trong node thí nghiệm riêng trước khi chạy tránh vật cản.

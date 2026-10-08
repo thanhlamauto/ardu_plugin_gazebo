@@ -46,6 +46,25 @@ conditioner, deadline, visualization and adapter parameters. The
 `local_navigation_node` publishes MPPI paths and cost markers itself on a
 separate 5 Hz timer, outside the 10 Hz control callback.
 
+For the experimental RGB-only C++ runtime, first export the pinned Depth
+Anything ONNX model on a development machine as described in
+[`docs/JETSON_CPP_RUNTIME_VI.md`](../docs/JETSON_CPP_RUNTIME_VI.md), then run:
+
+```bash
+ros2 launch uav_navigation_bringup monocular_sim.launch.xml \
+  model_file:=/path/to/depth_anything_v2_metric_outdoor_small_294x518_fixedpos.onnx \
+  depth_backend:=cpu enable_gazebo_gui:=false enable_rviz:=false
+```
+
+The RGB bridge, depth inference, MPPI, safety checker, and autopilot adapter
+in this launch are C++; `monocular_shadow.launch.xml` is C++ as well. The
+model exporter and evaluation scripts remain offboard. The default 100 ms
+depth deadline rejects late CPU results, and autonomous flight is not
+validated by this launch.
+The monocular planner profile also requires at least 12 finite cloud points
+and checks the source timestamp; insufficient or replayed clouds hold the
+planner before sampling.
+
 M7 performance validation uses the frozen `config/m7_baseline.yaml`, which
 disables trajectory visualization and sets the 10 Hz deadline to 100 ms. The
 scenario runner, metrics and fault variants are documented in

@@ -9,6 +9,7 @@ add_library(${PROJECT_NAME} SHARED
   src/astar_planner.cpp
   src/command_conditioner.cpp
   src/cost_grid.cpp
+  src/metric_depth.cpp
   src/mppi/cost_evaluator.cpp
   src/mppi/dynamics.cpp
   src/mppi/optimizer.cpp
@@ -49,6 +50,13 @@ if(BUILD_TESTING)
   add_executable(test_stabilization test/test_stabilization.cpp)
   target_link_libraries(test_stabilization PRIVATE ${PROJECT_NAME})
   add_test(NAME stabilization_tests COMMAND test_stabilization)
+
+  add_executable(test_metric_depth test/test_metric_depth.cpp)
+  target_link_libraries(test_metric_depth PRIVATE ${PROJECT_NAME})
+  add_test(NAME metric_depth_tests COMMAND test_metric_depth)
+
+  add_executable(metric_depth_preprocess_probe test/metric_depth_preprocess_probe.cpp)
+  target_link_libraries(metric_depth_preprocess_probe PRIVATE ${PROJECT_NAME})
 
   add_executable(test_mppi_dynamics test/test_mppi_dynamics.cpp)
   target_link_libraries(test_mppi_dynamics PRIVATE ${PROJECT_NAME})

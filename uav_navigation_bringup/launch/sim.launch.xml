@@ -13,6 +13,7 @@
   <arg name="enable_gazebo" default="true"/>
   <arg name="enable_gazebo_gui" default="true"/>
   <arg name="enable_bridge" default="true"/>
+  <arg name="enable_lidar_bridge" default="true"/>
   <arg name="enable_global_planner" default="true"/>
   <arg name="enable_local_navigation" default="true"/>
   <arg name="enable_autopilot_adapter" default="false"/>
@@ -48,11 +49,13 @@
   <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
         name="tf_bridge" output="screen"
         args="/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"/>
+  <group if="$(var enable_lidar_bridge)">
   <node if="$(var enable_bridge)" pkg="ros_gz_bridge" exec="parameter_bridge"
         name="obstacle_bridge" output="screen"
         args="/sensor_suite/lidar/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked">
     <remap from="/sensor_suite/lidar/points" to="/perception/obstacles"/>
   </node>
+  </group>
 
   <node if="$(var enable_bridge)" pkg="robot_state_publisher"
         exec="robot_state_publisher" name="robot_state_publisher" output="screen"

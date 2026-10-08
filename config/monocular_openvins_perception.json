@@ -1,0 +1,8 @@
+{
+  "backend": "geometry",
+  "pose_source": "openvins",
+  "initial_height_m": 3.0,
+  "max_hz": 10,
+  "map_lifetime": 60,
+  "save_every": 25
+}

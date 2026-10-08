@@ -1,0 +1,24 @@
+{
+  "boxes": [
+    {
+      "name": "obstacle_0",
+      "center": [
+        8,
+        1,
+        3
+      ],
+      "size": [
+        2,
+        3,
+        6
+      ],
+      "yaw": 0
+    }
+  ],
+  "goal": [
+    14,
+    4,
+    3
+  ],
+  "world": "worlds/iris_monocular_suite_diagonal.sdf"
+}

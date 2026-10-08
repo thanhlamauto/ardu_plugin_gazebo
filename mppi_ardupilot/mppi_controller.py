@@ -64,6 +64,8 @@ class MPPIConfig:
     response_accel_xy: float = 3.0
     response_jerk_xy: float = 5.0
     reference_lateral_accel_m_s2: float = 0.6
+    safety_chunk_size: int = 256  # bounded temporary working set; same safety predicate
+    camera_primitives: bool = False  # opt-in goal-relative angular/L-shaped proposals
     proactive_proposals: bool = False  # sample braking/turning before rejection
     reference_warm_start: bool = False  # opt-in proposal initialization/tail
     brake_swept_path: bool = False  # opt-in stopping-segment cloud geometry
@@ -260,6 +262,7 @@ class QuadMPPI:
         return evaluate_trajectory_safety_batch(
             states, [] if self.obstacles is None else self.obstacles.detach().cpu().numpy(),
             self.known_geometry, torch_module=self.torch, detailed=detailed,
+            chunk_size=self.cfg.safety_chunk_size,
             **self._trajectory_safety_parameters)
 
     def _evaluate_latest_sample_safety(self):
@@ -273,9 +276,15 @@ class QuadMPPI:
     def recovery_proposals(self):
         """Explicit alternatives in the MPPI sample pool; reference/cost unchanged."""
         torch = self.torch
-        if not self.cfg.proactive_proposals and not getattr(self, '_rejection_recovery', False):
+        if not self.cfg.camera_primitives and not self.cfg.proactive_proposals and not getattr(self, '_rejection_recovery', False):
             return torch.zeros((0, self.cfg.horizon, self.NU), dtype=torch.double, device=self.goal.device)
         proposals = [np.zeros((self.cfg.horizon, self.NU))]
+        if self.cfg.camera_primitives:
+            from .camera_motion_primitives import camera_motion_primitives
+            state=getattr(self,'_last_state_np',np.zeros(11))
+            goal=self.goal.detach().cpu().numpy()
+            proposals.extend(camera_motion_primitives(state[:3],float(state[6]),goal,
+                self.cfg.horizon,self.cfg.dt,self.cfg.vmax,self.cfg.yaw_rate_max))
         if self.reference_path is not None:
             for speed in (.5, 1., 2., 4.):
                 progress = self._path_progress_m + np.arange(self.cfg.horizon+1)*speed*self.cfg.dt
