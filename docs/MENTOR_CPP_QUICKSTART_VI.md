@@ -65,6 +65,8 @@ RoboStack**, chưa kiểm thử Humble. ROS 2 Humble không liệt kê macOS arm
 [nền tảng hỗ trợ chính thức](https://github.com/ros-infrastructure/rep/blob/master/rep-2000.rst);
 RoboStack có bản Humble cộng đồng cho macOS, nhưng cần xác nhận đủ MAVROS,
 `ros_gz_bridge` và Gazebo Harmonic trước khi chạy toàn bộ launch. Để tái lập
-đúng môi trường của mentor, dùng Ubuntu 22.04 (máy Linux hoặc VM trên Mac),
-với cặp Humble + Harmonic ở trên. Bản build Jazzy trên Mac không chứng minh
-stack Humble đã chạy.
+đúng môi trường của mentor, ưu tiên Ubuntu 22.04 x86_64 trên máy Linux với cặp
+Humble + Harmonic ở trên. VM Ubuntu 22.04 arm64 trên Mac có thể dùng để thử
+Humble, nhưng Gazebo trên arm64 chỉ được hỗ trợ best-effort
+([nền tảng Gazebo](https://gazebosim.org/docs/harmonic/install/)). Bản build
+Jazzy trên Mac không chứng minh stack Humble đã chạy.
