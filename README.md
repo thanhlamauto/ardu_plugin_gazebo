@@ -48,7 +48,7 @@ ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV
 [Cách build, xuất model và kết quả đối chiếu Python–C++](docs/JETSON_CPP_RUNTIME_VI.md)
 được ghi riêng. Phép đo trên Mac cho thấy OpenCV DNN CPU vẫn quá chậm để
 theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Nano chưa được kiểm tra.
-[Hướng dẫn chạy C++ ngắn cho mentor](docs/MENTOR_CPP_QUICKSTART_VI.md).
+[Hướng dẫn chạy C++ ngắn cho mentor (ROS 2 Humble)](docs/MENTOR_CPP_QUICKSTART_VI.md).
 
 **Code C++ ở đâu?**
 
@@ -496,6 +496,8 @@ Chi tiết số liệu và lập luận:
 
 ## ROS 2 architecture workflow
 
+Phần này ghi lại workflow đã dùng với ROS 2 Jazzy. Nếu chạy môi trường ROS 2
+Humble của mentor, xem [hướng dẫn C++ riêng](docs/MENTOR_CPP_QUICKSTART_VI.md).
 Trên Ubuntu ROS 2 Jazzy, build cả package Gazebo gốc và ba package navigation
 (ba package navigation nằm lồng trong repo nên cần liệt kê `--base-paths`):
 

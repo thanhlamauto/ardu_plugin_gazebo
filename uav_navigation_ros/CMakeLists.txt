@@ -70,13 +70,14 @@ ament_target_dependencies(autopilot_adapter_node
 set_target_properties(autopilot_adapter_node PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # RoboStack's macOS message libraries are Python extension modules with
-# dynamic Python symbols. Native Ubuntu ROS 2 does not need this workaround.
+# dynamic Python symbols. Match the Python ABI provided by the active ROS
+# environment (Jazzy and Humble may use different Python versions).
 if(APPLE)
-  find_library(ROS_PYTHON_RUNTIME NAMES python3.12 PATH_SUFFIXES lib REQUIRED)
-  target_link_libraries(global_planner_node ${ROS_PYTHON_RUNTIME})
-  target_link_libraries(local_navigation_node ${ROS_PYTHON_RUNTIME})
-  target_link_libraries(monocular_depth_node ${ROS_PYTHON_RUNTIME})
-  target_link_libraries(autopilot_adapter_node ${ROS_PYTHON_RUNTIME})
+  find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+  target_link_libraries(global_planner_node Python3::Python)
+  target_link_libraries(local_navigation_node Python3::Python)
+  target_link_libraries(monocular_depth_node Python3::Python)
+  target_link_libraries(autopilot_adapter_node Python3::Python)
 endif()
 
 if(BUILD_TESTING)

@@ -1,12 +1,16 @@
 # Chạy nhánh C++ monocular
 
-Trên máy phát triển Ubuntu có ROS 2 Jazzy, Gazebo Harmonic, `ros_gz_bridge`,
-MAVROS và OpenCV DNN. Chạy từ gốc repo. Đây là smoke test **RGB → depth C++ →
+Trên Ubuntu 22.04 có ROS 2 Humble, Gazebo Harmonic, `ros_gz_bridge`, MAVROS
+và OpenCV DNN. Humble mặc định đi với Gazebo Fortress, nhưng plugin trong repo
+cần Harmonic (`gz-sim8`). Cài Harmonic từ OSRF cùng gói
+`ros-humble-ros-gzharmonic`; tránh trộn với bộ `ros-humble-ros-gz*` mặc định
+cho Fortress ([hướng dẫn Gazebo](https://gazebosim.org/docs/garden/ros_installation/)).
+Chạy từ gốc repo. Đây là smoke test **RGB → depth C++ →
 cloud** và khởi động MPPI C++; launch monocular tắt LiDAR và adapter, không
 tạo global path nên chưa phải closed-loop tránh vật cản.
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 colcon build --base-paths . uav_navigation_core uav_navigation_ros uav_navigation_bringup \
   --merge-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 source install/setup.bash
@@ -37,7 +41,7 @@ ros2 launch uav_navigation_bringup monocular_sim.launch.xml \
 Ở terminal khác:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 topic echo /perception/monocular_depth/diagnostics --once
 ros2 topic hz /perception/obstacles_camera
@@ -55,3 +59,12 @@ Mã: [MPPI core](../uav_navigation_core/src/mppi/),
 [node RGB](../uav_navigation_ros/src/monocular_depth_node.cpp),
 [planner ROS](../uav_navigation_ros/src/local_navigation_node.cpp).
 [Kết quả và giới hạn hiện tại](JETSON_CPP_RUNTIME_VI.md).
+
+Trên Mac Apple Silicon, đã build/smoke test nhánh này với ROS 2 **Jazzy qua
+RoboStack**, chưa kiểm thử Humble. ROS 2 Humble không liệt kê macOS arm64 trong
+[nền tảng hỗ trợ chính thức](https://github.com/ros-infrastructure/rep/blob/master/rep-2000.rst);
+RoboStack có bản Humble cộng đồng cho macOS, nhưng cần xác nhận đủ MAVROS,
+`ros_gz_bridge` và Gazebo Harmonic trước khi chạy toàn bộ launch. Để tái lập
+đúng môi trường của mentor, dùng Ubuntu 22.04 (máy Linux hoặc VM trên Mac),
+với cặp Humble + Harmonic ở trên. Bản build Jazzy trên Mac không chứng minh
+stack Humble đã chạy.
