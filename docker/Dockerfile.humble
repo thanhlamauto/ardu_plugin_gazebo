@@ -1,0 +1,66 @@
+# ROS 2 Humble C++ runtime; no Gazebo, SITL, CUDA or model weights in the image.
+# Ubuntu 22.04's OpenCV 4.5 cannot import this opset-17 depth model
+# (LayerNormalization); build the OpenCV 5 CPU backend used by the Mac probe.
+ARG ROS_IMAGE=ros:humble-ros-base-jammy
+FROM ${ROS_IMAGE} AS opencv-build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+ARG OPENCV_VERSION=5.0.0
+ARG OPENCV_BUILD_JOBS=2
+RUN curl -fsSL "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" \
+      -o /tmp/opencv.tar.gz && \
+    tar -xzf /tmp/opencv.tar.gz -C /tmp && rm /tmp/opencv.tar.gz && \
+    cmake -S "/tmp/opencv-${OPENCV_VERSION}" -B /tmp/opencv-build \
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/opencv \
+      -DBUILD_LIST=core,imgproc,dnn -DBUILD_SHARED_LIBS=ON \
+      -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF \
+      -DBUILD_JAVA=OFF -DBUILD_opencv_apps=OFF -DBUILD_PROTOBUF=ON \
+      -DWITH_ONNXRUNTIME=OFF -DWITH_CUDA=OFF -DWITH_OPENCL=OFF \
+      -DWITH_IPP=OFF -DWITH_TBB=OFF -DWITH_LAPACK=OFF \
+      -DWITH_KLEIDICV=OFF -DWITH_FLATBUFFERS=OFF && \
+    cmake --build /tmp/opencv-build -j "${OPENCV_BUILD_JOBS}" && \
+    cmake --install /tmp/opencv-build
+
+FROM ${ROS_IMAGE} AS build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake python3-colcon-common-extensions libtinyxml2-dev \
+    ros-humble-rclcpp ros-humble-geometry-msgs ros-humble-nav-msgs \
+    ros-humble-sensor-msgs ros-humble-visualization-msgs \
+    ros-humble-diagnostic-msgs ros-humble-mavros-msgs \
+    ros-humble-tf2-ros ros-humble-tinyxml2-vendor \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=opencv-build /opt/opencv/ /opt/opencv/
+ENV LD_LIBRARY_PATH=/opt/opencv/lib
+WORKDIR /ws
+COPY uav_navigation_core/ src/uav_navigation_core/
+COPY uav_navigation_ros/ src/uav_navigation_ros/
+RUN source /opt/ros/humble/setup.bash && \
+    colcon build --base-paths src/uav_navigation_core src/uav_navigation_ros \
+      --packages-select uav_navigation_core uav_navigation_ros \
+      --merge-install --parallel-workers 2 \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+        -DOpenCV_DIR=/opt/opencv/lib/cmake/opencv5
+
+FROM ${ROS_IMAGE} AS runtime
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libtinyxml2-9 \
+    ros-humble-rclcpp ros-humble-geometry-msgs ros-humble-nav-msgs \
+    ros-humble-sensor-msgs ros-humble-visualization-msgs \
+    ros-humble-diagnostic-msgs ros-humble-mavros-msgs \
+    ros-humble-tf2-ros ros-humble-ros2launch ros-humble-launch-xml \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=opencv-build /opt/opencv/ /opt/opencv/
+COPY --from=build /ws/install/ /ws/install/
+COPY uav_navigation_bringup/config/monocular.yaml /opt/uav/monocular.yaml
+COPY docker/ros_entrypoint.sh /opt/uav/ros_entrypoint.sh
+ENV UAV_DEPTH_ONNX=/models/depth.onnx
+ENV LD_LIBRARY_PATH=/opt/opencv/lib
+ENTRYPOINT ["/opt/uav/ros_entrypoint.sh"]
+CMD ["bash"]

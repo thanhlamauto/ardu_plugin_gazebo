@@ -1,0 +1,10 @@
+*
+!docker/
+!docker/**
+!uav_navigation_core/
+!uav_navigation_core/**
+!uav_navigation_ros/
+!uav_navigation_ros/**
+!uav_navigation_bringup/
+!uav_navigation_bringup/config/
+!uav_navigation_bringup/config/monocular.yaml

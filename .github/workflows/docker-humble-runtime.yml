@@ -1,0 +1,18 @@
+name: docker-humble-runtime
+
+on: workflow_dispatch
+
+jobs:
+  arm64-build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ROS 2 Humble ARM64 image
+        run: docker build --platform linux/arm64 -f docker/Dockerfile.humble -t uav-monocular:humble .
+      - name: Check C++ executables
+        run: docker run --rm uav-monocular:humble ros2 pkg executables uav_navigation_ros
+      - name: Parse runtime launch
+        run: >-
+          docker run --rm uav-monocular:humble
+          ros2 launch uav_navigation_ros monocular_runtime.launch.xml --show-args

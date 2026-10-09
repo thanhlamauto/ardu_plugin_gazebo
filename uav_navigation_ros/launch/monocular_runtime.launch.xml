@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="model_file"/>
+  <arg name="params_file"/>
+  <arg name="depth_backend" default="cpu"/>
+  <arg name="enable_local_navigation" default="true"/>
+
+  <node pkg="uav_navigation_ros" exec="monocular_depth_node"
+        name="monocular_depth_cpp" output="screen">
+    <param from="$(var params_file)"/>
+    <param name="model_path" value="$(var model_file)"/>
+    <param name="backend" value="$(var depth_backend)"/>
+    <param name="use_sim_time" value="false"/>
+  </node>
+
+  <node if="$(var enable_local_navigation)" pkg="uav_navigation_ros"
+        exec="local_navigation_node" name="local_navigation" output="screen">
+    <param from="$(var params_file)"/>
+    <param name="use_sim_time" value="false"/>
+  </node>
+</launch>

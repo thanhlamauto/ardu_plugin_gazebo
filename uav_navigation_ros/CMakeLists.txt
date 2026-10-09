@@ -80,12 +80,12 @@ if(APPLE)
   target_link_libraries(autopilot_adapter_node Python3::Python)
 endif()
 
-if(BUILD_TESTING)
-  add_executable(depth_anything_onnx_probe test/depth_anything_onnx_probe.cpp)
-  target_link_libraries(depth_anything_onnx_probe depth_anything_onnx)
-  set_target_properties(depth_anything_onnx_probe PROPERTIES
-    BUILD_RPATH_USE_ORIGIN TRUE INSTALL_RPATH_USE_LINK_PATH TRUE)
+add_executable(depth_anything_onnx_probe test/depth_anything_onnx_probe.cpp)
+target_link_libraries(depth_anything_onnx_probe depth_anything_onnx)
+set_target_properties(depth_anything_onnx_probe PROPERTIES
+  BUILD_RPATH_USE_ORIGIN TRUE INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+if(BUILD_TESTING)
   add_executable(test_sdf_static_map_loader test/test_sdf_static_map_loader.cpp)
   target_link_libraries(test_sdf_static_map_loader PRIVATE sdf_static_map_loader)
   if(APPLE)
@@ -103,8 +103,10 @@ if(BUILD_TESTING)
 endif()
 
 install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(TARGETS sdf_static_map_loader autopilot_adapter_logic depth_anything_onnx
   global_planner_node local_navigation_node monocular_depth_node autopilot_adapter_node
+  depth_anything_onnx_probe
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})

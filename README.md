@@ -49,6 +49,7 @@ ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV
 được ghi riêng. Phép đo trên Mac cho thấy OpenCV DNN CPU vẫn quá chậm để
 theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Nano chưa được kiểm tra.
 [Hướng dẫn chạy C++ ngắn cho mentor (ROS 2 Humble)](docs/MENTOR_CPP_QUICKSTART_VI.md).
+[Image Docker Humble C++ cho Mac/Jetson ARM64](docs/MENTOR_DOCKER_HUMBLE_VI.md).
 
 **Code C++ ở đâu?**
 

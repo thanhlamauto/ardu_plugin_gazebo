@@ -1,5 +1,9 @@
 # Chạy nhánh C++ monocular
 
+Nếu host không cài ROS 2 Humble, dùng
+[Docker runtime C++](MENTOR_DOCKER_HUMBLE_VI.md) trước. Docker runtime không
+đóng gói Gazebo/SITL.
+
 Trên Ubuntu 22.04 có ROS 2 Humble, Gazebo Harmonic, `ros_gz_bridge`, MAVROS
 và OpenCV DNN. Humble mặc định đi với Gazebo Fortress, nhưng plugin trong repo
 cần Harmonic (`gz-sim8`). Cài Harmonic từ OSRF cùng gói
