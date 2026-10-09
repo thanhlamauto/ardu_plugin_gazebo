@@ -59,6 +59,7 @@ closed-loop; xem
 [Image Docker Humble C++ cho Mac/Jetson ARM64](docs/MENTOR_DOCKER_HUMBLE_VI.md).
 [Chạy Docker perception trên Jetson Orin Nano R36.5.2](docs/JETSON_ORIN_NANO_DOCKER_VI.md).
 [Demo video depth MPS trên Mac: `bash scripts/demo_mps_depth_mac.sh` (kèm đối chiếu C++)](docs/MENTOR_PRE_JETSON_DEMO_VI.md).
+[Depth Anything + MPPI với dữ liệu Gazebo: hai lượt closed-loop và bài thử C++ trong Docker trên Orin](docs/DEPTH_MPPI_GAZEBO_INTEGRATION_VI.md).
 
 **Code C++ ở đâu?**
 

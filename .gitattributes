@@ -1,0 +1,2 @@
+artifacts/orin_depth_mppi_samples/*.f32 binary
+artifacts/orin_depth_mppi_samples/*.rgb binary

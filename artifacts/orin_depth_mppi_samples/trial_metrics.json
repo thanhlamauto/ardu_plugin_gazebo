@@ -1,0 +1,191 @@
+{
+  "depth_mppi_gazebo_20261009_seed7": {
+    "status": "TIMEOUT",
+    "lidar_topic_messages": 0,
+    "gt_lidar_messages": 0,
+    "depth_topic_messages": 0,
+    "camera_cloud_messages": 402,
+    "min_obstacle_points": 0,
+    "camera_cloud_last_points": 3600,
+    "min_box_center_clearance_m": 6.9884224690559185,
+    "collision_proxy": false,
+    "eval_box_center": [
+      8,
+      0,
+      3
+    ],
+    "eval_box_size": [
+      2,
+      3,
+      6
+    ],
+    "eval_boxes": [
+      {
+        "center": [
+          8,
+          0,
+          3
+        ],
+        "size": [
+          2,
+          3,
+          6
+        ]
+      }
+    ],
+    "goal_enu": [
+      12.0,
+      0.0,
+      3.0
+    ],
+    "seed": 7,
+    "parameters_readback": {
+      "OA_TYPE": 0.0,
+      "AVOID_ENABLE": 0.0,
+      "PRX1_TYPE": 0.0
+    },
+    "camera_cloud_points_at_planner_start": 3600,
+    "start_position_enu": [
+      -0.03169520273351509,
+      0.009371626503849062,
+      3.1936885219755755
+    ],
+    "planner_start_wall_s": 605748.417594583,
+    "last_position_enu": [
+      -2.5766199718097513,
+      -3.2080317235057536,
+      3.1273396611718054
+    ],
+    "end_wall_s": 605768.443269791,
+    "planner_events": {
+      "command": 190
+    },
+    "planner_cycles": 190,
+    "cycle_deadline_misses": 0,
+    "perception_frames": 403,
+    "published_frames": 402,
+    "all_receive_to_publish_ms": {
+      "p50": 66.04824995156378,
+      "p95": 71.48567095864564,
+      "p99": 86.35991592658695
+    },
+    "during_control_receive_to_publish_ms": {
+      "p50": 65.82345848437399,
+      "p95": 71.90444754087366,
+      "p99": 80.54995659040301
+    },
+    "control_sim_duration_s": 19.550000000000004,
+    "control_wall_duration_s": 19.965376334032044,
+    "max_forward_x_m": 0.01157753094408144,
+    "altitude_min_max_m": [
+      2.8404575437945314,
+      3.5102509716056858
+    ],
+    "final_goal_distance_m": 14.926001900404863,
+    "horizontal_speed_m_s": {
+      "p50": 0.4850973872014505,
+      "p95": 0.7457013676161413,
+      "p99": 0.868652946564078
+    },
+    "path_length_m": 8.922064125219578,
+    "max_gt_gap_sim_s": 0.034000000000006025,
+    "dense_trace_min_center_clearance_m": 6.9884224690559185,
+    "dense_trace_collision_proxy": false,
+    "ground_truth_control_samples": 576
+  },
+  "depth_mppi_textured_20261009_seed11": {
+    "status": "TIMEOUT",
+    "lidar_topic_messages": 0,
+    "gt_lidar_messages": 0,
+    "depth_topic_messages": 0,
+    "camera_cloud_messages": 371,
+    "min_obstacle_points": 0,
+    "camera_cloud_last_points": 3600,
+    "min_box_center_clearance_m": 3.776010768708505,
+    "collision_proxy": false,
+    "eval_box_center": [
+      8,
+      0,
+      3
+    ],
+    "eval_box_size": [
+      2,
+      3,
+      6
+    ],
+    "eval_boxes": [
+      {
+        "center": [
+          8,
+          0,
+          3
+        ],
+        "size": [
+          2,
+          3,
+          6
+        ]
+      }
+    ],
+    "goal_enu": [
+      12.0,
+      0.0,
+      3.0
+    ],
+    "seed": 11,
+    "parameters_readback": {
+      "OA_TYPE": 0.0,
+      "AVOID_ENABLE": 0.0,
+      "PRX1_TYPE": 0.0
+    },
+    "camera_cloud_points_at_planner_start": 3600,
+    "start_position_enu": [
+      -0.03248205241227818,
+      0.01035221007459122,
+      3.1946846738992853
+    ],
+    "planner_start_wall_s": 605839.897344416,
+    "last_position_enu": [
+      3.223989231291495,
+      0.4424661879423477,
+      3.2514417508052182
+    ],
+    "end_wall_s": 605860.304740708,
+    "planner_events": {
+      "hold-timeout": 1,
+      "command": 130
+    },
+    "planner_cycles": 131,
+    "cycle_deadline_misses": 2,
+    "perception_frames": 371,
+    "published_frames": 371,
+    "all_receive_to_publish_ms": {
+      "p50": 68.13141598831862,
+      "p95": 113.74322947813198,
+      "p99": 146.12991686444732
+    },
+    "during_control_receive_to_publish_ms": {
+      "p50": 67.21477099927142,
+      "p95": 110.86155003868039,
+      "p99": 136.13796484773053
+    },
+    "control_sim_duration_s": 19.821999999999996,
+    "control_wall_duration_s": 20.373227249947377,
+    "max_forward_x_m": 3.223989231291495,
+    "altitude_min_max_m": [
+      3.184312166443098,
+      3.429649700916759
+    ],
+    "final_goal_distance_m": 8.79075447808707,
+    "horizontal_speed_m_s": {
+      "p50": 0.14233856043974008,
+      "p95": 0.4654474994157346,
+      "p99": 0.6027404493837185
+    },
+    "path_length_m": 3.595940728766847,
+    "max_gt_gap_sim_s": 0.034000000000006025,
+    "dense_trace_min_center_clearance_m": 3.776010768708505,
+    "dense_trace_collision_proxy": false,
+    "ground_truth_control_samples": 584
+  }
+}

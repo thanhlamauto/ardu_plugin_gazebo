@@ -1,0 +1,26 @@
+[
+  {
+    "trial": "depth_mppi_gazebo_20261009_seed7",
+    "frame": 205,
+    "sim_s": 21.8,
+    "position_enu": [
+      -0.03896962929036893,
+      0.010803199432300235,
+      3.2008962169446837
+    ],
+    "mps_center_m": 3.178311347961426,
+    "nominal_box_front_along_x_m": 7.038969629290369
+  },
+  {
+    "trial": "depth_mppi_textured_20261009_seed11",
+    "frame": 190,
+    "sim_s": 21.7,
+    "position_enu": [
+      -0.03971811772869166,
+      0.011713561018214733,
+      3.202313787807745
+    ],
+    "mps_center_m": 5.016758918762207,
+    "nominal_box_front_along_x_m": 7.039718117728691
+  }
+]

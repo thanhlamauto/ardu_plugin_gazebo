@@ -1,0 +1,2 @@
+scene=0 frames_sent=80 clouds=68 depth_ok=68 depth_warn=0 planner_diagnostics=87 planner_active=80 commands=80 obstacle_points_last=720 publish_p50_ms=100.068 publish_p95_ms=100.663 mode_ACTIVE=80 mode_HOLD_STALE=1 mode_WAITING_FOR_OBSTACLES=1 mode_WAITING_FOR_STATE=5
+scene=1 frames_sent=80 clouds=75 depth_ok=75 depth_warn=0 planner_diagnostics=87 planner_active=81 commands=81 obstacle_points_last=720 publish_p50_ms=99.9723 publish_p95_ms=100.756 mode_ACTIVE=81 mode_HOLD_STALE=6

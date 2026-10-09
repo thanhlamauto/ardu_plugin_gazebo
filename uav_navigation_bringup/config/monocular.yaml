@@ -81,6 +81,9 @@ local_navigation:
     safety.stopping_delay_s: 0.25
     safety.stopping_uncertainty_m: 0.0
     conditioner.alpha: 0.3
+    stabilization.speed_shaping.nominal_speed_m_s: 1.0
+    stabilization.speed_shaping.turn_speed_m_s: 1.0
+    stabilization.speed_shaping.min_speed_m_s: 0.5
     visualization.enabled: true
     visualization.publish_rate_hz: 5.0
     visualization.max_mppi_samples: 80

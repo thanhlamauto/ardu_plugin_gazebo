@@ -118,6 +118,14 @@ target_compile_features(rgb_depth_ros_replay PRIVATE cxx_std_17)
 ament_target_dependencies(rgb_depth_ros_replay
   rclcpp sensor_msgs diagnostic_msgs)
 
+add_executable(rgb_depth_mppi_shadow test/rgb_depth_mppi_shadow.cpp)
+target_compile_features(rgb_depth_mppi_shadow PRIVATE cxx_std_17)
+ament_target_dependencies(rgb_depth_mppi_shadow
+  rclcpp geometry_msgs nav_msgs sensor_msgs diagnostic_msgs tf2_ros)
+if(APPLE)
+  target_link_libraries(rgb_depth_mppi_shadow Python3::Python)
+endif()
+
 if(BUILD_TESTING)
   add_executable(test_sdf_static_map_loader test/test_sdf_static_map_loader.cpp)
   target_link_libraries(test_sdf_static_map_loader PRIVATE sdf_static_map_loader)
@@ -141,6 +149,7 @@ install(TARGETS sdf_static_map_loader autopilot_adapter_logic depth_anything_onn
   ${depth_optional_targets}
   global_planner_node local_navigation_node monocular_depth_node autopilot_adapter_node
   depth_anything_onnx_probe depth_anything_onnx_stream rgb_depth_ros_replay
+  rgb_depth_mppi_shadow
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
