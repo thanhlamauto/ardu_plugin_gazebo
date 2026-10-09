@@ -10,7 +10,7 @@ runtime khởi động depth và, nếu bật, MPPI; **không tự arm hoặc đ
 Từ gốc repo, build image đúng kiến trúc máy chạy:
 
 ```bash
-# Mac Apple Silicon / Jetson Nano: ARM64; máy Ubuntu x86_64: linux/amd64.
+# Mac Apple Silicon / Jetson Orin Nano: ARM64; máy Ubuntu x86_64: linux/amd64.
 docker build --platform linux/arm64 -f docker/Dockerfile.humble \
   -t uav-monocular:humble .
 docker run --rm uav-monocular:humble ros2 pkg executables uav_navigation_ros
@@ -58,12 +58,14 @@ Jetson; trên Jetson nạp image bằng:
 gunzip -c uav-monocular-humble-arm64.tar.gz | docker load
 ```
 
-Chuyển riêng file ONNX sang Jetson và mount như lệnh trên. Chạy CPU trước và đo
-latency/CPU trên Nano. CUDA/TensorRT
+Chuyển riêng file ONNX sang Jetson và mount như lệnh trên. Với Orin Nano
+R36.5.2, dùng [runner riêng](JETSON_ORIN_NANO_DOCKER_VI.md) để kiểm tra image
+và chạy perception trong container chỉ đọc. Chạy CPU trước và đo
+latency/CPU trên Orin. CUDA/TensorRT
 trong container phụ thuộc JetPack, driver host và bản OpenCV được build với
 CUDA; image này biên dịch OpenCV 5 **CPU**. Docker không tự bổ sung
 GPU backend. Cần xác nhận JetPack và thử tương thích kernel/runtime trên đúng
-Nano trước khi dùng image; không coi build trên Mac là xác nhận Jetson.
+Orin trước khi dùng image; không coi build trên Mac là xác nhận Jetson.
 
 Gazebo Harmonic + `ros_gz` Humble được tách khỏi image ARM64: gói
 `ros-humble-ros-gzharmonic` của OSRF hiện chỉ có binary Ubuntu x86_64.

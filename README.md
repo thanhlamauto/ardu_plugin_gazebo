@@ -36,7 +36,7 @@ pose bay; benchmark này không chạy OpenVINS hay MPPI. Đọc
 phải 15 Hz đo được**. Chu kỳ 15 Hz là 66,7 ms; cần đo lại throughput, frame
 drop, độ trễ và sai số sau mọi thay đổi.
 
-**Mốc CPU trước khi đưa lên Jetson Nano:** phát lại ảnh RGB ở 10 Hz trên
+**Mốc CPU trước khi đưa lên Jetson Orin Nano:** phát lại ảnh RGB ở 10 Hz trên
 MacBook Air M2 cho riêng model depth, tiến trình dùng 21–24% của một lõi CPU
 khi chạy MPS (2,6–2,9% nếu chia cho cả 8 lõi); hai lượt đều theo kịp 10 Hz.
 Chạy chỉ CPU với một luồng dùng gần 100% một lõi nhưng chỉ đạt 4 ảnh/s.
@@ -47,9 +47,10 @@ Chạy chỉ CPU với một luồng dùng gần 100% một lõi nhưng chỉ đ
 ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV DNN.
 [Cách build, xuất model và kết quả đối chiếu Python–C++](docs/JETSON_CPP_RUNTIME_VI.md)
 được ghi riêng. Phép đo trên Mac cho thấy OpenCV DNN CPU vẫn quá chậm để
-theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Nano chưa được kiểm tra.
+theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Orin Nano chưa được kiểm tra.
 [Hướng dẫn chạy C++ ngắn cho mentor (ROS 2 Humble)](docs/MENTOR_CPP_QUICKSTART_VI.md).
 [Image Docker Humble C++ cho Mac/Jetson ARM64](docs/MENTOR_DOCKER_HUMBLE_VI.md).
+[Chạy Docker perception trên Jetson Orin Nano R36.5.2](docs/JETSON_ORIN_NANO_DOCKER_VI.md).
 [Demo video depth MPS trên Mac: `bash scripts/demo_mps_depth_mac.sh` (kèm đối chiếu C++)](docs/MENTOR_PRE_JETSON_DEMO_VI.md).
 
 **Code C++ ở đâu?**
@@ -64,7 +65,7 @@ theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Nano chưa được 
 
 `scripts/` và `mppi_ardupilot/*.py` vẫn giữ các thí nghiệm, xuất model và
 đánh giá offline. Đường ROS 2 dự kiến chạy trên UAV dùng các thành phần C++ ở
-trên; nó chưa được xác nhận chạy closed-loop trên Jetson Nano. Xem
+trên; nó chưa được xác nhận chạy closed-loop trên Jetson Orin Nano. Xem
 [tình trạng thay thế từng phần Python](docs/JETSON_CPP_RUNTIME_VI.md#tình-trạng-thay-thế-python)
 trước khi xóa runner cũ.
 
