@@ -49,8 +49,17 @@ chưa được kiểm thử ở repo này. Khi có `/localization/odometry` từ
 `/opt/uav/monocular.yaml` hiện giới hạn 1 m/s và vẫn chỉ có occupied cloud;
 đây chưa phải stack tránh vật an toàn để bay.
 
-Để chuyển **cùng image ARM64** sang Jetson, dùng `docker save` / `docker load`
-hoặc registry. Chạy CPU trước và đo latency/CPU trên Nano. CUDA/TensorRT
+CI [docker-humble-runtime](../.github/workflows/docker-humble-runtime.yml) build
+và kiểm tra image ARM64. File `uav-monocular-humble-arm64.tar.gz` nằm trong
+artifact của lượt CI thành công, lưu 7 ngày. Tải file đó về rồi chuyển sang
+Jetson; trên Jetson nạp image bằng:
+
+```bash
+gunzip -c uav-monocular-humble-arm64.tar.gz | docker load
+```
+
+Chuyển riêng file ONNX sang Jetson và mount như lệnh trên. Chạy CPU trước và đo
+latency/CPU trên Nano. CUDA/TensorRT
 trong container phụ thuộc JetPack, driver host và bản OpenCV được build với
 CUDA; image này biên dịch OpenCV 5 **CPU**. Docker không tự bổ sung
 GPU backend. Cần xác nhận JetPack và thử tương thích kernel/runtime trên đúng

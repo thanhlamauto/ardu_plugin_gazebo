@@ -18,3 +18,16 @@ jobs:
         run: >-
           docker run --rm uav-monocular:humble
           ros2 launch uav_navigation_ros monocular_runtime.launch.xml --show-args
+      - name: Check image architecture
+        run: test "$(docker image inspect uav-monocular:humble --format '{{.Os}}/{{.Architecture}}')" = linux/arm64
+      - name: Export ARM64 image
+        run: |
+          docker save uav-monocular:humble | gzip -1 > uav-monocular-humble-arm64.tar.gz
+          sha256sum uav-monocular-humble-arm64.tar.gz
+      - name: Upload ARM64 image
+        uses: actions/upload-artifact@v4
+        with:
+          name: uav-monocular-humble-arm64
+          path: uav-monocular-humble-arm64.tar.gz
+          retention-days: 7
+          compression-level: 0
