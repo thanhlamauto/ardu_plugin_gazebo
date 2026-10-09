@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -121,15 +122,19 @@ double CpuSeconds() {
 
 int main(int argc, char **argv) {
   if (argc != 4 && argc != 5) {
-    std::cerr << "usage: depth_tensorrt_probe engine.plan input.rgb output.f32 [repeats]\n";
+    std::cerr << "usage: depth_tensorrt_probe engine.plan input.rgb output.f32 [repeats|--sequence]\n";
     return 2;
   }
   try {
-    const int repeats = argc == 5 ? std::stoi(argv[4]) : 20;
-    if (repeats < 1 || repeats > 1000) throw std::invalid_argument("repeats must be 1..1000");
+    const bool sequence = argc == 5 && std::string(argv[4]) == "--sequence";
     const auto rgb = ReadAll(argv[2]);
-    if (rgb.size() != kWidth * kHeight * 3)
+    constexpr std::size_t kFrameBytes = kWidth * kHeight * 3;
+    if (rgb.empty() || rgb.size() % kFrameBytes != 0 ||
+        (!sequence && rgb.size() != kFrameBytes))
       throw std::runtime_error("expected packed RGB 640x360 input");
+    const int repeats = sequence ? static_cast<int>(rgb.size() / kFrameBytes)
+                                 : argc == 5 ? std::stoi(argv[4]) : 20;
+    if (repeats < 1 || repeats > 1000) throw std::invalid_argument("frames/repeats must be 1..1000");
     const auto plan = ReadAll(argv[1]);
     Logger logger;
     std::unique_ptr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
@@ -164,9 +169,9 @@ int main(int argc, char **argv) {
     Stream stream;
     std::vector<float> small(kInputWidth * kInputHeight);
     std::vector<float> full(kWidth * kHeight);
-    auto predict = [&] {
+    auto predict = [&](const std::uint8_t *frame) {
       const auto tensor = uav_navigation_core::PrepareDepthAnythingInput(
-          reinterpret_cast<const std::uint8_t *>(rgb.data()), kWidth, kHeight,
+          frame, kWidth, kHeight,
           kWidth * 3, false, kInputWidth, kInputHeight);
       CheckCuda(cudaMemcpyAsync(gpu_input.ptr, tensor.data(), tensor.size() * sizeof(float),
                                 cudaMemcpyHostToDevice, stream.stream), "H2D");
@@ -176,30 +181,41 @@ int main(int argc, char **argv) {
       CheckCuda(cudaStreamSynchronize(stream.stream), "cudaStreamSynchronize");
       ResizeDepth(small.data(), full.data());
     };
-    predict(); // warmup, excluded
+    const auto *frames = reinterpret_cast<const std::uint8_t *>(rgb.data());
+    predict(frames); // warmup, excluded
     std::vector<double> times;
     times.reserve(repeats);
+    std::ofstream output(argv[3], std::ios::binary);
+    if (!output) throw std::runtime_error("cannot write output");
+    float depth_min = std::numeric_limits<float>::infinity();
+    float depth_max = -std::numeric_limits<float>::infinity();
     const double cpu_before = CpuSeconds();
     const auto wall_before = std::chrono::steady_clock::now();
     for (int i = 0; i < repeats; ++i) {
       const auto start = std::chrono::steady_clock::now();
-      predict();
+      predict(frames + (sequence ? static_cast<std::size_t>(i) * kFrameBytes : 0));
       times.push_back(std::chrono::duration<double, std::milli>(
                           std::chrono::steady_clock::now() - start).count());
+      if (sequence) {
+        output.write(reinterpret_cast<const char *>(full.data()), full.size() * sizeof(float));
+        if (!output) throw std::runtime_error("cannot write sequence depth");
+      }
+      const auto [low, high] = std::minmax_element(full.begin(), full.end());
+      depth_min = std::min(depth_min, *low);
+      depth_max = std::max(depth_max, *high);
     }
     const double elapsed = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - wall_before).count();
     std::sort(times.begin(), times.end());
-    std::ofstream output(argv[3], std::ios::binary);
-    if (!output) throw std::runtime_error("cannot write output");
-    output.write(reinterpret_cast<const char *>(full.data()), full.size() * sizeof(float));
-    const auto [min_it, max_it] = std::minmax_element(full.begin(), full.end());
+    if (!sequence) output.write(reinterpret_cast<const char *>(full.data()), full.size() * sizeof(float));
+    if (!output) throw std::runtime_error("cannot write depth");
     std::cout << "RGB 640x360 -> metric depth 640x360, frames " << repeats
+              << ", mode " << (sequence ? "sequence" : "repeat")
               << ", p50_ms " << times[repeats / 2]
               << ", p95_ms " << times[static_cast<std::size_t>(std::ceil(.95 * repeats) - 1)]
               << ", fps " << repeats / elapsed
               << ", cpu_one_core_percent " << 100.0 * (CpuSeconds() - cpu_before) / elapsed
-              << ", depth_min_m " << *min_it << ", depth_max_m " << *max_it << '\n';
+              << ", depth_min_m " << depth_min << ", depth_max_m " << depth_max << '\n';
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
     return 1;

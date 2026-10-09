@@ -138,6 +138,15 @@ trung bình tuyệt đối **0,019 m** trên 230.400 pixel (p95 **0,055 m**). Đ
 độ lệch giữa hai implementation, không phải sai số so với LiDAR ground truth.
 [Ảnh RGB, depth TensorRT và sai khác CPU](mentor_depth_evidence/orin/tensorrt_cpp_20261009.png)
 cho mentor xem trực tiếp; thang màu depth được cắt tại 25 m.
+
+[Video RGB cạnh depth TensorRT trên Orin](mentor_depth_evidence/orin/orin_tensorrt_depth_video.mp4)
+cho thấy 131 frame Gazebo liên tiếp, phát lại ở 10 FPS. Probe C++ xử lý offline
+toàn chuỗi bằng engine FP16 trên Orin: p50/p95 **42,56/53,47 ms**, thông lượng
+**22,29 frame/s**, CPU **46,42% một lõi**. FPS ghi trên video là tốc độ phát
+lại, còn 22,29 frame/s là thông lượng suy luận của probe. Đây là chuỗi offline
+khác với bài kiểm tra node ROS ở cuối tài liệu (100 lần phát cùng một frame);
+chưa phải video camera thật hoặc closed-loop.
+
 Probe C++ đã được chạy lại **trong image JetPack** trên cùng Orin, không cần
 OpenCV trong container: 30 lần lặp đạt p50 **37,27 ms**, p95 **51,52 ms**,
 **26,01 FPS**, CPU **37,36% của một lõi**. Depth từ container khác bản chạy
