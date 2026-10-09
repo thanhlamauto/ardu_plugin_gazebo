@@ -8,7 +8,8 @@ bash scripts/demo_cpp_depth_mac.sh
 
 Cửa sổ phát lại 16 khung RGB đã ghi trong Gazebo, suy luận từng khung bằng
 **C++/ONNX đang chạy ngay trên Mac**, hiện depth màu, sai lệch với LiDAR mô phỏng,
-độ trễ và CPU. Nhấn **Space** để tạm dừng/tiếp tục; đóng cửa sổ để dừng. Nếu
+độ trễ và CPU. Lệnh mặc định dùng 4 luồng CPU trên Mac; để đo lại mốc cũ một
+luồng, thêm `--threads 1`. Nhấn **Space** để tạm dừng/tiếp tục; đóng cửa sổ để dừng. Nếu
 muốn kiểm tra không mở GUI: `bash scripts/demo_cpp_depth_mac.sh --headless --frames 3`.
 Máy này đã có model ONNX và executable C++ nên không cần Docker hay Jetson để
 chạy demo. Python chỉ phát lại RGB, vẽ cửa sổ và đọc LiDAR để chấm; suy luận
@@ -24,6 +25,13 @@ cmake --build build/uav_navigation_ros_cpp_migration --target depth_anything_onn
 **Mục tiêu 3–5 phút:** cho thấy RGB → depth bằng C++ trên ảnh Gazebo,
 đối chiếu LiDAR chỉ **sau** suy luận, rồi trình bày độ trễ CPU và giới hạn hiện
 tại. Đây là demo phát lại perception, **chưa phải** bay tránh vật cản closed-loop.
+
+Trên Mac M2, phép thử một luồng 4 ảnh mất khoảng 0,78–0,81 s/ảnh. Với 4 luồng
+trên 20 ảnh khác nhau, p50 là 256 ms, p95 là 315 ms, CPU trung vị khoảng
+341% của một lõi (tức 3,4 lõi). Đây là suy luận
+OpenCV DNN **CPU**, không dùng GPU Apple MPS. Dù đã nhanh hơn, 4 luồng vẫn
+chậm hơn chu kỳ 100 ms của camera 10 Hz; phải tối ưu backend/model và đo lại
+trên Jetson trước khi dùng để bay.
 
 1. Mở [ảnh C++ mẫu](mentor_depth_evidence/cpp/demo_frame_000220.png). Ảnh bên
    trái là RGB từ Gazebo; bên phải là depth từ `depth_anything_onnx_probe`
@@ -91,5 +99,6 @@ Script vẽ cần `numpy`, `Pillow`, `matplotlib`. Nếu không có sẵn, chỉ
 **Câu nói ngắn khi demo:** “Em đang dùng Depth Anything V2 Metric Outdoor
 Small từ một camera RGB. Đây là kết quả C++ trên ảnh Gazebo; LiDAR chỉ để chấm
 sai số. Model C++ cho vật giữa ảnh 4,44 m so với LiDAR 5,06 m. Trên Mac chạy
-CPU khoảng 0,8 giây một ảnh, nên chưa đủ 10 Hz. Image Humble ARM64 đã build,
+CPU một luồng khoảng 0,8 giây/ảnh; với 4 luồng thường khoảng 0,25 giây/ảnh
+nhưng vẫn chưa đủ 10 Hz. Image Humble ARM64 đã build,
 nhưng em cần đo lại trên Jetson trước khi nói đến tránh vật khi bay.”

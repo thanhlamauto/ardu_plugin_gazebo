@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <sys/resource.h>
 #include <vector>
 
@@ -23,8 +24,8 @@ double CpuSeconds() {
 // frame, write two native-endian doubles (wall_ms, CPU % of one core), followed
 // by 640x360 float32 metric depth values. The model stays loaded across frames.
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    std::cerr << "usage: depth_anything_onnx_stream model.onnx\n";
+  if (argc != 2 && argc != 3) {
+    std::cerr << "usage: depth_anything_onnx_stream model.onnx [opencv_threads]\n";
     return 2;
   }
   try {
@@ -32,7 +33,10 @@ int main(int argc, char **argv) {
     constexpr std::size_t kPixels =
         static_cast<std::size_t>(Model::kCameraWidth) * Model::kCameraHeight;
     std::vector<std::uint8_t> rgb(kPixels * 3);
-    cv::setNumThreads(1);
+    const int threads = argc == 3 ? std::stoi(argv[2]) : 1;
+    if (threads < 1 || threads > 8)
+      throw std::invalid_argument("opencv_threads must be 1..8");
+    cv::setNumThreads(threads);
     Model model(argv[1], "cpu");
     while (true) {
       std::cin.read(reinterpret_cast<char *>(rgb.data()),

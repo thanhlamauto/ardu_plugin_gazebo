@@ -10,6 +10,7 @@ import json
 import queue
 import struct
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -52,7 +53,7 @@ def frames(trial, count):
 
 
 def run_inference(args, selected, output, stop, paused):
-    process = subprocess.Popen([str(args.stream), str(args.model)],
+    process = subprocess.Popen([str(args.stream), str(args.model), str(args.threads)],
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
     try:
@@ -81,11 +82,15 @@ def run_inference(args, selected, output, stop, paused):
                                 0, 255).astype(np.uint8)
                 heat = Image.fromarray(PALETTE[index], "RGB")
                 output.put((rgb, heat, pair, center, wall_ms, cpu_percent))
+                if not args.headless:
+                    print(f"frame {pair['frame']}: C++ {center:.2f} m, "
+                          f"{wall_ms:.0f} ms, CPU {cpu_percent:.0f}% một lõi", flush=True)
             if args.headless:
                 break
     except Exception as error:
         if process.poll() is not None:
             error = RuntimeError(f"{error}; C++: {process.stderr.read().decode(errors='replace')}")
+        print(f"Demo C++ lỗi: {error}", file=sys.stderr, flush=True)
         output.put(error)
     finally:
         if process.poll() is None:
@@ -104,10 +109,14 @@ def main():
     parser.add_argument("--stream", type=Path, default=STREAM)
     parser.add_argument("--trial", type=Path, default=TRIAL)
     parser.add_argument("--frames", type=int, default=16)
+    parser.add_argument("--threads", type=int, default=4,
+                        help="OpenCV CPU threads (default 4); use 1 for reference measurements")
     parser.add_argument("--headless", action="store_true", help="validate one pass without GUI")
     args = parser.parse_args()
     if args.frames < 1:
         parser.error("--frames must be positive")
+    if not 1 <= args.threads <= 8:
+        parser.error("--threads must be 1..8")
     if not args.model.is_file():
         parser.error(f"ONNX model missing: {args.model}")
     if not args.stream.is_file():
@@ -141,6 +150,11 @@ def main():
     root = tk.Tk()
     root.title("UAV monocular C++ depth — demo trực tiếp trên Mac")
     root.configure(bg="#0b1321")
+    root.attributes("-topmost", True)
+    root.lift()
+    root.after(1500, lambda: root.attributes("-topmost", False))
+    print(f"Đã mở cửa sổ 'UAV monocular C++ depth' ({args.threads} luồng CPU); "
+          "nhấn Space để tạm dừng.", flush=True)
     title = tk.Label(root, text="Ảnh Gazebo đã ghi → Depth Anything V2 Metric Outdoor Small (C++)",
                      font=("Arial", 18), fg="white", bg="#0b1321")
     title.pack(pady=12)
@@ -190,7 +204,8 @@ def main():
                 lidar = pair["lidar_depth_m"]
                 metric.configure(text=f"Frame {pair['frame']}  |  C++ {center:.2f} m  |  "
                                       f"LiDAR {lidar:.2f} m  |  Sai lệch {center-lidar:+.2f} m\n"
-                                      f"Suy luận {wall_ms:.0f} ms  |  CPU {cpu:.0f}% một lõi")
+                                      f"Suy luận {wall_ms:.0f} ms  |  CPU {cpu:.0f}% "
+                                      f"(≈{cpu/100:.1f} lõi)")
         except queue.Empty:
             pass
         root.after(50, pump)
