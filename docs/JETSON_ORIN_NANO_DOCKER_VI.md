@@ -12,11 +12,33 @@ không phải tốc độ Docker này trên Orin. Trước khi nối planner, c�
 tuổi ảnh và số cloud được publish trên chính Orin. Đường chạy dưới đây chỉ bật
 perception; không chạy MPPI, MAVROS hay adapter điều khiển bay.
 
+Trên Orin, clone repo để có script:
+
+```bash
+git clone https://github.com/thanhlamauto/ardu_plugin_gazebo.git
+cd ardu_plugin_gazebo
+```
+
+Tải artifact `uav-monocular-humble-arm64`
+từ [run CI ARM64](https://github.com/thanhlamauto/ardu_plugin_gazebo/actions/workflows/docker-humble-runtime.yml)
+(GitHub tải về một file ZIP; copy ZIP sang Orin rồi giải nén để lấy `.tar.gz`).
+Copy file ONNX từ Mac sang Orin vì model không nằm trong Git/Docker image:
+
+```bash
+# Chạy trên Mac; thay user/IP của Orin.
+ssh user@JETSON_IP 'mkdir -p ~/models'
+scp ~/Downloads/uav-monocular-humble-arm64.zip \
+  user@JETSON_IP:~/ardu_plugin_gazebo/
+scp results/monocular_research/depth_anything_v2_metric_outdoor_small_294x518_fixedpos.onnx \
+  user@JETSON_IP:~/models/depth.onnx
+```
+
 Từ gốc repo trên Orin, chuẩn bị image theo một trong hai cách:
 
 ```bash
-# Nếu đã tải artifact uav-monocular-humble-arm64.tar.gz từ CI:
-gunzip -c uav-monocular-humble-arm64.tar.gz | docker load
+# Nếu đã tải artifact dạng ZIP từ CI:
+unzip uav-monocular-humble-arm64.zip -d ./uav-image
+gunzip -c ./uav-image/uav-monocular-humble-arm64.tar.gz | docker load
 
 # Hoặc build tại chỗ (biên dịch OpenCV 5 có thể tốn thời gian và nhiều bộ nhớ):
 docker build --platform linux/arm64 --build-arg OPENCV_BUILD_JOBS=2 \
@@ -27,7 +49,9 @@ Chỉ chạy **một** trong hai lệnh trên. Sau đó chỉ đường dẫn tu
 ONNX đã xuất theo [quickstart C++](MENTOR_CPP_QUICKSTART_VI.md):
 
 ```bash
-export UAV_DEPTH_ONNX="$(realpath results/monocular_research/depth_anything_v2_metric_outdoor_small_294x518_fixedpos.onnx)"
+export UAV_DEPTH_ONNX="$(realpath ~/models/depth.onnx)"
+sha256sum "$UAV_DEPTH_ONNX"
+# SHA-256 đã kiểm thử: 1a7cb9d9c31d60afc9cbe96c6a401ac27c8cebcfce78cfc4ca1c2587691dc4a8
 bash scripts/run_cpp_depth_orin.sh check
 bash scripts/run_cpp_depth_orin.sh probe
 ```
@@ -63,5 +87,38 @@ tại, chưa có số đo nào xác nhận đạt hạn 100 ms trên Orin. Nếu
 tiếp theo là image GPU/TensorRT riêng, được build và đo trên đúng R36.5.2;
 không tăng deadline rồi coi đó là đủ để bay.
 
+## Kiểm tra GPU bằng TensorRT (model riêng, chưa phải node ROS)
+
+Trên Orin, kiểm tra Docker đã có NVIDIA runtime:
+
+```bash
+docker info --format '{{json .Runtimes}}'
+```
+
+Nếu không thấy `nvidia`, làm theo [NVIDIA Docker Setup](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/setup_docker.html)
+để cài NVIDIA Container Toolkit và cấu hình runtime; bước đó thay đổi cấu hình
+Docker của host nên cần người quản trị máy thực hiện. Khi runtime đã sẵn sàng:
+
+```bash
+export UAV_DEPTH_ONNX="$(realpath ~/models/depth.onnx)"
+bash scripts/probe_depth_tensorrt_orin.sh
+```
+
+Script dùng image NVIDIA `l4t-jetpack:r36.4.0` với `--runtime nvidia`, mount
+model chỉ đọc, build engine FP16 trên chính Orin rồi benchmark 10 giây. Nó lưu
+`build.log`, `benchmark.log` và `depth_fp16.plan` trong
+`artifacts/orin_tensorrt/`. NVIDIA hiện công bố tag container `r36.4.0`; host
+đang ở R36.5.2, nên **phải xác nhận container và engine chạy được trên host
+này**, không suy ra tương thích chỉ từ tên R36. Có thể đặt `UAV_JETPACK_IMAGE`
+để dùng tag khác nếu NVIDIA phát hành bản phù hợp hơn.
+
+`trtexec` dùng tensor ngẫu nhiên để đo riêng suy luận TensorRT; tốc độ đó
+không gồm camera, tiền/hậu xử lý, ROS hay chất lượng depth. Engine `.plan`
+không được node C++ hiện tại nạp. OpenCV 5 `ENGINE_NEW` hiện chỉ chạy CPU;
+muốn perception ROS thật sự dùng GPU cần thêm backend TensorRT C++ đọc engine,
+so kết quả depth với bản CPU và đo lại toàn pipeline trước khi bật planner.
+
 Tham chiếu: [NVIDIA Jetson Linux R36.5.2](https://docs.nvidia.com/jetson/archives/r36.5.2/DeveloperGuide/index.html),
-[NVIDIA Docker Setup cho Orin Nano](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/setup_docker.html).
+[NVIDIA Docker Setup cho Orin Nano](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/setup_docker.html),
+[OpenCV 5 DNN engine selection](https://docs.opencv.org/5.0/main_modules/dnn_engine_selection.html),
+[NVIDIA L4T JetPack container](https://catalog.ngc.nvidia.com/orgs/nvidia/-/containers/l4t-jetpack/-).

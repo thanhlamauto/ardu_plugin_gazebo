@@ -118,6 +118,7 @@ output/log/
 *.pcap
 # Keep the short mentor demo in the repository; trial recordings stay local.
 !artifacts/depth_demo.mp4
+/artifacts/orin_tensorrt/
 /artifacts/*.zip
 /artifacts/*.png
 /results/monocular_baseline*/
