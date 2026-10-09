@@ -47,7 +47,10 @@ Chạy chỉ CPU với một luồng dùng gần 100% một lõi nhưng chỉ đ
 ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV DNN.
 [Cách build, xuất model và kết quả đối chiếu Python–C++](docs/JETSON_CPP_RUNTIME_VI.md)
 được ghi riêng. Phép đo trên Mac cho thấy OpenCV DNN CPU vẫn quá chậm để
-theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Orin Nano chưa được kiểm tra.
+theo kịp camera 10 Hz. Trên Jetson Orin Nano R36.5.2, TensorRT FP16 đạt
+62,48 inference/s cho riêng model; probe C++ RGB → depth đạt 26,01 FPS
+trong Docker JetPack trên ảnh mẫu. Đây chưa phải node ROS hoặc camera thật; xem
+[cách đo và trạng thái Docker](docs/JETSON_ORIN_NANO_DOCKER_VI.md).
 [Hướng dẫn chạy C++ ngắn cho mentor (ROS 2 Humble)](docs/MENTOR_CPP_QUICKSTART_VI.md).
 [Image Docker Humble C++ cho Mac/Jetson ARM64](docs/MENTOR_DOCKER_HUMBLE_VI.md).
 [Chạy Docker perception trên Jetson Orin Nano R36.5.2](docs/JETSON_ORIN_NANO_DOCKER_VI.md).

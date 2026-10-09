@@ -49,6 +49,7 @@ docker run --rm --runtime nvidia --network none \
     test -x "$trtexec"
     "$trtexec" --onnx="/models/$UAV_MODEL_BASENAME" \
       --saveEngine=/artifacts/depth_fp16.plan --fp16 --skipInference \
+      --memPoolSize=workspace:1024 \
       2>&1 | tee /artifacts/build.log
     "$trtexec" --loadEngine=/artifacts/depth_fp16.plan --duration=10 \
       2>&1 | tee /artifacts/benchmark.log

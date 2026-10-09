@@ -108,8 +108,9 @@ Script dùng image NVIDIA `l4t-jetpack:r36.4.0` với `--runtime nvidia`, mount
 model chỉ đọc, build engine FP16 trên chính Orin rồi benchmark 10 giây. Nó lưu
 `build.log`, `benchmark.log` và `depth_fp16.plan` trong
 `artifacts/orin_tensorrt/`. NVIDIA hiện công bố tag container `r36.4.0`; host
-đang ở R36.5.2, nên **phải xác nhận container và engine chạy được trên host
-này**, không suy ra tương thích chỉ từ tên R36. Có thể đặt `UAV_JETPACK_IMAGE`
+đang ở R36.5.2. Probe C++ bên dưới đã nạp engine TensorRT 10.3 tạo trên host
+và chạy thành công trong image này; nếu đổi engine/image vẫn phải thử lại.
+Có thể đặt `UAV_JETPACK_IMAGE`
 để dùng tag khác nếu NVIDIA phát hành bản phù hợp hơn.
 
 `trtexec` dùng tensor ngẫu nhiên để đo riêng suy luận TensorRT; tốc độ đó
@@ -117,6 +118,38 @@ không gồm camera, tiền/hậu xử lý, ROS hay chất lượng depth. Engin
 không được node C++ hiện tại nạp. OpenCV 5 `ENGINE_NEW` hiện chỉ chạy CPU;
 muốn perception ROS thật sự dùng GPU cần thêm backend TensorRT C++ đọc engine,
 so kết quả depth với bản CPU và đo lại toàn pipeline trước khi bật planner.
+
+### Kết quả đo trực tiếp trên Orin R36.5.2 (09/10/2026)
+
+Với ONNX SHA-256 ở trên, `trtexec` TensorRT 10.3 tạo engine FP16 50 MiB
+trong 443,8 giây. Benchmark 20 giây tại power mode 15 W: **62,48 inference/s**,
+host latency trung bình **16,19 ms**, p95 **16,22 ms**. Đây là phép đo mô hình
+với đầu vào giả, không phải FPS camera hay node ROS.
+Chính engine này cũng nạp và chạy trong image `l4t-jetpack:r36.4.0` trên host
+R36.5.2: phép đo 5 giây đạt **61,89 inference/s**, p95 **16,27 ms**.
+
+Probe C++ riêng đã chạy một ảnh RGB 640×360 từ Gazebo qua tiền xử lý, engine
+TensorRT và nội suy ra depth 640×360 trên Orin: 30 lần lặp có p50 **44,76 ms**,
+p95 **54,76 ms**, **23,25 FPS** và CPU tiến trình **39,44% của một lõi**.
+So với OpenCV DNN CPU trên Mac cho đúng frame/model đó, sai khác depth FP16
+trung bình tuyệt đối **0,019 m** trên 230.400 pixel (p95 **0,055 m**). Đây là
+độ lệch giữa hai implementation, không phải sai số so với LiDAR ground truth.
+[Ảnh RGB, depth TensorRT và sai khác CPU](mentor_depth_evidence/orin/tensorrt_cpp_20261009.png)
+cho mentor xem trực tiếp; thang màu depth được cắt tại 25 m.
+Probe C++ đã được chạy lại **trong image JetPack** trên cùng Orin, không cần
+OpenCV trong container: 30 lần lặp đạt p50 **37,27 ms**, p95 **51,52 ms**,
+**26,01 FPS**, CPU **37,36% của một lõi**. Depth từ container khác bản chạy
+trực tiếp trên host trung bình **0,000002 m** do bước nội suy C++ thay OpenCV.
+Lệnh tái lập:
+
+```bash
+export UAV_TRT_ENGINE="$(realpath ~/uav_deploy/depth_fp16.plan)"
+bash scripts/probe_cpp_depth_tensorrt_orin.sh
+```
+
+Probe C++ này dùng file RGB mẫu trong repo, không đăng ký topic ROS, không nối
+planner và chưa đo camera thời gian thực. File depth float32 và log lưu ở
+`artifacts/orin_cpp_tensorrt/`.
 
 Tham chiếu: [NVIDIA Jetson Linux R36.5.2](https://docs.nvidia.com/jetson/archives/r36.5.2/DeveloperGuide/index.html),
 [NVIDIA Docker Setup cho Orin Nano](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/setup_docker.html),
