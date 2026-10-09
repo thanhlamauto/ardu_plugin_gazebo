@@ -50,7 +50,7 @@ ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV
 theo kịp camera 10 Hz; hiệu năng và CUDA trên Jetson Nano chưa được kiểm tra.
 [Hướng dẫn chạy C++ ngắn cho mentor (ROS 2 Humble)](docs/MENTOR_CPP_QUICKSTART_VI.md).
 [Image Docker Humble C++ cho Mac/Jetson ARM64](docs/MENTOR_DOCKER_HUMBLE_VI.md).
-[Demo 3–5 phút trước khi có Jetson: ảnh C++, video benchmark, latency CPU và lời trình bày](docs/MENTOR_PRE_JETSON_DEMO_VI.md).
+[Demo C++ chạy trực tiếp trên Mac trước khi có Jetson: `bash scripts/demo_cpp_depth_mac.sh`](docs/MENTOR_PRE_JETSON_DEMO_VI.md).
 
 **Code C++ ở đâu?**
 

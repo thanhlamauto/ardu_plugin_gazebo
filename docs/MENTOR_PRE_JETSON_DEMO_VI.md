@@ -1,8 +1,29 @@
 # Demo cho mentor trước khi có Jetson
 
-**Mục tiêu 3–5 phút:** cho thấy RGB → depth bằng C++ trên một khung ảnh Gazebo,
+**Chạy trực tiếp trên chiếc Mac hiện tại:** từ gốc repo, mở Terminal và chạy:
+
+```bash
+bash scripts/demo_cpp_depth_mac.sh
+```
+
+Cửa sổ phát lại 16 khung RGB đã ghi trong Gazebo, suy luận từng khung bằng
+**C++/ONNX đang chạy ngay trên Mac**, hiện depth màu, sai lệch với LiDAR mô phỏng,
+độ trễ và CPU. Nhấn **Space** để tạm dừng/tiếp tục; đóng cửa sổ để dừng. Nếu
+muốn kiểm tra không mở GUI: `bash scripts/demo_cpp_depth_mac.sh --headless --frames 3`.
+Máy này đã có model ONNX và executable C++ nên không cần Docker hay Jetson để
+chạy demo. Python chỉ phát lại RGB, vẽ cửa sổ và đọc LiDAR để chấm; suy luận
+depth do executable C++ `depth_anything_onnx_stream` thực hiện. Nếu cần build
+lại sau khi sửa C++:
+
+```bash
+source /opt/miniconda3/envs/ardupilot-rviz/setup.bash
+cmake -S uav_navigation_ros -B build/uav_navigation_ros_cpp_migration
+cmake --build build/uav_navigation_ros_cpp_migration --target depth_anything_onnx_stream -j 2
+```
+
+**Mục tiêu 3–5 phút:** cho thấy RGB → depth bằng C++ trên ảnh Gazebo,
 đối chiếu LiDAR chỉ **sau** suy luận, rồi trình bày độ trễ CPU và giới hạn hiện
-tại. Đây là demo perception offline, **chưa phải** bay tránh vật cản closed-loop.
+tại. Đây là demo phát lại perception, **chưa phải** bay tránh vật cản closed-loop.
 
 1. Mở [ảnh C++ mẫu](mentor_depth_evidence/cpp/demo_frame_000220.png). Ảnh bên
    trái là RGB từ Gazebo; bên phải là depth từ `depth_anything_onnx_probe`
