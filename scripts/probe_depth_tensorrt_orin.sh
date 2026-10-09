@@ -38,6 +38,8 @@ echo "ONNX: $model"
 echo "TensorRT engine/logs: $artifact_dir"
 
 docker run --rm --runtime nvidia --network none \
+  --env NVIDIA_VISIBLE_DEVICES=all \
+  --env NVIDIA_DRIVER_CAPABILITIES=compute,utility \
   --mount "type=bind,src=$model_dir,dst=/models,readonly" \
   --mount "type=bind,src=$artifact_dir,dst=/artifacts" \
   --env "UAV_MODEL_BASENAME=$model_name" \
