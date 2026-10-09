@@ -20,6 +20,13 @@ jobs:
           ros2 launch uav_navigation_ros monocular_runtime.launch.xml --show-args
       - name: Check image architecture
         run: test "$(docker image inspect uav-monocular:humble --format '{{.Os}}/{{.Architecture}}')" = linux/arm64
+      - name: Check read-only model mount
+        run: >-
+          docker run --rm --runtime runc --read-only
+          --tmpfs /tmp:rw,nosuid,nodev --tmpfs /root/.ros:rw,nosuid,nodev
+          --cap-drop ALL --security-opt no-new-privileges
+          --mount type=bind,src=/etc/hostname,dst=/models/depth.onnx,readonly
+          uav-monocular:humble bash -lc 'test -r /models/depth.onnx && ros2 pkg executables uav_navigation_ros'
       - name: Export ARM64 image
         run: |
           docker save uav-monocular:humble | gzip -1 > uav-monocular-humble-arm64.tar.gz
