@@ -9,7 +9,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build ROS 2 Humble ARM64 image
-        run: docker build --platform linux/arm64 -f docker/Dockerfile.humble -t uav-monocular:humble .
+        run: >-
+          docker build --platform linux/arm64 --build-arg OPENCV_BUILD_JOBS=4
+          -f docker/Dockerfile.humble -t uav-monocular:humble .
       - name: Check C++ executables
         run: docker run --rm uav-monocular:humble ros2 pkg executables uav_navigation_ros
       - name: Parse runtime launch

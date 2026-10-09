@@ -13,7 +13,7 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
-find_package(tinyxml2 REQUIRED CONFIG)
+find_package(TinyXML2 REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn)
 
 add_library(depth_anything_onnx STATIC src/depth_anything_onnx.cpp)
