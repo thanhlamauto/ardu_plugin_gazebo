@@ -1,0 +1,38 @@
+# TensorRT-enabled ROS 2 Humble runtime for Jetson Orin, built from the CPU
+# image and JetPack userspace libraries. Driver devices come from --runtime nvidia.
+ARG JETPACK_IMAGE=nvcr.io/nvidia/l4t-jetpack:r36.4.0
+ARG CPU_IMAGE=uav-monocular:humble
+FROM ${JETPACK_IMAGE} AS jetpack
+FROM ${CPU_IMAGE} AS build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake python3-colcon-common-extensions libtinyxml2-dev \
+    ros-humble-ament-cmake ros-humble-tinyxml2-vendor \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=jetpack /usr/include/aarch64-linux-gnu/Nv*.h /opt/tensorrt/include/
+COPY --from=jetpack /usr/lib/aarch64-linux-gnu/libnvinfer.so* /opt/tensorrt/lib/
+COPY --from=jetpack /usr/local/cuda-12.6/targets/aarch64-linux/include/ /opt/cuda/include/
+COPY --from=jetpack /usr/local/cuda-12.6/targets/aarch64-linux/lib/libcudart.so* /opt/cuda/lib/
+COPY --from=jetpack /usr/local/cuda-12.6/targets/aarch64-linux/lib/libcudla.so* /opt/cuda/lib/
+ENV LD_LIBRARY_PATH=/opt/tensorrt/lib:/opt/cuda/lib:/opt/opencv/lib
+WORKDIR /gpu_ws
+COPY uav_navigation_core/ src/uav_navigation_core/
+COPY uav_navigation_ros/ src/uav_navigation_ros/
+RUN source /opt/ros/humble/setup.bash && \
+    colcon build --base-paths src/uav_navigation_core src/uav_navigation_ros \
+      --packages-select uav_navigation_core uav_navigation_ros \
+      --merge-install --parallel-workers 2 \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+        -DOpenCV_DIR=/opt/opencv/lib/cmake/opencv5 \
+        -DTENSORRT_INCLUDE_DIR=/opt/tensorrt/include \
+        -DTENSORRT_LIBRARY=/opt/tensorrt/lib/libnvinfer.so \
+        -DCUDA_RUNTIME_INCLUDE_DIR=/opt/cuda/include \
+        -DCUDA_RUNTIME_LIBRARY=/opt/cuda/lib/libcudart.so
+
+FROM ${CPU_IMAGE} AS runtime
+COPY --from=build /opt/tensorrt/lib/ /opt/tensorrt/lib/
+COPY --from=build /opt/cuda/lib/ /opt/cuda/lib/
+COPY --from=build /gpu_ws/install/ /ws/install/
+ENV LD_LIBRARY_PATH=/opt/tensorrt/lib:/opt/cuda/lib:/opt/opencv/lib
+ENV UAV_DEPTH_ENGINE=/models/depth_fp16.plan

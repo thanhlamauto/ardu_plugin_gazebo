@@ -49,7 +49,11 @@ ArduPilot đã là C++; node monocular mới chạy model ONNX bằng C++/OpenCV
 được ghi riêng. Phép đo trên Mac cho thấy OpenCV DNN CPU vẫn quá chậm để
 theo kịp camera 10 Hz. Trên Jetson Orin Nano R36.5.2, TensorRT FP16 đạt
 62,48 inference/s cho riêng model; probe C++ RGB → depth đạt 26,01 FPS
-trong Docker JetPack trên ảnh mẫu. Đây chưa phải node ROS hoặc camera thật; xem
+trong Docker JetPack trên ảnh mẫu. Image ROS Humble/OpenCV CPU trên cùng Orin
+chỉ đạt 0,319 FPS ở 5 lần lặp. **Node ROS Humble/TensorRT C++ đã chạy GPU**:
+với ảnh RGB phát lại đúng 10 Hz, lượt 100 ảnh cuối nhận 97 cloud; inference
+p95 61,08 ms và CPU trung vị 27,8% một lõi. Đây là ảnh phát lại, chưa phải camera thật hay
+closed-loop; xem
 [cách đo và trạng thái Docker](docs/JETSON_ORIN_NANO_DOCKER_VI.md).
 [Hướng dẫn chạy C++ ngắn cho mentor (ROS 2 Humble)](docs/MENTOR_CPP_QUICKSTART_VI.md).
 [Image Docker Humble C++ cho Mac/Jetson ARM64](docs/MENTOR_DOCKER_HUMBLE_VI.md).
@@ -62,7 +66,7 @@ trong Docker JetPack trên ảnh mẫu. Đây chưa phải node ROS hoặc camer
 | --- | --- |
 | MPPI: rollout, dynamics, cost, optimizer | [`uav_navigation_core/src/mppi/`](uav_navigation_core/src/mppi/) |
 | Tiền xử lý RGB và tạo điểm 3D từ depth | [`uav_navigation_core/src/metric_depth.cpp`](uav_navigation_core/src/metric_depth.cpp) |
-| Suy luận Depth Anything ONNX và node camera ROS 2 | [`depth_anything_onnx.cpp`](uav_navigation_ros/src/depth_anything_onnx.cpp), [`monocular_depth_node.cpp`](uav_navigation_ros/src/monocular_depth_node.cpp) |
+| Suy luận Depth Anything CPU/TensorRT và node camera ROS 2 | [`depth_anything_onnx.cpp`](uav_navigation_ros/src/depth_anything_onnx.cpp), [`depth_anything_tensorrt.cpp`](uav_navigation_ros/src/depth_anything_tensorrt.cpp), [`monocular_depth_node.cpp`](uav_navigation_ros/src/monocular_depth_node.cpp) |
 | Node MPPI ROS 2 và adapter ArduPilot | [`local_navigation_node.cpp`](uav_navigation_ros/src/local_navigation_node.cpp), [`autopilot_adapter_node.cpp`](uav_navigation_ros/src/autopilot_adapter_node.cpp) |
 | Cấu hình và launch thử monocular | [`monocular.yaml`](uav_navigation_bringup/config/monocular.yaml), [`monocular_sim.launch.xml`](uav_navigation_bringup/launch/monocular_sim.launch.xml) |
 

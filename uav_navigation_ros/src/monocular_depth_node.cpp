@@ -21,6 +21,9 @@
 
 #include "uav_navigation_core/metric_depth.hpp"
 #include "uav_navigation_ros/depth_anything_onnx.hpp"
+#ifdef UAV_DEPTH_TENSORRT
+#include "uav_navigation_ros/depth_anything_tensorrt.hpp"
+#endif
 
 using namespace std::chrono_literals;
 
@@ -64,13 +67,21 @@ public:
     const auto opencv_threads = declare_parameter<int>("opencv_threads", 1);
     point_stride_ = declare_parameter<int>("point_stride", 8);
     if (model_path.empty() || !std::filesystem::is_regular_file(model_path))
-      throw std::invalid_argument("model_path must name an exported ONNX file");
+      throw std::invalid_argument("model_path must name an ONNX model or TensorRT engine");
     if (max_image_age_s_ <= 0 || max_inference_ms_ <= 0 ||
         max_processing_ms_ <= 0 ||
         opencv_threads < 1 || point_stride_ < 1)
       throw std::invalid_argument("invalid depth runtime limits");
     cv::setNumThreads(opencv_threads);
-    predictor_ = std::make_unique<DepthAnythingOnnx>(model_path, backend);
+    if (backend == "tensorrt") {
+#ifdef UAV_DEPTH_TENSORRT
+      trt_predictor_ = std::make_unique<DepthAnythingTensorRt>(model_path);
+#else
+      throw std::runtime_error("TensorRT backend was not built into this image");
+#endif
+    } else {
+      predictor_ = std::make_unique<DepthAnythingOnnx>(model_path, backend);
+    }
     cloud_publisher_ = create_publisher<sensor_msgs::msg::PointCloud2>(
         cloud_topic, rclcpp::SensorDataQoS());
     diagnostic_publisher_ =
@@ -140,8 +151,13 @@ private:
       return;
     }
     try {
-      const auto depth = predictor_->Predict(image.data.data(), image.width,
-                                             image.height, image.step, bgr);
+      const auto depth =
+#ifdef UAV_DEPTH_TENSORRT
+          trt_predictor_ ? trt_predictor_->Predict(image.data.data(), image.width,
+                                                   image.height, image.step, bgr) :
+#endif
+                           predictor_->Predict(image.data.data(), image.width,
+                                               image.height, image.step, bgr);
       const double inference_ms =
           std::chrono::duration<double, std::milli>(
               std::chrono::steady_clock::now() - start)
@@ -209,6 +225,9 @@ private:
   double cpu_start_{0.0};
   std::chrono::steady_clock::time_point cpu_wall_start_{};
   std::unique_ptr<DepthAnythingOnnx> predictor_;
+#ifdef UAV_DEPTH_TENSORRT
+  std::unique_ptr<DepthAnythingTensorRt> trt_predictor_;
+#endif
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_publisher_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr

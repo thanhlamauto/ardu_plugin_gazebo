@@ -50,15 +50,18 @@ or changes mode. Its states are `DISCONNECTED`, `CONNECTED_NOT_READY`, `READY`,
 validation, readiness policy and transport boundary independently testable.
 The previous Python MAVLink bridge is no longer installed or used by launch.
 
-`monocular_depth_node` receives 640×360 RGB images and runs a fixed-shape
-Depth Anything V2 Metric Outdoor Small ONNX model through OpenCV DNN. It
+`monocular_depth_node` receives 640×360 RGB images and runs fixed-shape
+Depth Anything V2 Metric Outdoor Small. The CPU image uses OpenCV DNN with
+an ONNX file; the Jetson GPU image builds the optional TensorRT backend and
+loads an FP16 `.plan` engine with `backend:=tensorrt`. It
 publishes an occupied-point cloud with the camera timestamp and frame only
 when image age, inference time, and total processing time pass their gates.
 Diagnostics report both latency measurements and process CPU usage as a
 percentage of one logical core. The model is exported offline with
 `scripts/export_depth_anything_onnx.py`; Python is not used for live inference.
 The monocular launch and its current limitations are documented in
-`../docs/JETSON_CPP_RUNTIME_VI.md`.
+`../docs/JETSON_CPP_RUNTIME_VI.md` and
+`../docs/JETSON_ORIN_NANO_DOCKER_VI.md`.
 
 Runtime parameters are in `uav_navigation_bringup/config/navigation.yaml` for
 the baseline and `uav_navigation_bringup/config/monocular.yaml` for the RGB

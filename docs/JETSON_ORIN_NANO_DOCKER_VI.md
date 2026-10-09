@@ -6,11 +6,12 @@ R36 về hệ điều hành. Container chỉ chứa node C++ và thư viện c�
 ONNX được mount chỉ đọc. Nó nhận ảnh từ một ROS 2 camera publisher đang chạy
 trên host hoặc trong container khác, không cần truy cập trực tiếp `/dev/video*`.
 
-**Image hiện tại chỉ suy luận bằng OpenCV DNN trên CPU.** `--runtime nvidia`
-không làm image này dùng GPU. Kết quả 12 FPS trên Mac là PyTorch/MPS của Apple,
-không phải tốc độ Docker này trên Orin. Trước khi nối planner, cần đo inference,
-tuổi ảnh và số cloud được publish trên chính Orin. Đường chạy dưới đây chỉ bật
-perception; không chạy MPPI, MAVROS hay adapter điều khiển bay.
+**Image `uav-monocular:humble` dưới đây chỉ suy luận bằng OpenCV DNN trên CPU.**
+`--runtime nvidia` không làm image CPU này dùng GPU. Image
+`uav-monocular:humble-gpu` ở cuối tài liệu dùng TensorRT trong node ROS C++.
+Kết quả 12 FPS trên Mac là PyTorch/MPS của Apple, không phải tốc độ Docker
+trên Orin. Cả hai đường chạy ở đây chỉ bật perception, không chạy MPPI,
+MAVROS hay adapter điều khiển bay.
 
 Trên Orin, clone repo để có script:
 
@@ -81,11 +82,12 @@ container và dữ liệu quản lý Docker trên host; nó không cài ROS/Open
 trường hệ điều hành của mentor. Nếu camera publisher nằm trong container khác,
 đặt `ROS_DOMAIN_ID` giống nhau và kiểm tra DDS discovery.
 
-Lượt chạy đầu trên Orin cần ghi `inference_ms`, `image_age_ms`, tỉ lệ cloud
-được publish, CPU/RAM và nhiệt độ khi camera phát 10 Hz. Với backend CPU hiện
-tại, chưa có số đo nào xác nhận đạt hạn 100 ms trên Orin. Nếu không đạt, bước
-tiếp theo là image GPU/TensorRT riêng, được build và đo trên đúng R36.5.2;
-không tăng deadline rồi coi đó là đủ để bay.
+Image CPU đã nạp và chạy `check`/`probe` thành công trên Orin R36.5.2.
+Với **cùng frame RGB mẫu**, 5 lần suy luận sau warmup đạt p50 **3.129,67 ms**,
+p95 **3.135,08 ms**, **0,319 FPS** và CPU tiến trình **99,69% một lõi**.
+Nó không đạt hạn 100 ms hay camera 10 Hz. Đây là phép đo file ảnh bằng probe,
+chưa có publisher camera/ROS để đo `image_age_ms`, tỉ lệ cloud, RAM hay nhiệt
+độ của toàn pipeline. Không tăng deadline rồi coi đó là đủ để bay.
 
 ## Kiểm tra GPU bằng TensorRT (model riêng, chưa phải node ROS)
 
@@ -114,10 +116,10 @@ Có thể đặt `UAV_JETPACK_IMAGE`
 để dùng tag khác nếu NVIDIA phát hành bản phù hợp hơn.
 
 `trtexec` dùng tensor ngẫu nhiên để đo riêng suy luận TensorRT; tốc độ đó
-không gồm camera, tiền/hậu xử lý, ROS hay chất lượng depth. Engine `.plan`
-không được node C++ hiện tại nạp. OpenCV 5 `ENGINE_NEW` hiện chỉ chạy CPU;
-muốn perception ROS thật sự dùng GPU cần thêm backend TensorRT C++ đọc engine,
-so kết quả depth với bản CPU và đo lại toàn pipeline trước khi bật planner.
+không gồm camera, tiền/hậu xử lý, ROS hay chất lượng depth. Image CPU ở phần
+trên vẫn chỉ dùng OpenCV DNN CPU. Image GPU ở phần cuối tài liệu có backend
+TensorRT C++ nạp engine `.plan` vào chính node ROS perception; cần dùng image
+đó để nhận ảnh ROS bằng GPU.
 
 ### Kết quả đo trực tiếp trên Orin R36.5.2 (09/10/2026)
 
@@ -140,6 +142,9 @@ Probe C++ đã được chạy lại **trong image JetPack** trên cùng Orin, k
 OpenCV trong container: 30 lần lặp đạt p50 **37,27 ms**, p95 **51,52 ms**,
 **26,01 FPS**, CPU **37,36% của một lõi**. Depth từ container khác bản chạy
 trực tiếp trên host trung bình **0,000002 m** do bước nội suy C++ thay OpenCV.
+Image NVIDIA `l4t-jetpack:r36.4.0` sau khi tải chiếm khoảng **15,5 GB** theo
+`docker images`; engine FP16 chiếm khoảng **50 MiB**. Lần đầu tạo engine mất
+khoảng 7 phút trên Orin, các lần chạy probe dùng lại file `.plan`.
 Lệnh tái lập:
 
 ```bash
@@ -150,6 +155,46 @@ bash scripts/probe_cpp_depth_tensorrt_orin.sh
 Probe C++ này dùng file RGB mẫu trong repo, không đăng ký topic ROS, không nối
 planner và chưa đo camera thời gian thực. File depth float32 và log lưu ở
 `artifacts/orin_cpp_tensorrt/`.
+
+## Node ROS C++ dùng GPU trên Orin
+
+Image GPU build từ image Humble CPU ở trên và các thư viện TensorRT/CUDA từ
+`l4t-jetpack:r36.4.0`; image runtime `uav-monocular:humble-gpu` đo được khoảng
+2,7 GB. Node `monocular_depth_node` nhận `backend:=tensorrt`, nạp engine FP16
+đã tạo trên chính Orin, và giữ nguyên topic ảnh/cloud/diagnostics. ROS và
+OpenCV nằm trong image; driver GPU được NVIDIA Container Runtime gắn lúc chạy.
+
+```bash
+cd ~/ardu_plugin_gazebo
+docker build --platform linux/arm64 -f docker/Dockerfile.humble-gpu \
+  -t uav-monocular:humble-gpu .
+export UAV_DEPTH_ENGINE="$(realpath ~/uav_deploy/depth_fp16.plan)"
+bash scripts/run_cpp_depth_orin_gpu.sh check
+ROS_DOMAIN_ID=73 bash scripts/run_cpp_depth_orin_gpu.sh run
+```
+
+Trong terminal thứ hai, kiểm tra với ảnh RGB Gazebo phát ở 10 Hz qua ROS 2:
+
+```bash
+cd ~/ardu_plugin_gazebo
+ROS_DOMAIN_ID=73 UAV_REPLAY_FRAMES=100 \
+  bash scripts/probe_cpp_depth_ros_orin_gpu.sh
+```
+
+Hai container dùng domain thử nghiệm 73; đổi thành domain của camera khi nối
+camera thật. Node GPU hiện chỉ chạy perception, không bật MPPI/MAVROS hay lệnh
+bay. Lệnh replay là C++ và báo nhịp publish thật, số cloud, inference,
+processing và tuổi ảnh; file RGB đầu vào là frame mẫu trong repo.
+
+**Đo trên Orin R36.5.2:** lượt cuối phát 100 ảnh với publish interval
+p50/p95 **99,99/100,79 ms**, nhận **97 cloud/97 diagnostics OK**, inference
+p50/p95 **60,23/61,08 ms**, processing p95 **61,21 ms**, image age p95
+**62,77 ms**. CPU của tiến trình depth đạt trung vị **27,80% một lõi** và p95
+**30,14% một lõi**. Hai lượt trước nhận 59/60 và 99/100 cloud; mọi ảnh được
+xử lý đều qua deadline 100 ms, nhưng có **1–3 ảnh/lượt không tới cloud**.
+Chưa xác định chính xác ảnh rơi ở DDS, hàng đợi hay khâu phát ảnh. Đây là
+replay của **một frame lặp lại**, chưa kiểm tra camera thật, độ chính xác khi
+scene đổi, nhiệt/nguồn dài hạn hoặc closed-loop an toàn.
 
 Tham chiếu: [NVIDIA Jetson Linux R36.5.2](https://docs.nvidia.com/jetson/archives/r36.5.2/DeveloperGuide/index.html),
 [NVIDIA Docker Setup cho Orin Nano](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/setup_docker.html),

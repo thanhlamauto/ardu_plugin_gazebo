@@ -15,6 +15,10 @@ find_package(tf2_ros REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
 find_package(TinyXML2 REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn)
+find_path(TENSORRT_INCLUDE_DIR NvInfer.h PATHS /opt/tensorrt/include)
+find_library(TENSORRT_LIBRARY nvinfer PATHS /opt/tensorrt/lib)
+find_path(CUDA_RUNTIME_INCLUDE_DIR cuda_runtime_api.h PATHS /opt/cuda/include)
+find_library(CUDA_RUNTIME_LIBRARY cudart PATHS /opt/cuda/lib)
 
 add_library(depth_anything_onnx STATIC src/depth_anything_onnx.cpp)
 target_compile_features(depth_anything_onnx PUBLIC cxx_std_17)
@@ -55,6 +59,25 @@ target_link_libraries(monocular_depth_node depth_anything_onnx)
 ament_target_dependencies(monocular_depth_node
   rclcpp sensor_msgs diagnostic_msgs)
 set_target_properties(monocular_depth_node PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(depth_optional_targets)
+if(TENSORRT_INCLUDE_DIR AND TENSORRT_LIBRARY AND
+   CUDA_RUNTIME_INCLUDE_DIR AND CUDA_RUNTIME_LIBRARY)
+  add_library(depth_anything_tensorrt STATIC src/depth_anything_tensorrt.cpp)
+  target_compile_features(depth_anything_tensorrt PUBLIC cxx_std_17)
+  target_include_directories(depth_anything_tensorrt PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${TENSORRT_INCLUDE_DIR} ${CUDA_RUNTIME_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
+  target_link_libraries(depth_anything_tensorrt PUBLIC
+    uav_navigation_core::uav_navigation_core ${OpenCV_LIBS}
+    ${TENSORRT_LIBRARY} ${CUDA_RUNTIME_LIBRARY})
+  target_link_libraries(monocular_depth_node depth_anything_tensorrt)
+  target_compile_definitions(monocular_depth_node PRIVATE UAV_DEPTH_TENSORRT=1)
+  # Jetson driver-side DLA/CUDA libraries are mounted by NVIDIA Container
+  # Runtime at launch, not present in the Docker build stage.
+  target_link_options(monocular_depth_node PRIVATE -Wl,--allow-shlib-undefined)
+  list(APPEND depth_optional_targets depth_anything_tensorrt)
+endif()
 
 add_library(autopilot_adapter_logic STATIC src/autopilot_adapter.cpp)
 target_compile_features(autopilot_adapter_logic PUBLIC cxx_std_17)
@@ -90,6 +113,11 @@ target_link_libraries(depth_anything_onnx_stream depth_anything_onnx)
 set_target_properties(depth_anything_onnx_stream PROPERTIES
   BUILD_RPATH_USE_ORIGIN TRUE INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+add_executable(rgb_depth_ros_replay test/rgb_depth_ros_replay.cpp)
+target_compile_features(rgb_depth_ros_replay PRIVATE cxx_std_17)
+ament_target_dependencies(rgb_depth_ros_replay
+  rclcpp sensor_msgs diagnostic_msgs)
+
 if(BUILD_TESTING)
   add_executable(test_sdf_static_map_loader test/test_sdf_static_map_loader.cpp)
   target_link_libraries(test_sdf_static_map_loader PRIVATE sdf_static_map_loader)
@@ -110,8 +138,9 @@ endif()
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(TARGETS sdf_static_map_loader autopilot_adapter_logic depth_anything_onnx
+  ${depth_optional_targets}
   global_planner_node local_navigation_node monocular_depth_node autopilot_adapter_node
-  depth_anything_onnx_probe depth_anything_onnx_stream
+  depth_anything_onnx_probe depth_anything_onnx_stream rgb_depth_ros_replay
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
