@@ -223,7 +223,7 @@ def main():
     root.lift()
     root.after(1500, lambda: root.attributes("-topmost", False))
     print(f"Đã mở cửa sổ demo {backend_name}; nhấn Space để tạm dừng.", flush=True)
-    title = tk.Label(root, text=f"Video RGB 10 Hz → Depth Anything V2 Metric Outdoor Small ({backend_name})",
+    title = tk.Label(root, text=f"Phát lại RGB {args.camera_hz:g} Hz → Depth Anything V2 Metric Outdoor Small ({backend_name})",
                      font=("Arial", 18), fg="white", bg="#0b1321")
     title.pack(pady=12)
     panels = tk.Frame(root, bg="#0b1321")

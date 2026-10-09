@@ -14,6 +14,12 @@ LiDAR chỉ dùng để đối chiếu offline. Nhấn **Space** để tạm d�
 cửa sổ để dừng. Kiểm tra không mở GUI:
 `bash scripts/demo_mps_depth_mac.sh --headless --frames 3`.
 
+Muốn thử phát nhanh hơn 10 Hz: `bash scripts/demo_mps_depth_mac.sh --camera-hz 12`.
+Đây là phát lại nhanh hơn tốc độ 10 Hz của dữ liệu camera gốc.
+Ở lượt thử trên Mac này, RGB và depth thường quanh 12 FPS; một lần suy luận
+vọt lên ~145 ms khiến 1 frame RGB bị bỏ. Số FPS trên cửa sổ là thông lượng
+đo thực, không phải `1000 / inference_ms` của một ảnh riêng lẻ.
+
 Để so với **đường triển khai C++**, chạy `bash scripts/demo_cpp_depth_mac.sh`.
 Lệnh này dùng OpenCV DNN **CPU**, không dùng MPS; cửa sổ hiện cùng các chỉ số
 FPS và frame bị bỏ. Mặc định 4 luồng CPU; thêm `--threads 1` để đo lại mốc cũ
