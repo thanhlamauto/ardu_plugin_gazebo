@@ -11,9 +11,17 @@ if [[ -z "$engine" || "$engine" != /* || ! -r "$engine" ]]; then
   echo 'Set UAV_DEPTH_ENGINE to an absolute path to the TensorRT .plan file.' >&2; exit 1
 fi
 image="${UAV_GPU_DOCKER_IMAGE:-uav-monocular:humble-gpu}"
-arch="$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || true)"
+if ! docker info --format '{{.ServerVersion}}' >/dev/null; then
+  echo "Cannot access Docker daemon as $(id -un); check Docker context and permissions." >&2
+  exit 1
+fi
+if ! arch="$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')"; then
+  echo "Docker image unavailable: $image (context: $(docker context show); user: $(id -un))." >&2
+  echo 'Build it with: docker build --platform linux/arm64 -f docker/Dockerfile.humble-gpu -t uav-monocular:humble-gpu .' >&2
+  exit 1
+fi
 if [[ "$arch" != linux/arm64 ]]; then
-  echo "Missing linux/arm64 image: $image" >&2; exit 1
+  echo "Expected linux/arm64 image, found $arch: $image" >&2; exit 1
 fi
 if ! docker info --format '{{json .Runtimes}}' | grep -q nvidia; then
   echo 'Docker NVIDIA runtime is unavailable.' >&2; exit 1
