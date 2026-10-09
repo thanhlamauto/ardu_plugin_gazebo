@@ -168,7 +168,7 @@ OpenCV nằm trong image; driver GPU được NVIDIA Container Runtime gắn lú
 cd ~/ardu_plugin_gazebo
 docker build --platform linux/arm64 -f docker/Dockerfile.humble-gpu \
   -t uav-monocular:humble-gpu .
-export UAV_DEPTH_ENGINE="$(realpath ~/uav_deploy/depth_fp16.plan)"
+# Mặc định: ~/uav_deploy/depth_fp16.plan; chỉ cần export UAV_DEPTH_ENGINE nếu đặt nơi khác.
 bash scripts/run_cpp_depth_orin_gpu.sh check
 ROS_DOMAIN_ID=73 bash scripts/run_cpp_depth_orin_gpu.sh run
 ```

@@ -6,9 +6,11 @@ case "$mode" in check|run) ;; *) echo 'usage: bash scripts/run_cpp_depth_orin_gp
 if [[ "$(uname -m)" != aarch64 || ! -r /etc/nv_tegra_release || ! -e /dev/nvhost-gpu ]]; then
   echo 'Run this on a Jetson Orin host with GPU device available.' >&2; exit 1
 fi
-engine="${UAV_DEPTH_ENGINE:-}"
-if [[ -z "$engine" || "$engine" != /* || ! -r "$engine" ]]; then
-  echo 'Set UAV_DEPTH_ENGINE to an absolute path to the TensorRT .plan file.' >&2; exit 1
+engine="${UAV_DEPTH_ENGINE:-${HOME}/uav_deploy/depth_fp16.plan}"
+if [[ "$engine" != /* || ! -r "$engine" ]]; then
+  echo "TensorRT engine must be an absolute, readable file: $engine" >&2
+  echo 'Set UAV_DEPTH_ENGINE to its absolute path if stored elsewhere.' >&2
+  exit 1
 fi
 image="${UAV_GPU_DOCKER_IMAGE:-uav-monocular:humble-gpu}"
 if ! docker info --format '{{.ServerVersion}}' >/dev/null; then
